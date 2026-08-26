@@ -18,6 +18,8 @@
     "core": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "babel-preset-expo": "~11.0.0",
+    "@types/react": "~18.2.79"
   }
 }

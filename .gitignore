@@ -1,12 +1,25 @@
+# dependencias
 node_modules/
+
+# variables de entorno
+.env
+.env.local
+.env.*.local
+
+# builds
 dist/
 build/
+apps/desktop/src-tauri/target/
+
+# expo
 .expo/
-.expo-shared/
-.env
-.env.*
-!.env.example
-src-tauri/target/
+*.jsbundle
+
+# supabase local
+supabase/.branches/
+supabase/.temp/
+
+# sistema
 .DS_Store
+Thumbs.db
 *.log
-.turbo/

@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
+import { setSupabaseClient } from "core";
 import type { Database } from "core/src/types/database";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
@@ -13,3 +14,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
 });
+
+// Le pasamos el cliente ya configurado a `core` para que los
+// repositorios y casos de uso compartidos puedan usarlo.
+setSupabaseClient(supabase);

@@ -1,5 +1,20 @@
 import { getSupabaseClient } from "../client";
 import type { Gasto } from "../types/domain";
+import type { Database } from "../types/database";
+
+type GastoRow = Database["public"]["Tables"]["gastos"]["Row"];
+
+/** La tabla usa snake_case (categoria_id, created_at); el dominio usa camelCase. */
+function filaAGasto(row: GastoRow): Gasto {
+  return {
+    id: row.id,
+    monto: Number(row.monto),
+    descripcion: row.descripcion,
+    categoriaId: row.categoria_id ?? "",
+    fecha: row.fecha,
+    createdAt: row.created_at,
+  };
+}
 
 export async function listarGastos(): Promise<Gasto[]> {
   const { data, error } = await getSupabaseClient()
@@ -8,7 +23,7 @@ export async function listarGastos(): Promise<Gasto[]> {
     .order("fecha", { ascending: false });
 
   if (error) throw error;
-  return data as Gasto[];
+  return (data ?? []).map(filaAGasto);
 }
 
 export async function crearGasto(
@@ -16,12 +31,17 @@ export async function crearGasto(
 ): Promise<Gasto> {
   const { data, error } = await getSupabaseClient()
     .from("gastos")
-    .insert(gasto)
+    .insert({
+      monto: gasto.monto,
+      descripcion: gasto.descripcion,
+      categoria_id: gasto.categoriaId,
+      fecha: gasto.fecha,
+    })
     .select()
     .single();
 
   if (error) throw error;
-  return data as Gasto;
+  return filaAGasto(data);
 }
 
 export async function eliminarGasto(id: string): Promise<void> {

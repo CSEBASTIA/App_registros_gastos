@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { setSupabaseClient } from "core";
 import type { Database } from "core/src/types/database";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -11,3 +12,7 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     persistSession: true,
   },
 });
+
+// Le pasamos el cliente ya configurado a `core` para que los
+// repositorios y casos de uso compartidos puedan usarlo.
+setSupabaseClient(supabase);

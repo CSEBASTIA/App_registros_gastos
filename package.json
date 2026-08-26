@@ -1,0 +1,14 @@
+{
+  "name": "gastos-app",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:mobile": "pnpm --filter mobile start",
+    "dev:desktop": "pnpm --filter desktop dev",
+    "build:desktop": "pnpm --filter desktop build",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:types": "supabase gen types typescript --local > packages/core/src/types/database.ts"
+  },
+  "devDependencies": {}
+}

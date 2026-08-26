@@ -1,0 +1,12 @@
+node_modules/
+dist/
+build/
+.expo/
+.expo-shared/
+.env
+.env.*
+!.env.example
+src-tauri/target/
+.DS_Store
+*.log
+.turbo/

@@ -1,0 +1,11 @@
+{
+  "expo": {
+    "name": "gastos-app",
+    "slug": "gastos-app",
+    "scheme": "gastosapp",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "plugins": ["expo-router"]
+  }
+}

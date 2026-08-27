@@ -11,6 +11,7 @@ function filaAGasto(row: GastoRow): Gasto {
     monto: Number(row.monto),
     descripcion: row.descripcion,
     categoriaId: row.categoria_id ?? "",
+    cuentaId: row.cuenta_id ?? undefined,
     fecha: row.fecha,
     createdAt: row.created_at,
   };
@@ -35,6 +36,7 @@ export async function crearGasto(
       monto: gasto.monto,
       descripcion: gasto.descripcion,
       categoria_id: gasto.categoriaId,
+      cuenta_id: gasto.cuentaId ?? null,
       fecha: gasto.fecha,
     })
     .select()

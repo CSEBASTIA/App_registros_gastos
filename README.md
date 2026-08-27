@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # gastos-app
 
 Monorepo con app móvil (Expo), panel de escritorio (React + Vite + Tauri) y backend (Supabase), compartiendo lógica de dominio en `packages/core`.
@@ -14,7 +13,7 @@ Monorepo con app móvil (Expo), panel de escritorio (React + Vite + Tauri) y bac
 
 ```bash
 pnpm install
-pnpm supabase:start        # levanta Supabase local (requiere Supabase CLI)
+pnpm supabase:start        # levanta Supabase local (requiere Supabase CLI + Docker)
 pnpm supabase:types        # genera packages/core/src/types/database.ts
 ```
 
@@ -36,6 +35,3 @@ pnpm dev:desktop           # corre el panel de escritorio
 > exigen un usuario autenticado (`auth.uid() = usuario_id`). Para ver datos hay
 > que crear una cuenta desde la pantalla de registro; los datos del `seed.sql`
 > (categorías) son de lectura pública una vez logueado.
-=======
-Aplicación de Finanzas Personales Inteligente — app móvil multiplataforma para administrar finanzas personales con enfoque minimalista, intuitivo e inteligente. Permite registrar ingresos, gastos, tarjetas, cuentas, presupuestos y metas de ahorro, de forma manual o automática.
->>>>>>> 428033bf0d7c29b0a0ffcefba316909ad54076aa

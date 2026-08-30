@@ -9,6 +9,8 @@ function filaAIngreso(row: IngresoRow): Ingreso {
     id: row.id,
     monto: Number(row.monto),
     descripcion: row.descripcion,
+    categoriaId: row.categoria_id ?? undefined,
+    categoriaDetalle: row.categoria_detalle ?? undefined,
     cuentaId: row.cuenta_id ?? undefined,
     fecha: row.fecha,
     createdAt: row.created_at,
@@ -33,6 +35,8 @@ export async function crearIngreso(
     .insert({
       monto: ingreso.monto,
       descripcion: ingreso.descripcion,
+      categoria_id: ingreso.categoriaId ?? null,
+      categoria_detalle: ingreso.categoriaDetalle ?? null,
       cuenta_id: ingreso.cuentaId ?? null,
       fecha: ingreso.fecha,
     })

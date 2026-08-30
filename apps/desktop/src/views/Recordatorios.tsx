@@ -1,5 +1,7 @@
 import { useState, type FormEvent } from "react";
 import type { Deuda, Frecuencia, Recordatorio, TipoRecordatorio } from "core";
+import { IconoPapelera, IconoRecordatorios } from "../components/iconos";
+import EstadoVacio from "../components/EstadoVacio";
 
 function hoy() {
   return new Date().toISOString().slice(0, 10);
@@ -22,7 +24,11 @@ export default function Recordatorios({ recordatorios, deudas, onCrear, onToggle
       <NuevoRecordatorio deudas={deudas} onCrear={onCrear} />
 
       {ordenados.length === 0 ? (
-        <p className="vacio">No tienes recordatorios.</p>
+        <EstadoVacio
+          icono={<IconoRecordatorios />}
+          titulo="No tienes recordatorios"
+          subtitulo="Agrega uno para no olvidarte de un pago o vencimiento."
+        />
       ) : (
         <div className="card" style={{ padding: 0 }}>
           <table className="tabla">
@@ -56,7 +62,7 @@ export default function Recordatorios({ recordatorios, deudas, onCrear, onToggle
                     </td>
                     <td>
                       <button className="btn-icon" title="Eliminar" onClick={() => onEliminar(r.id)}>
-                        ✕
+                        <IconoPapelera />
                       </button>
                     </td>
                   </tr>

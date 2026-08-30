@@ -1,9 +1,12 @@
 import { useState, type FormEvent } from "react";
-import type { Deuda, Endeudamiento, TipoDeuda } from "core";
+import type { Cuenta, Deuda, Endeudamiento, TipoDeuda } from "core";
 import BarraProgreso from "../components/BarraProgreso";
+import { IconoDeudas, IconoPapelera } from "../components/iconos";
+import EstadoVacio from "../components/EstadoVacio";
 
 interface Props {
   deudas: Deuda[];
+  cuentas: Cuenta[];
   endeudamiento: Endeudamiento;
   onCrear: (input: Omit<Deuda, "id" | "createdAt">) => Promise<void>;
   onAbonar: (id: string, monto: number) => Promise<void>;
@@ -14,7 +17,10 @@ function hoy() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export default function Deudas({ deudas, endeudamiento, onCrear, onAbonar, onEliminar }: Props) {
+export default function Deudas({ deudas, cuentas, endeudamiento, onCrear, onAbonar, onEliminar }: Props) {
+  function cuentaDe(id?: string) {
+    return id ? cuentas.find((c) => c.id === id) : undefined;
+  }
   return (
     <>
       <div className="card" style={{ marginBottom: 24 }}>
@@ -39,10 +45,14 @@ export default function Deudas({ deudas, endeudamiento, onCrear, onAbonar, onEli
         </div>
       </div>
 
-      <NuevaDeuda onCrear={onCrear} />
+      <NuevaDeuda cuentas={cuentas} onCrear={onCrear} />
 
       {deudas.length === 0 ? (
-        <p className="vacio">No tienes deudas ni préstamos registrados.</p>
+        <EstadoVacio
+          icono={<IconoDeudas />}
+          titulo="No tienes deudas ni préstamos registrados"
+          subtitulo="Cuando agregues una, vas a ver acá tu nivel de endeudamiento."
+        />
       ) : (
         <div className="card" style={{ padding: 0 }}>
           <table className="tabla">
@@ -50,6 +60,7 @@ export default function Deudas({ deudas, endeudamiento, onCrear, onAbonar, onEli
               <tr>
                 <th>Nombre</th>
                 <th>Tipo</th>
+                <th>Cuenta</th>
                 <th>Saldo pendiente</th>
                 <th>Cuota mensual</th>
                 <th>Próximo pago</th>
@@ -58,7 +69,13 @@ export default function Deudas({ deudas, endeudamiento, onCrear, onAbonar, onEli
             </thead>
             <tbody>
               {deudas.map((d) => (
-                <FilaDeuda key={d.id} deuda={d} onAbonar={onAbonar} onEliminar={onEliminar} />
+                <FilaDeuda
+                  key={d.id}
+                  deuda={d}
+                  nombreCuenta={cuentaDe(d.cuentaId)?.nombre}
+                  onAbonar={onAbonar}
+                  onEliminar={onEliminar}
+                />
               ))}
             </tbody>
           </table>
@@ -74,10 +91,12 @@ function etiquetaNivel(nivel: Endeudamiento["nivel"]) {
 
 function FilaDeuda({
   deuda,
+  nombreCuenta,
   onAbonar,
   onEliminar,
 }: {
   deuda: Deuda;
+  nombreCuenta?: string;
   onAbonar: (id: string, monto: number) => Promise<void>;
   onEliminar: (id: string) => Promise<void>;
 }) {
@@ -95,6 +114,7 @@ function FilaDeuda({
     <tr>
       <td>{deuda.nombre}</td>
       <td>{etiquetaTipo(deuda.tipo)}</td>
+      <td>{nombreCuenta ?? "—"}</td>
       <td>${deuda.saldoPendiente.toFixed(2)}</td>
       <td>${deuda.cuotaMensual.toFixed(2)}</td>
       <td>{deuda.proximoPago ?? "—"}</td>
@@ -124,7 +144,7 @@ function FilaDeuda({
             </button>
           )}
           <button className="btn-icon" title="Eliminar" onClick={() => onEliminar(deuda.id)}>
-            ✕
+            <IconoPapelera />
           </button>
         </div>
       </td>
@@ -136,12 +156,19 @@ function etiquetaTipo(tipo: TipoDeuda) {
   return tipo === "prestamo" ? "Préstamo" : tipo === "tarjeta" ? "Tarjeta" : "Otro";
 }
 
-function NuevaDeuda({ onCrear }: { onCrear: (input: Omit<Deuda, "id" | "createdAt">) => Promise<void> }) {
+function NuevaDeuda({
+  cuentas,
+  onCrear,
+}: {
+  cuentas: Cuenta[];
+  onCrear: (input: Omit<Deuda, "id" | "createdAt">) => Promise<void>;
+}) {
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<TipoDeuda>("prestamo");
   const [montoTotal, setMontoTotal] = useState("");
   const [cuotaMensual, setCuotaMensual] = useState("");
   const [proximoPago, setProximoPago] = useState("");
+  const [cuentaId, setCuentaId] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -158,11 +185,13 @@ function NuevaDeuda({ onCrear }: { onCrear: (input: Omit<Deuda, "id" | "createdA
         cuotaMensual: Number(cuotaMensual),
         fechaInicio: hoy(),
         proximoPago: proximoPago || undefined,
+        cuentaId: cuentaId || undefined,
       });
       setNombre("");
       setMontoTotal("");
       setCuotaMensual("");
       setProximoPago("");
+      setCuentaId("");
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -228,6 +257,22 @@ function NuevaDeuda({ onCrear }: { onCrear: (input: Omit<Deuda, "id" | "createdA
             value={proximoPago}
             onChange={(e) => setProximoPago(e.target.value)}
           />
+        </div>
+        <div className="campo">
+          <label htmlFor="cuenta-deuda">Cuenta asociada</label>
+          <select
+            id="cuenta-deuda"
+            className="input"
+            value={cuentaId}
+            onChange={(e) => setCuentaId(e.target.value)}
+          >
+            <option value="">Sin asignar</option>
+            {cuentas.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.nombre}
+              </option>
+            ))}
+          </select>
         </div>
         <button type="submit" className="btn btn-primary" disabled={guardando}>
           {guardando ? "Guardando…" : "Agregar"}

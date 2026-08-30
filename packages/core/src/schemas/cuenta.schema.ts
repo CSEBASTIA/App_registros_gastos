@@ -6,6 +6,7 @@ export const cuentaSchema = z
     tipo: z.enum(["debito", "credito", "efectivo", "ahorro"]),
     banco: z.enum(["banco_guayaquil", "pichincha", "produbanco", "otro"]).default("otro"),
     marca: z.enum(["amex", "visa", "mastercard", "diners", "otro"]).optional(),
+    estilo: z.string().min(1).optional(),
     cupoTotal: z.number().positive().optional(),
     disponible: z.number(),
   })

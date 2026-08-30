@@ -41,7 +41,7 @@ function extraerMonto(texto: string): number | undefined {
   return Math.max(...todos);
 }
 
-function normalizarNumero(valor: string): number {
+export function normalizarNumero(valor: string): number {
   // "1.234,56" o "1234.56" -> 1234.56
   const limpio = valor.replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".");
   return Number(limpio);
@@ -67,7 +67,7 @@ function extraerComercio(texto: string): string | undefined {
   return primeraLinea;
 }
 
-function sugerirCategoria(texto: string): string | undefined {
+export function sugerirCategoria(texto: string): string | undefined {
   const textoNormalizado = texto.toLowerCase();
   for (const [categoria, palabras] of Object.entries(PALABRAS_POR_CATEGORIA)) {
     if (palabras.some((palabra) => textoNormalizado.includes(palabra))) {

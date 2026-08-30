@@ -11,6 +11,7 @@ function filaACuenta(row: CuentaRow): Cuenta {
     tipo: row.tipo as Cuenta["tipo"],
     banco: row.banco as Cuenta["banco"],
     marca: (row.marca as Cuenta["marca"]) ?? undefined,
+    estilo: row.estilo ?? undefined,
     cupoTotal: row.cupo_total !== null ? Number(row.cupo_total) : undefined,
     disponible: Number(row.disponible),
     createdAt: row.created_at,
@@ -35,6 +36,7 @@ export async function crearCuenta(cuenta: Omit<Cuenta, "id" | "createdAt">): Pro
       tipo: cuenta.tipo,
       banco: cuenta.banco,
       marca: cuenta.marca ?? null,
+      estilo: cuenta.estilo ?? null,
       cupo_total: cuenta.cupoTotal ?? null,
       disponible: cuenta.disponible,
     })

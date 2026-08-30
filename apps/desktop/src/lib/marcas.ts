@@ -12,6 +12,18 @@ export const GRADIENTE_BANCO: Record<Banco, string> = {
   otro: "linear-gradient(135deg, #52525b, #27272a)",
 };
 
+/**
+ * Color sólido por banco para cuentas que no son tarjeta de crédito
+ * (ahorro/débito/efectivo) — un tono plano de marca en vez del degradado
+ * de las tarjetas, para diferenciarlas de un vistazo.
+ */
+export const COLOR_CUENTA_BANCO: Record<Banco, string> = {
+  banco_guayaquil: "#e6117f",
+  pichincha: "#f0b429",
+  produbanco: "#0a4f8c",
+  otro: "#52525b",
+};
+
 export const ETIQUETA_BANCO: Record<Banco, string> = {
   banco_guayaquil: "Banco Guayaquil",
   pichincha: "Banco Pichincha",

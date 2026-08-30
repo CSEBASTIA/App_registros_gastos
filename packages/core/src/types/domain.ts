@@ -1,15 +1,27 @@
+export type TipoCategoria = "gasto" | "ingreso";
+
 export interface Categoria {
   id: string;
   nombre: string;
   color: string;
+  tipo: TipoCategoria;
+  /** undefined = categoría global/compartida; si tiene valor, es una categoría propia del usuario. */
+  usuarioId?: string;
 }
+
+export type MetodoPago = "efectivo" | "debito" | "credito" | "transferencia" | "otro";
 
 export interface Gasto {
   id: string;
   monto: number;
   descripcion: string;
   categoriaId: string;
+  /** Texto libre cuando la categoría elegida es "Otros". */
+  categoriaDetalle?: string;
   cuentaId?: string;
+  metodoPago?: MetodoPago;
+  /** Ruta del archivo (PDF o imagen) dentro del bucket privado "facturas", ej. "<usuario_id>/<archivo>". */
+  facturaPath?: string;
   fecha: string;
   createdAt: string;
 }
@@ -31,6 +43,8 @@ export interface Cuenta {
   tipo: TipoCuenta;
   banco: Banco;
   marca?: Marca;
+  /** Id del producto en el catálogo de diseños (ver `catalogoTarjetas` en desktop), ej. "visa-oro-lifemiles". */
+  estilo?: string;
   /** Solo aplica a cuentas de tipo "credito". */
   cupoTotal?: number;
   /** Saldo usable: para crédito es el cupo disponible, para el resto es el saldo. */
@@ -42,6 +56,9 @@ export interface Ingreso {
   id: string;
   monto: number;
   descripcion: string;
+  categoriaId?: string;
+  /** Texto libre cuando la categoría elegida es "Otros". */
+  categoriaDetalle?: string;
   cuentaId?: string;
   fecha: string;
   createdAt: string;

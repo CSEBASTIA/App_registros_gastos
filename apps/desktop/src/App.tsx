@@ -7,7 +7,9 @@ import {
   listarIngresos,
   listarDeudas,
   listarRecordatorios,
+  listarPagosTarjeta,
   crearGasto,
+  actualizarGasto,
   eliminarGasto,
   crearIngreso,
   eliminarIngreso,
@@ -20,15 +22,21 @@ import {
   crearRecordatorio,
   marcarCompletado,
   eliminarRecordatorio,
+  crearCategoria,
+  actualizarCategoria,
+  eliminarCategoria,
   balanceGeneral,
   calcularEndeudamiento,
   generarRecomendaciones,
   type Gasto,
+  type CambiosGasto,
   type Categoria,
+  type TipoCategoria,
   type Cuenta,
   type Ingreso,
   type Deuda,
   type Recordatorio,
+  type PagoTarjeta,
 } from "core";
 import { supabase } from "./lib/supabase";
 import Resumen from "./views/Resumen";
@@ -37,6 +45,18 @@ import Ingresos from "./views/Ingresos";
 import Tarjetas from "./views/Tarjetas";
 import Deudas from "./views/Deudas";
 import Recordatorios from "./views/Recordatorios";
+import Categorias from "./views/Categorias";
+import Logo from "./components/Logo";
+import {
+  IconoResumen,
+  IconoGastos,
+  IconoIngresos,
+  IconoTarjetas,
+  IconoDeudas,
+  IconoRecordatorios,
+  IconoCategorias,
+  IconoSalir,
+} from "./components/iconos";
 
 export default function App() {
   // undefined = todavía no sabemos si hay sesión; null = no hay sesión.
@@ -52,7 +72,7 @@ export default function App() {
 
   if (session === undefined) return <p className="contenedor">Cargando…</p>;
   if (!session) return <Login />;
-  return <Dashboard onSalir={() => supabase.auth.signOut()} />;
+  return <Dashboard onSalir={() => supabase.auth.signOut()} session={session} />;
 }
 
 function Login() {
@@ -73,7 +93,11 @@ function Login() {
   return (
     <main className="login-wrap">
       <form onSubmit={iniciarSesion} className="card login-card">
+        <div className="login-logo">
+          <Logo size={44} />
+        </div>
         <h1>Gastos App</h1>
+        <p className="subtitulo">Tus gastos, ingresos y tarjetas en un solo lugar</p>
         <div className="campo">
           <label htmlFor="email">Email</label>
           <input
@@ -109,18 +133,26 @@ function mesActual() {
   return new Date().toISOString().slice(0, 7); // YYYY-MM
 }
 
-type Tab = "resumen" | "gastos" | "ingresos" | "tarjetas" | "deudas" | "recordatorios";
+type Tab =
+  | "resumen"
+  | "gastos"
+  | "ingresos"
+  | "tarjetas"
+  | "deudas"
+  | "recordatorios"
+  | "categorias";
 
-const TABS: { id: Tab; etiqueta: string }[] = [
-  { id: "resumen", etiqueta: "Resumen" },
-  { id: "gastos", etiqueta: "Gastos" },
-  { id: "ingresos", etiqueta: "Ingresos" },
-  { id: "tarjetas", etiqueta: "Tarjetas" },
-  { id: "deudas", etiqueta: "Deudas" },
-  { id: "recordatorios", etiqueta: "Recordatorios" },
+const TABS: { id: Tab; etiqueta: string; icono: typeof IconoResumen }[] = [
+  { id: "resumen", etiqueta: "Resumen", icono: IconoResumen },
+  { id: "gastos", etiqueta: "Gastos", icono: IconoGastos },
+  { id: "ingresos", etiqueta: "Ingresos", icono: IconoIngresos },
+  { id: "tarjetas", etiqueta: "Tarjetas", icono: IconoTarjetas },
+  { id: "deudas", etiqueta: "Deudas", icono: IconoDeudas },
+  { id: "recordatorios", etiqueta: "Recordatorios", icono: IconoRecordatorios },
+  { id: "categorias", etiqueta: "Categorías", icono: IconoCategorias },
 ];
 
-function Dashboard({ onSalir }: { onSalir: () => void }) {
+function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session }) {
   const [tab, setTab] = useState<Tab>("resumen");
   const [mes, setMes] = useState(mesActual());
 
@@ -130,6 +162,7 @@ function Dashboard({ onSalir }: { onSalir: () => void }) {
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([]);
+  const [pagosTarjeta, setPagosTarjeta] = useState<PagoTarjeta[]>([]);
 
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -137,13 +170,14 @@ function Dashboard({ onSalir }: { onSalir: () => void }) {
   async function recargar() {
     setError(null);
     try {
-      const [g, c, cu, i, d, r] = await Promise.all([
+      const [g, c, cu, i, d, r, p] = await Promise.all([
         listarGastos(),
         listarCategorias(),
         listarCuentas(),
         listarIngresos(),
         listarDeudas(),
         listarRecordatorios(),
+        listarPagosTarjeta(),
       ]);
       setGastos(g);
       setCategorias(c);
@@ -151,6 +185,7 @@ function Dashboard({ onSalir }: { onSalir: () => void }) {
       setIngresos(i);
       setDeudas(d);
       setRecordatorios(r);
+      setPagosTarjeta(p);
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -182,8 +217,21 @@ function Dashboard({ onSalir }: { onSalir: () => void }) {
     await crearGasto(input);
     await recargar();
   }
+  async function handleActualizarGasto(id: string, cambios: CambiosGasto) {
+    await actualizarGasto(id, cambios);
+    await recargar();
+  }
   async function handleEliminarGasto(id: string) {
     await eliminarGasto(id);
+    await recargar();
+  }
+  async function handleImportarGastos(inputs: Omit<Gasto, "id" | "createdAt">[]) {
+    // Secuencial (no Promise.all): varias filas pueden compartir la misma
+    // cuenta, y los triggers que ajustan `cuentas.disponible` no son seguros
+    // ante inserts concurrentes sobre la misma fila.
+    for (const input of inputs) {
+      await crearGasto(input);
+    }
     await recargar();
   }
   async function handleCrearIngreso(input: Omit<Ingreso, "id" | "createdAt">) {
@@ -199,8 +247,12 @@ function Dashboard({ onSalir }: { onSalir: () => void }) {
     await recargar();
   }
   async function handleEliminarCuenta(id: string) {
-    await eliminarCuenta(id);
-    await recargar();
+    try {
+      await eliminarCuenta(id);
+      await recargar();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
   async function handleRegistrarPago(cuentaId: string, monto: number) {
     await registrarPagoTarjeta({ cuentaId, monto, fecha: new Date().toISOString().slice(0, 10) });
@@ -232,94 +284,145 @@ function Dashboard({ onSalir }: { onSalir: () => void }) {
     await eliminarRecordatorio(id);
     await recargar();
   }
+  async function handleCrearCategoria(input: { nombre: string; color: string; tipo: TipoCategoria }) {
+    await crearCategoria(input);
+    await recargar();
+  }
+  async function handleActualizarCategoria(id: string, cambios: { nombre: string; color: string }) {
+    await actualizarCategoria(id, cambios);
+    await recargar();
+  }
+  async function handleEliminarCategoria(id: string) {
+    await eliminarCategoria(id);
+    await recargar();
+  }
 
   return (
-    <div className="pagina">
-      <header className="header">
-        <h1>Gastos App — Escritorio</h1>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          {(tab === "resumen" || tab === "gastos" || tab === "ingresos") && (
-            <input type="month" className="input" value={mes} onChange={(e) => setMes(e.target.value)} />
-          )}
-          <button className="btn" onClick={onSalir}>
-            Salir
-          </button>
+    <div className="shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <Logo size={28} />
+          <span>Gastos App</span>
         </div>
-      </header>
+        <nav className="nav">
+          {TABS.map((t) => {
+            const Icono = t.icono;
+            return (
+              <button
+                key={t.id}
+                className={`nav-item ${tab === t.id ? "nav-item-activo" : ""}`}
+                onClick={() => setTab(t.id)}
+              >
+                <Icono />
+                {t.etiqueta}
+              </button>
+            );
+          })}
+        </nav>
+        <button className="btn nav-salir" onClick={onSalir}>
+          <IconoSalir />
+          Salir
+        </button>
+      </aside>
 
-      <nav className="tabs">
-        {TABS.map((t) => (
-          <button
-            key={t.id}
-            className={`tab ${tab === t.id ? "tab-activo" : ""}`}
-            onClick={() => setTab(t.id)}
-          >
-            {t.etiqueta}
-          </button>
-        ))}
-      </nav>
+      <div className="main">
+        <header className="topbar">
+          <h1>{TABS.find((t) => t.id === tab)?.etiqueta}</h1>
+          {(tab === "resumen" || tab === "gastos" || tab === "ingresos") && (
+            <div className="topbar-acciones">
+              <input type="month" className="input" value={mes} onChange={(e) => setMes(e.target.value)} />
+            </div>
+          )}
+        </header>
 
-      <div className="contenedor">
-        {error && (
-          <p className="error" style={{ marginBottom: 16 }}>
-            Error: {error}
-          </p>
-        )}
+        <div className="contenedor">
+          {error && (
+            <p className="error" style={{ marginBottom: 16 }}>
+              Error: {error}
+            </p>
+          )}
 
-        {cargando ? (
-          <p>Cargando…</p>
-        ) : (
-          <>
-            {tab === "resumen" && (
-              <Resumen balance={balance} endeudamiento={endeudamiento} recomendaciones={recomendaciones} />
-            )}
-            {tab === "gastos" && (
-              <Gastos
-                mes={mes}
-                gastos={gastos}
-                categorias={categorias}
-                cuentas={cuentas}
-                onCrear={handleCrearGasto}
-                onEliminar={handleEliminarGasto}
-              />
-            )}
-            {tab === "ingresos" && (
-              <Ingresos
-                mes={mes}
-                ingresos={ingresos}
-                cuentas={cuentas}
-                onCrear={handleCrearIngreso}
-                onEliminar={handleEliminarIngreso}
-              />
-            )}
-            {tab === "tarjetas" && (
-              <Tarjetas
-                cuentas={cuentas}
-                onCrear={handleCrearCuenta}
-                onEliminar={handleEliminarCuenta}
-                onRegistrarPago={handleRegistrarPago}
-              />
-            )}
-            {tab === "deudas" && (
-              <Deudas
-                deudas={deudas}
-                endeudamiento={endeudamiento}
-                onCrear={handleCrearDeuda}
-                onAbonar={handleAbonarDeuda}
-                onEliminar={handleEliminarDeuda}
-              />
-            )}
-            {tab === "recordatorios" && (
-              <Recordatorios
-                recordatorios={recordatorios}
-                deudas={deudas}
-                onCrear={handleCrearRecordatorio}
-                onToggle={handleToggleRecordatorio}
-                onEliminar={handleEliminarRecordatorio}
-              />
-            )}
-          </>
-        )}
+          {cargando ? (
+            <p>Cargando…</p>
+          ) : (
+            <>
+              {tab === "resumen" && (
+                <Resumen
+                  balance={balance}
+                  endeudamiento={endeudamiento}
+                  recomendaciones={recomendaciones}
+                  gastos={gastos}
+                  ingresos={ingresos}
+                  categorias={categorias}
+                  correoUsuario={session.user.email ?? ""}
+                />
+              )}
+              {tab === "gastos" && (
+                <Gastos
+                  mes={mes}
+                  gastos={gastos}
+                  categorias={categorias}
+                  cuentas={cuentas}
+                  onCrear={handleCrearGasto}
+                  onActualizar={handleActualizarGasto}
+                  onEliminar={handleEliminarGasto}
+                  onImportarVarios={handleImportarGastos}
+                />
+              )}
+              {tab === "ingresos" && (
+                <Ingresos
+                  mes={mes}
+                  ingresos={ingresos}
+                  cuentas={cuentas}
+                  categorias={categorias}
+                  onCrear={handleCrearIngreso}
+                  onEliminar={handleEliminarIngreso}
+                />
+              )}
+              {tab === "tarjetas" && (
+                <Tarjetas
+                  cuentas={cuentas}
+                  gastos={gastos}
+                  pagosTarjeta={pagosTarjeta}
+                  ingresos={ingresos}
+                  categorias={categorias}
+                  onCrear={handleCrearCuenta}
+                  onEliminar={handleEliminarCuenta}
+                  onRegistrarPago={handleRegistrarPago}
+                  onCrearGasto={handleCrearGasto}
+                  onCrearIngreso={handleCrearIngreso}
+                />
+              )}
+              {tab === "deudas" && (
+                <Deudas
+                  deudas={deudas}
+                  cuentas={cuentas}
+                  endeudamiento={endeudamiento}
+                  onCrear={handleCrearDeuda}
+                  onAbonar={handleAbonarDeuda}
+                  onEliminar={handleEliminarDeuda}
+                />
+              )}
+              {tab === "recordatorios" && (
+                <Recordatorios
+                  recordatorios={recordatorios}
+                  deudas={deudas}
+                  onCrear={handleCrearRecordatorio}
+                  onToggle={handleToggleRecordatorio}
+                  onEliminar={handleEliminarRecordatorio}
+                />
+              )}
+              {tab === "categorias" && (
+                <Categorias
+                  categorias={categorias}
+                  onCrear={handleCrearCategoria}
+                  onActualizar={handleActualizarCategoria}
+                  onEliminar={handleEliminarCategoria}
+                />
+              )}
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

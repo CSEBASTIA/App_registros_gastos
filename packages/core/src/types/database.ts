@@ -19,16 +19,22 @@ export type Database = {
           id: string;
           nombre: string;
           color: string;
+          tipo: string;
+          usuario_id: string | null;
         };
         Insert: {
           id?: string;
           nombre: string;
           color?: string;
+          tipo?: string;
+          usuario_id?: string | null;
         };
         Update: {
           id?: string;
           nombre?: string;
           color?: string;
+          tipo?: string;
+          usuario_id?: string | null;
         };
         Relationships: [];
       };
@@ -38,7 +44,10 @@ export type Database = {
           monto: number;
           descripcion: string;
           categoria_id: string | null;
+          categoria_detalle: string | null;
           cuenta_id: string | null;
+          metodo_pago: string | null;
+          factura_path: string | null;
           fecha: string;
           created_at: string;
           usuario_id: string;
@@ -48,7 +57,10 @@ export type Database = {
           monto: number;
           descripcion: string;
           categoria_id?: string | null;
+          categoria_detalle?: string | null;
           cuenta_id?: string | null;
+          metodo_pago?: string | null;
+          factura_path?: string | null;
           fecha?: string;
           created_at?: string;
           usuario_id?: string;
@@ -58,7 +70,10 @@ export type Database = {
           monto?: number;
           descripcion?: string;
           categoria_id?: string | null;
+          categoria_detalle?: string | null;
           cuenta_id?: string | null;
+          metodo_pago?: string | null;
+          factura_path?: string | null;
           fecha?: string;
           created_at?: string;
           usuario_id?: string;
@@ -96,6 +111,7 @@ export type Database = {
           tipo: string;
           banco: string;
           marca: string | null;
+          estilo: string | null;
           cupo_total: number | null;
           disponible: number;
           created_at: string;
@@ -107,6 +123,7 @@ export type Database = {
           tipo: string;
           banco?: string;
           marca?: string | null;
+          estilo?: string | null;
           cupo_total?: number | null;
           disponible?: number;
           created_at?: string;
@@ -118,6 +135,7 @@ export type Database = {
           tipo?: string;
           banco?: string;
           marca?: string | null;
+          estilo?: string | null;
           cupo_total?: number | null;
           disponible?: number;
           created_at?: string;
@@ -130,6 +148,8 @@ export type Database = {
           id: string;
           monto: number;
           descripcion: string;
+          categoria_id: string | null;
+          categoria_detalle: string | null;
           cuenta_id: string | null;
           fecha: string;
           created_at: string;
@@ -139,6 +159,8 @@ export type Database = {
           id?: string;
           monto: number;
           descripcion: string;
+          categoria_id?: string | null;
+          categoria_detalle?: string | null;
           cuenta_id?: string | null;
           fecha?: string;
           created_at?: string;
@@ -148,6 +170,8 @@ export type Database = {
           id?: string;
           monto?: number;
           descripcion?: string;
+          categoria_id?: string | null;
+          categoria_detalle?: string | null;
           cuenta_id?: string | null;
           fecha?: string;
           created_at?: string;

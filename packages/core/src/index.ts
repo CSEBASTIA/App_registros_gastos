@@ -7,13 +7,23 @@ export * from "./schemas/ingreso.schema";
 export * from "./schemas/pagoTarjeta.schema";
 export * from "./schemas/deuda.schema";
 export * from "./schemas/recordatorio.schema";
-export * from "./repositories/categorias.repo";
+export * from "./schemas/categoria.schema";
 
 // De gastos.repo/presupuestos.repo (y las demás) NO reexportamos los
 // `crear*` (inserts sin validar) para no chocar de nombre con los use cases
 // de abajo, que son la forma correcta de crear datos (validan con zod antes
 // de insertar).
-export { listarGastos, eliminarGasto } from "./repositories/gastos.repo";
+export {
+  listarCategorias,
+  actualizarCategoria,
+  eliminarCategoria,
+} from "./repositories/categorias.repo";
+export {
+  listarGastos,
+  actualizarGasto,
+  eliminarGasto,
+  type CambiosGasto,
+} from "./repositories/gastos.repo";
 export { listarPresupuestos, eliminarPresupuesto } from "./repositories/presupuestos.repo";
 export { listarCuentas, eliminarCuenta } from "./repositories/cuentas.repo";
 export { listarIngresos, eliminarIngreso } from "./repositories/ingresos.repo";
@@ -29,6 +39,7 @@ export {
   marcarCompletado,
 } from "./repositories/recordatorios.repo";
 
+export * from "./usecases/crearCategoria";
 export * from "./usecases/crearGasto";
 export * from "./usecases/crearPresupuesto";
 export * from "./usecases/crearCuenta";

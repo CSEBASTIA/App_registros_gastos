@@ -191,12 +191,50 @@ export function IconoAlcancia(props: Props) {
   );
 }
 
+export function IconoOjo(props: Props) {
+  return (
+    <svg {...base({ width: 18, height: 18, ...props })}>
+      <path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+export function IconoOjoCerrado(props: Props) {
+  return (
+    <svg {...base({ width: 18, height: 18, ...props })}>
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="M6.6 6.7C4 8.4 2.5 12 2.5 12S6 18.5 12 18.5a9.7 9.7 0 0 0 3.9-.8m2.7-1.9C20.2 14.3 21.5 12 21.5 12S18 5.5 12 5.5a10.6 10.6 0 0 0-1.4.1" />
+      <path d="M3 3l18 18" />
+    </svg>
+  );
+}
+
 export function IconoFactura(props: Props) {
   return (
     <svg {...base({ width: 17, height: 17, ...props })}>
       <path d="M6 3h9l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Z" />
       <path d="M14 3v4a1 1 0 0 0 1 1h4" />
       <path d="M8.5 12.5h7M8.5 16h4.5" />
+    </svg>
+  );
+}
+
+export function IconoCheck(props: Props) {
+  return (
+    <svg {...base(props)}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M8 12.3l2.5 2.5L16 9" />
+    </svg>
+  );
+}
+
+export function IconoAlerta(props: Props) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 3.5 2.5 20h19L12 3.5Z" />
+      <path d="M12 10v4.2" />
+      <circle cx="12" cy="17.2" r="0.9" fill="currentColor" stroke="none" />
     </svg>
   );
 }

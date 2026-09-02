@@ -1,5 +1,12 @@
 export * from "./client";
 export * from "./types/domain";
+export * from "./lib/semanas";
+export * from "./lib/movimientosCuenta";
+export * from "./lib/marcas";
+export * from "./lib/mensajeError";
+export * from "./lib/formatMonto";
+export * from "./lib/categorias";
+export * from "./lib/metodoPago";
 export * from "./schemas/gasto.schema";
 export * from "./schemas/presupuesto.schema";
 export * from "./schemas/cuenta.schema";
@@ -51,3 +58,4 @@ export * from "./usecases/resumenMensual";
 export * from "./usecases/balanceGeneral";
 export * from "./usecases/calcularEndeudamiento";
 export * from "./usecases/generarRecomendaciones";
+export * from "./usecases/eliminarTodosLosDatos";

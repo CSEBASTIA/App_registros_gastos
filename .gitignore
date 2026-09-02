@@ -23,3 +23,17 @@ supabase/.temp/
 .DS_Store
 Thumbs.db
 *.log
+
+# cache/artefactos de build que no hace falta versionar
+*.tsbuildinfo
+.turbo/
+coverage/
+playwright-report/
+test-results/
+
+# volcados de imágenes sin procesar de tarjetas/logos (nombres con espacios,
+# tal como se recibieron): las versiones ya normalizadas que usa la app viven
+# en apps/desktop/src/assets/tarjetas/ y assets/logos/, esas sí se versionan.
+apps/desktop/src/assets/Logotipos/
+apps/desktop/src/assets/Tarjetas dinner club/
+apps/desktop/src/assets/tarjetas produbanco/

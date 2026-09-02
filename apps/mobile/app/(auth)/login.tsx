@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { Link } from "expo-router";
+import { mensajeError } from "core";
 import { supabase } from "../../lib/supabase";
 
 export default function Login() {
@@ -14,7 +15,7 @@ export default function Login() {
     setCargando(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setCargando(false);
-    if (error) setError(error.message);
+    if (error) setError(mensajeError(error));
     // Si no hay error, el RootLayout detecta la sesión nueva y redirige solo.
   }
 

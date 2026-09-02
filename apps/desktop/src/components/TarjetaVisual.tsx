@@ -1,8 +1,10 @@
+import { useState } from "react";
 import type { Cuenta } from "core";
-import { COLOR_CUENTA_BANCO, ETIQUETA_BANCO, ETIQUETA_MARCA, GRADIENTE_BANCO } from "../lib/marcas";
+import { COLOR_CUENTA_BANCO, cssGradiente, ETIQUETA_BANCO, ETIQUETA_MARCA, GRADIENTE_BANCO, TEXTO_CUENTA_BANCO } from "core";
 import { imagenDe, productoDe } from "../lib/catalogoTarjetas";
-import { IconoAlcancia, IconoChip, IconoContactless, IconoTarjetas, IconoWallet } from "./iconos";
+import { IconoAlcancia, IconoChip, IconoContactless, IconoOjo, IconoOjoCerrado, IconoTarjetas, IconoWallet } from "./iconos";
 import BarraProgreso from "./BarraProgreso";
+import { formatMonto } from "core";
 
 const ICONO_TIPO_CUENTA: Record<Cuenta["tipo"], (props: { className?: string }) => JSX.Element> = {
   credito: IconoTarjetas,
@@ -62,13 +64,13 @@ export default function TarjetaVisual({
                   <div className="tarjeta-visual-cupo-linea">
                     <span>Disponible</span>
                     <span>
-                      ${cuenta.disponible.toFixed(2)} / ${cuenta.cupoTotal.toFixed(2)}
+                      {formatMonto(cuenta.disponible)} / {formatMonto(cuenta.cupoTotal)}
                     </span>
                   </div>
                   <BarraProgreso porcentaje={usoPorcentaje ?? 0} />
                 </div>
               ) : (
-                <span className="tarjeta-visual-imagen-tipo">${cuenta.disponible.toFixed(2)}</span>
+                <span className="tarjeta-visual-imagen-tipo">{formatMonto(cuenta.disponible)}</span>
               )}
             </>
           )}
@@ -89,7 +91,7 @@ export default function TarjetaVisual({
   return (
     <div
       className={clases}
-      style={{ background: GRADIENTE_BANCO[cuenta.banco] }}
+      style={{ background: cssGradiente(GRADIENTE_BANCO[cuenta.banco]) }}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -110,14 +112,14 @@ export default function TarjetaVisual({
             <div className="tarjeta-visual-cupo-linea">
               <span>Disponible</span>
               <span>
-                ${cuenta.disponible.toFixed(2)} / ${cuenta.cupoTotal.toFixed(2)}
+                {formatMonto(cuenta.disponible)} / {formatMonto(cuenta.cupoTotal)}
               </span>
             </div>
             <BarraProgreso porcentaje={usoPorcentaje ?? 0} />
           </div>
         )
       ) : (
-        <div className="tarjeta-visual-saldo">${cuenta.disponible.toFixed(2)}</div>
+        <div className="tarjeta-visual-saldo">{formatMonto(cuenta.disponible)}</div>
       )}
 
       <div className="tarjeta-visual-footer">
@@ -140,6 +142,7 @@ function CuentaVisual({
   onClick?: () => void;
 }) {
   const Icono = ICONO_TIPO_CUENTA[cuenta.tipo];
+  const [visible, setVisible] = useState(true);
   const clases = [
     "cuenta-visual",
     compacta ? "cuenta-visual-compacta" : "",
@@ -152,7 +155,7 @@ function CuentaVisual({
   return (
     <div
       className={clases}
-      style={{ background: COLOR_CUENTA_BANCO[cuenta.banco] }}
+      style={{ background: COLOR_CUENTA_BANCO[cuenta.banco], color: TEXTO_CUENTA_BANCO[cuenta.banco] }}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -169,8 +172,23 @@ function CuentaVisual({
         </div>
         {!compacta && (
           <div className="cuenta-visual-saldo">
-            <span className="cuenta-visual-saldo-monto">${cuenta.disponible.toFixed(2)}</span>
-            <span className="cuenta-visual-saldo-etiqueta">Disponible</span>
+            <span className="cuenta-visual-saldo-etiqueta">Saldo disponible</span>
+            <div className="cuenta-visual-saldo-linea">
+              <span className="cuenta-visual-saldo-monto">
+                {visible ? formatMonto(cuenta.disponible) : "••••••"}
+              </span>
+              <button
+                type="button"
+                className="cuenta-visual-ojo"
+                title={visible ? "Ocultar saldo" : "Mostrar saldo"}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setVisible((v) => !v);
+                }}
+              >
+                {visible ? <IconoOjo /> : <IconoOjoCerrado />}
+              </button>
+            </div>
           </div>
         )}
       </div>

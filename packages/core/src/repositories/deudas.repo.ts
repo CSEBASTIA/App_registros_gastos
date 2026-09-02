@@ -16,6 +16,7 @@ function filaADeuda(row: DeudaRow): Deuda {
     fechaInicio: row.fecha_inicio,
     proximoPago: row.proximo_pago ?? undefined,
     cuentaId: row.cuenta_id ?? undefined,
+    gastoId: row.gasto_id ?? undefined,
     createdAt: row.created_at,
   };
 }

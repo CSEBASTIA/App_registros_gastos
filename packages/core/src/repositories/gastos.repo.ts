@@ -14,6 +14,7 @@ function filaAGasto(row: GastoRow): Gasto {
     categoriaDetalle: row.categoria_detalle ?? undefined,
     cuentaId: row.cuenta_id ?? undefined,
     metodoPago: (row.metodo_pago as Gasto["metodoPago"]) ?? undefined,
+    mesesDiferido: row.meses_diferido ?? undefined,
     facturaPath: row.factura_path ?? undefined,
     fecha: row.fecha,
     createdAt: row.created_at,
@@ -42,6 +43,7 @@ export async function crearGasto(
       categoria_detalle: gasto.categoriaDetalle ?? null,
       cuenta_id: gasto.cuentaId ?? null,
       metodo_pago: gasto.metodoPago ?? null,
+      meses_diferido: gasto.mesesDiferido ?? null,
       factura_path: gasto.facturaPath ?? null,
       fecha: gasto.fecha,
     })

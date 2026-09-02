@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { mensajeError } from "core";
 import {
   listarGastos,
   listarCategorias,
@@ -28,6 +29,7 @@ import {
   balanceGeneral,
   calcularEndeudamiento,
   generarRecomendaciones,
+  eliminarTodosLosDatos,
   type Gasto,
   type CambiosGasto,
   type Categoria,
@@ -43,6 +45,7 @@ import Resumen from "./views/Resumen";
 import Gastos from "./views/Gastos";
 import Ingresos from "./views/Ingresos";
 import Tarjetas from "./views/Tarjetas";
+import Cuentas from "./views/Cuentas";
 import Deudas from "./views/Deudas";
 import Recordatorios from "./views/Recordatorios";
 import Categorias from "./views/Categorias";
@@ -52,6 +55,7 @@ import {
   IconoGastos,
   IconoIngresos,
   IconoTarjetas,
+  IconoWallet,
   IconoDeudas,
   IconoRecordatorios,
   IconoCategorias,
@@ -138,15 +142,17 @@ type Tab =
   | "gastos"
   | "ingresos"
   | "tarjetas"
+  | "cuentas"
   | "deudas"
   | "recordatorios"
   | "categorias";
 
 const TABS: { id: Tab; etiqueta: string; icono: typeof IconoResumen }[] = [
   { id: "resumen", etiqueta: "Resumen", icono: IconoResumen },
-  { id: "gastos", etiqueta: "Gastos", icono: IconoGastos },
   { id: "ingresos", etiqueta: "Ingresos", icono: IconoIngresos },
+  { id: "gastos", etiqueta: "Gastos", icono: IconoGastos },
   { id: "tarjetas", etiqueta: "Tarjetas", icono: IconoTarjetas },
+  { id: "cuentas", etiqueta: "Cuentas", icono: IconoWallet },
   { id: "deudas", etiqueta: "Deudas", icono: IconoDeudas },
   { id: "recordatorios", etiqueta: "Recordatorios", icono: IconoRecordatorios },
   { id: "categorias", etiqueta: "Categorías", icono: IconoCategorias },
@@ -187,7 +193,7 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
       setRecordatorios(r);
       setPagosTarjeta(p);
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(mensajeError(err));
     } finally {
       setCargando(false);
     }
@@ -251,11 +257,16 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
       await eliminarCuenta(id);
       await recargar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(mensajeError(err));
     }
   }
-  async function handleRegistrarPago(cuentaId: string, monto: number) {
-    await registrarPagoTarjeta({ cuentaId, monto, fecha: new Date().toISOString().slice(0, 10) });
+  async function handleRegistrarPago(cuentaId: string, monto: number, cuentaOrigenId?: string) {
+    await registrarPagoTarjeta({
+      cuentaId,
+      cuentaOrigenId,
+      monto,
+      fecha: new Date().toISOString().slice(0, 10),
+    });
     await recargar();
   }
   async function handleCrearDeuda(input: Omit<Deuda, "id" | "createdAt">) {
@@ -297,6 +308,25 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
     await recargar();
   }
 
+  // BOTÓN TEMPORAL DE DESARROLLO — ver usecases/eliminarTodosLosDatos.ts.
+  // Quitar este handler y el botón que lo llama antes de un lanzamiento real.
+  const [borrandoTodo, setBorrandoTodo] = useState(false);
+  async function handleBorrarTodo() {
+    const confirmado = window.confirm(
+      "¿Borrar TODOS tus datos (gastos, ingresos, cuentas, deudas, recordatorios, pagos y categorías propias)? Esto no se puede deshacer."
+    );
+    if (!confirmado) return;
+    setBorrandoTodo(true);
+    try {
+      await eliminarTodosLosDatos();
+      await recargar();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setBorrandoTodo(false);
+    }
+  }
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -319,6 +349,15 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
             );
           })}
         </nav>
+        <button
+          className="btn nav-salir"
+          style={{ marginBottom: 8, color: "var(--color-danger)", borderColor: "var(--color-danger-bg)" }}
+          onClick={handleBorrarTodo}
+          disabled={borrandoTodo}
+          title="Botón temporal de desarrollo: borra todos tus datos"
+        >
+          🗑️ {borrandoTodo ? "Borrando…" : "Borrar todo (temporal)"}
+        </button>
         <button className="btn nav-salir" onClick={onSalir}>
           <IconoSalir />
           Salir
@@ -357,6 +396,16 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
                   correoUsuario={session.user.email ?? ""}
                 />
               )}
+              {tab === "ingresos" && (
+                <Ingresos
+                  mes={mes}
+                  ingresos={ingresos}
+                  cuentas={cuentas}
+                  categorias={categorias}
+                  onCrear={handleCrearIngreso}
+                  onEliminar={handleEliminarIngreso}
+                />
+              )}
               {tab === "gastos" && (
                 <Gastos
                   mes={mes}
@@ -369,16 +418,6 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
                   onImportarVarios={handleImportarGastos}
                 />
               )}
-              {tab === "ingresos" && (
-                <Ingresos
-                  mes={mes}
-                  ingresos={ingresos}
-                  cuentas={cuentas}
-                  categorias={categorias}
-                  onCrear={handleCrearIngreso}
-                  onEliminar={handleEliminarIngreso}
-                />
-              )}
               {tab === "tarjetas" && (
                 <Tarjetas
                   cuentas={cuentas}
@@ -389,6 +428,17 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
                   onCrear={handleCrearCuenta}
                   onEliminar={handleEliminarCuenta}
                   onRegistrarPago={handleRegistrarPago}
+                  onCrearGasto={handleCrearGasto}
+                />
+              )}
+              {tab === "cuentas" && (
+                <Cuentas
+                  cuentas={cuentas}
+                  gastos={gastos}
+                  ingresos={ingresos}
+                  categorias={categorias}
+                  onCrear={handleCrearCuenta}
+                  onEliminar={handleEliminarCuenta}
                   onCrearGasto={handleCrearGasto}
                   onCrearIngreso={handleCrearIngreso}
                 />

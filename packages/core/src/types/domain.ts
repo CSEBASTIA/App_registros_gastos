@@ -9,7 +9,7 @@ export interface Categoria {
   usuarioId?: string;
 }
 
-export type MetodoPago = "efectivo" | "debito" | "credito" | "transferencia" | "otro";
+export type MetodoPago = "efectivo" | "debito" | "credito" | "transferencia" | "diferido" | "otro";
 
 export interface Gasto {
   id: string;
@@ -20,6 +20,8 @@ export interface Gasto {
   categoriaDetalle?: string;
   cuentaId?: string;
   metodoPago?: MetodoPago;
+  /** Solo cuando metodoPago === "diferido": a cuántos meses (3-24). Genera una deuda automáticamente. */
+  mesesDiferido?: number;
   /** Ruta del archivo (PDF o imagen) dentro del bucket privado "facturas", ej. "<usuario_id>/<archivo>". */
   facturaPath?: string;
   fecha: string;
@@ -34,7 +36,7 @@ export interface Presupuesto {
 }
 
 export type TipoCuenta = "debito" | "credito" | "efectivo" | "ahorro";
-export type Banco = "banco_guayaquil" | "pichincha" | "produbanco" | "otro";
+export type Banco = "banco_guayaquil" | "pichincha" | "produbanco" | "diners_club" | "otro";
 export type Marca = "amex" | "visa" | "mastercard" | "diners" | "otro";
 
 export interface Cuenta {
@@ -67,12 +69,14 @@ export interface Ingreso {
 export interface PagoTarjeta {
   id: string;
   cuentaId: string;
+  /** Cuenta de ahorro/débito desde la que se paga (opcional: pagos viejos no la tenían). */
+  cuentaOrigenId?: string;
   monto: number;
   fecha: string;
   createdAt: string;
 }
 
-export type TipoDeuda = "prestamo" | "tarjeta" | "otro";
+export type TipoDeuda = "prestamo" | "tarjeta" | "otro" | "diferido";
 
 export interface Deuda {
   id: string;
@@ -85,6 +89,8 @@ export interface Deuda {
   fechaInicio: string;
   proximoPago?: string;
   cuentaId?: string;
+  /** Si esta deuda se creó sola a partir de un gasto diferido, el id de ese gasto. */
+  gastoId?: string;
   createdAt: string;
 }
 

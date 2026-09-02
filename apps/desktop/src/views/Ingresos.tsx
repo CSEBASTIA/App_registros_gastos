@@ -1,7 +1,12 @@
 import { useState, type FormEvent } from "react";
 import type { Categoria, Cuenta, Ingreso } from "core";
-import { IconoIngresos, IconoPapelera } from "../components/iconos";
+import { IconoIngresos, IconoMas, IconoPapelera } from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
+import GraficoBarras from "../components/GraficoBarras";
+import { semanasDelMes, enRangoSemana, ultimosMeses, etiquetaMes } from "core";
+import { mensajeError } from "core";
+
+const COLOR_INGRESOS = "#16a34a";
 
 function hoy() {
   return new Date().toISOString().slice(0, 10);
@@ -19,6 +24,20 @@ interface Props {
 export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, onEliminar }: Props) {
   const ingresosDelMes = ingresos.filter((i) => i.fecha.startsWith(mes));
   const categoriasIngreso = categorias.filter((c) => c.tipo === "ingreso");
+  const [mostrarForm, setMostrarForm] = useState(false);
+  const [periodo, setPeriodo] = useState<"semana" | "mes">("semana");
+
+  const datosSemana = semanasDelMes(mes).map((s) => ({
+    etiqueta: `Semana ${s.numero}`,
+    valor: ingresosDelMes.filter((i) => enRangoSemana(i.fecha, s)).reduce((acc, i) => acc + i.monto, 0),
+    color: COLOR_INGRESOS,
+  }));
+
+  const datosMes = ultimosMeses(mes, 6).map((m) => ({
+    etiqueta: etiquetaMes(m),
+    valor: ingresos.filter((i) => i.fecha.startsWith(m)).reduce((acc, i) => acc + i.monto, 0),
+    color: COLOR_INGRESOS,
+  }));
 
   function cuentaDe(id?: string) {
     return id ? cuentas.find((c) => c.id === id) : undefined;
@@ -27,9 +46,47 @@ export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, 
     return id ? categorias.find((c) => c.id === id) : undefined;
   }
 
+  async function crearYCerrar(input: Omit<Ingreso, "id" | "createdAt">) {
+    await onCrear(input);
+    setMostrarForm(false);
+  }
+
   return (
     <>
-      <NuevoIngreso cuentas={cuentas} categorias={categoriasIngreso} onCrear={onCrear} />
+      {mostrarForm ? (
+        <NuevoIngreso cuentas={cuentas} categorias={categoriasIngreso} onCrear={crearYCerrar} onCancelar={() => setMostrarForm(false)} />
+      ) : (
+        <button className="btn btn-primary" style={{ marginBottom: 24 }} onClick={() => setMostrarForm(true)}>
+          <IconoMas /> Nuevo ingreso
+        </button>
+      )}
+
+      <div className="card" style={{ marginBottom: 24 }}>
+        <div className="form-gasto-header">
+          <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Ingresos</h3>
+          <div className="periodo-toggle">
+            <button
+              type="button"
+              className={periodo === "semana" ? "periodo-toggle-activo" : ""}
+              onClick={() => setPeriodo("semana")}
+            >
+              Por semana
+            </button>
+            <button
+              type="button"
+              className={periodo === "mes" ? "periodo-toggle-activo" : ""}
+              onClick={() => setPeriodo("mes")}
+            >
+              Por mes
+            </button>
+          </div>
+        </div>
+        <GraficoBarras
+          datos={periodo === "semana" ? datosSemana : datosMes}
+          leyenda={{ etiqueta: "Ingresos", color: COLOR_INGRESOS }}
+          mensajeVacio="Sin ingresos en este período."
+        />
+      </div>
 
       <div className="card" style={{ padding: 0 }}>
         {ingresosDelMes.length === 0 ? (
@@ -54,28 +111,28 @@ export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, 
               {ingresosDelMes.map((i) => {
                 const cat = categoriaDe(i.categoriaId);
                 return (
-                <tr key={i.id}>
-                  <td>{i.fecha}</td>
-                  <td>{i.descripcion}</td>
-                  <td>
-                    {cat ? (
-                      <span className="categoria-tag">
-                        <span className="categoria-punto" style={{ background: cat.color }} />
-                        {cat.nombre}
-                        {cat.nombre === "Otros" && i.categoriaDetalle ? ` · ${i.categoriaDetalle}` : ""}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </td>
-                  <td>{cuentaDe(i.cuentaId)?.nombre ?? "—"}</td>
-                  <td>${i.monto.toFixed(2)}</td>
-                  <td>
-                    <button className="btn-icon" title="Eliminar" onClick={() => onEliminar(i.id)}>
-                      <IconoPapelera />
-                    </button>
-                  </td>
-                </tr>
+                  <tr key={i.id}>
+                    <td>{i.fecha}</td>
+                    <td>{i.descripcion}</td>
+                    <td>
+                      {cat ? (
+                        <span className="categoria-tag">
+                          <span className="categoria-punto" style={{ background: cat.color }} />
+                          {cat.nombre}
+                          {cat.nombre === "Otros" && i.categoriaDetalle ? ` · ${i.categoriaDetalle}` : ""}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td>{cuentaDe(i.cuentaId)?.nombre ?? "—"}</td>
+                    <td>${i.monto.toFixed(2)}</td>
+                    <td>
+                      <button className="btn-icon" title="Eliminar" onClick={() => onEliminar(i.id)}>
+                        <IconoPapelera />
+                      </button>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
@@ -90,10 +147,12 @@ function NuevoIngreso({
   cuentas,
   categorias,
   onCrear,
+  onCancelar,
 }: {
   cuentas: Cuenta[];
   categorias: Categoria[];
   onCrear: (input: Omit<Ingreso, "id" | "createdAt">) => Promise<void>;
+  onCancelar: () => void;
 }) {
   const [monto, setMonto] = useState("");
   const [descripcion, setDescripcion] = useState("");
@@ -110,6 +169,12 @@ function NuevoIngreso({
   async function agregar(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
+    if (!monto || Number(monto) <= 0) {
+      setError("El monto no puede ser un valor negativo.");
+      return;
+    }
+
     setGuardando(true);
     try {
       await onCrear({
@@ -125,7 +190,7 @@ function NuevoIngreso({
       setCategoriaDetalle("");
       setFecha(hoy());
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(mensajeError(err));
     } finally {
       setGuardando(false);
     }
@@ -133,6 +198,12 @@ function NuevoIngreso({
 
   return (
     <form onSubmit={agregar} className="card" style={{ marginBottom: 24 }}>
+      <div className="form-gasto-header">
+        <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Nuevo ingreso</h3>
+        <button type="button" className="btn" onClick={onCancelar}>
+          Cancelar
+        </button>
+      </div>
       <div className="form-gasto">
         <div className="campo">
           <label htmlFor="monto-ingreso">Monto</label>
@@ -153,6 +224,7 @@ function NuevoIngreso({
             id="descripcion-ingreso"
             className="input"
             placeholder="Sueldo, freelance…"
+            maxLength={40}
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             required

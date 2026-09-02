@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import type { Categoria, TipoCategoria } from "core";
 import { IconoCategorias, IconoPapelera } from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
+import { mensajeError } from "core";
 
 interface Props {
   categorias: Categoria[];
@@ -154,7 +155,7 @@ function NuevaCategoria({
       setNombre("");
       setColor("#3b6ff2");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(mensajeError(err));
     } finally {
       setGuardando(false);
     }

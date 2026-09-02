@@ -2,7 +2,9 @@ import type { BalanceGeneral, Categoria, Endeudamiento, Gasto, Ingreso, Recomend
 import BarraProgreso from "../components/BarraProgreso";
 import EstadoVacio from "../components/EstadoVacio";
 import {
+  IconoAlerta,
   IconoCampana,
+  IconoCheck,
   IconoFlechaAbajo,
   IconoFlechaArriba,
   IconoGastos,
@@ -105,13 +107,7 @@ export default function Resumen({
             </div>
           </div>
 
-          <div className="card">
-            <div className="tarjeta-visual-cupo-linea">
-              <span>Nivel de endeudamiento</span>
-              <span className={`nivel-${endeudamiento.nivel}`}>{etiquetaNivel(endeudamiento.nivel)}</span>
-            </div>
-            <BarraProgreso porcentaje={endeudamiento.porcentaje} />
-          </div>
+          <VeredictoFinanciero balance={balance} endeudamiento={endeudamiento} />
 
           <div className="card">
             <h3 style={{ marginTop: 0, fontSize: "0.95rem" }}>Recomendaciones</h3>
@@ -178,6 +174,72 @@ function etiquetaNivel(nivel: Endeudamiento["nivel"]) {
   return nivel === "alto" ? "Alto" : nivel === "moderado" ? "Moderado" : "Bajo";
 }
 
+type EstadoFinanciero = "bien" | "atencion" | "riesgo";
+
+function veredictoFinanciero(
+  balance: BalanceGeneral,
+  endeudamiento: Endeudamiento
+): { titulo: string; detalle: string; estado: EstadoFinanciero } {
+  if (endeudamiento.nivel === "alto") {
+    return {
+      estado: "riesgo",
+      titulo: "Endeudamiento alto",
+      detalle: `El ${endeudamiento.porcentaje.toFixed(0)}% de tu ingreso mensual se va en cuotas de deuda. Evita tomar más deuda por ahora.`,
+    };
+  }
+  if (balance.totalIngresos > 0 && balance.balance < 0) {
+    return {
+      estado: "riesgo",
+      titulo: "Gastando más de lo que ingresa",
+      detalle: `Este mes tus gastos superan tus ingresos por $${Math.abs(balance.balance).toFixed(2)}.`,
+    };
+  }
+  if (endeudamiento.nivel === "moderado") {
+    return {
+      estado: "atencion",
+      titulo: "Endeudamiento moderado",
+      detalle: `El ${endeudamiento.porcentaje.toFixed(0)}% de tu ingreso se va en cuotas. Vale la pena vigilarlo.`,
+    };
+  }
+  return {
+    estado: "bien",
+    titulo: "Estás en buena forma",
+    detalle: "Tus ingresos cubren tus gastos y cuotas de deuda sin problema.",
+  };
+}
+
+function VeredictoFinanciero({
+  balance,
+  endeudamiento,
+}: {
+  balance: BalanceGeneral;
+  endeudamiento: Endeudamiento;
+}) {
+  const veredicto = veredictoFinanciero(balance, endeudamiento);
+  const Icono = veredicto.estado === "bien" ? IconoCheck : IconoAlerta;
+
+  return (
+    <div className="card veredicto-financiero">
+      <div className="form-gasto-header">
+        <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Salud financiera</h3>
+        <span className={`nivel-${endeudamiento.nivel}`} style={{ fontSize: "0.8rem", fontWeight: 600 }}>
+          Endeudamiento: {etiquetaNivel(endeudamiento.nivel)}
+        </span>
+      </div>
+      <div className={`veredicto-financiero-cuerpo veredicto-${veredicto.estado}`}>
+        <span className="veredicto-financiero-icono">
+          <Icono />
+        </span>
+        <div>
+          <p className="veredicto-financiero-titulo">{veredicto.titulo}</p>
+          <p className="veredicto-financiero-detalle">{veredicto.detalle}</p>
+        </div>
+      </div>
+      <BarraProgreso porcentaje={endeudamiento.porcentaje} />
+    </div>
+  );
+}
+
 function nombreDesdeCorreo(correo: string) {
   const local = correo.split("@")[0] || "Usuario";
   return local.charAt(0).toUpperCase() + local.slice(1);
@@ -219,11 +281,12 @@ function construirActividad(gastos: Gasto[], ingresos: Ingreso[], categorias: Ca
   const items: ItemActividad[] = [
     ...gastos.map((g) => {
       const categoria = categorias.find((c) => c.id === g.categoriaId);
+      const esOtrosConDetalle = categoria?.nombre === "Otros" && g.categoriaDetalle;
       return {
         id: g.id,
         tipo: "gasto" as const,
         descripcion: g.descripcion || categoria?.nombre || "Gasto",
-        subtitulo: categoria?.nombre ?? "Sin categoría",
+        subtitulo: esOtrosConDetalle ? g.categoriaDetalle! : categoria?.nombre ?? "Sin categoría",
         monto: g.monto,
         fecha: g.fecha,
         createdAt: g.createdAt,

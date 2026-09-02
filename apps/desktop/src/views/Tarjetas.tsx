@@ -1,131 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
-import type { Banco, Categoria, Cuenta, Gasto, Ingreso, Marca, PagoTarjeta, TipoCuenta } from "core";
+import type { Banco, Categoria, Cuenta, Gasto, Ingreso, Marca, PagoTarjeta } from "core";
 import TarjetaVisual from "../components/TarjetaVisual";
 import BarraProgreso from "../components/BarraProgreso";
-import { ETIQUETA_BANCO, GRADIENTE_BANCO, OPCIONES_BANCO, OPCIONES_MARCA } from "../lib/marcas";
-import { CATALOGO_TARJETAS } from "../lib/catalogoTarjetas";
-import { IconoFlechaArriba, IconoGastos, IconoMas, IconoPapelera, IconoTarjetas } from "../components/iconos";
+import ItemMovimiento from "../components/ItemMovimiento";
+import { PagarTarjeta, RegistrarGastoInline } from "../components/AccionesCuentaRapidas";
+import { agruparPorFecha, movimientosDe, type MovimientoCuenta } from "core";
+import { cssGradiente, ETIQUETA_BANCO, GRADIENTE_BANCO, OPCIONES_BANCO, OPCIONES_MARCA } from "core";
+import SwatchBanco from "../components/SwatchBanco";
+import { bancoTieneCatalogo, gruposDelCatalogo, productoDe } from "../lib/catalogoTarjetas";
+import { IconoGastos, IconoMas, IconoPapelera, IconoTarjetas } from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
-
-function hoy() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-interface MovimientoTarjeta {
-  id: string;
-  tipo: "gasto" | "pago" | "ingreso";
-  descripcion: string;
-  subtitulo: string;
-  monto: number;
-  fecha: string;
-  createdAt: string;
-  color: string;
-}
-
-function movimientosDe(
-  cuentaId: string,
-  gastos: Gasto[],
-  pagos: PagoTarjeta[],
-  ingresos: Ingreso[],
-  categorias: Categoria[]
-): MovimientoTarjeta[] {
-  const items: MovimientoTarjeta[] = [
-    ...gastos
-      .filter((g) => g.cuentaId === cuentaId)
-      .map((g) => {
-        const categoria = categorias.find((c) => c.id === g.categoriaId);
-        return {
-          id: g.id,
-          tipo: "gasto" as const,
-          descripcion: g.descripcion || categoria?.nombre || "Gasto",
-          subtitulo: categoria?.nombre ?? "Sin categoría",
-          monto: g.monto,
-          fecha: g.fecha,
-          createdAt: g.createdAt,
-          color: categoria?.color ?? "#6b7280",
-        };
-      }),
-    ...pagos
-      .filter((p) => p.cuentaId === cuentaId)
-      .map((p) => ({
-        id: p.id,
-        tipo: "pago" as const,
-        descripcion: "Pago",
-        subtitulo: "Pago a la tarjeta",
-        monto: p.monto,
-        fecha: p.fecha,
-        createdAt: p.createdAt,
-        color: "#16a34a",
-      })),
-    ...ingresos
-      .filter((i) => i.cuentaId === cuentaId)
-      .map((i) => ({
-        id: i.id,
-        tipo: "ingreso" as const,
-        descripcion: i.descripcion || "Ingreso",
-        subtitulo: "Ingreso",
-        monto: i.monto,
-        fecha: i.fecha,
-        createdAt: i.createdAt,
-        color: "#16a34a",
-      })),
-  ];
-
-  return items.sort((a, b) => {
-    if (a.fecha !== b.fecha) return a.fecha < b.fecha ? 1 : -1;
-    return a.createdAt < b.createdAt ? 1 : -1;
-  });
-}
-
-function etiquetaFecha(fecha: string): string {
-  const hoy = new Date();
-  const ayer = new Date(hoy);
-  ayer.setDate(hoy.getDate() - 1);
-  if (fecha === hoy.toISOString().slice(0, 10)) return "Hoy";
-  if (fecha === ayer.toISOString().slice(0, 10)) return "Ayer";
-  return new Date(`${fecha}T00:00:00`).toLocaleDateString("es-EC", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
-
-function agruparPorFecha(items: MovimientoTarjeta[]): { fecha: string; etiqueta: string; items: MovimientoTarjeta[] }[] {
-  const grupos: { fecha: string; etiqueta: string; items: MovimientoTarjeta[] }[] = [];
-  for (const item of items) {
-    let grupo = grupos.find((g) => g.fecha === item.fecha);
-    if (!grupo) {
-      grupo = { fecha: item.fecha, etiqueta: etiquetaFecha(item.fecha), items: [] };
-      grupos.push(grupo);
-    }
-    grupo.items.push(item);
-  }
-  return grupos;
-}
-
-function ItemMovimiento({ item }: { item: MovimientoTarjeta }) {
-  const esIngreso = item.tipo !== "gasto";
-  return (
-    <li className="actividad-item">
-      <span className="actividad-icono" style={{ background: `${item.color}1f`, color: item.color }}>
-        {esIngreso ? <IconoFlechaArriba /> : <IconoGastos />}
-      </span>
-      <div className="actividad-info">
-        <span className="actividad-descripcion">{item.descripcion}</span>
-        <span className="actividad-subtitulo">{item.subtitulo}</span>
-      </div>
-      <span className={`actividad-monto ${esIngreso ? "valor-positivo" : "valor-negativo"}`}>
-        {esIngreso ? "+" : "-"}${item.monto.toFixed(2)}
-      </span>
-    </li>
-  );
-}
-
-const GRUPOS_CATALOGO: { titulo: string; marca: Marca }[] = [
-  { titulo: "American Express", marca: "amex" },
-  { titulo: "Visa", marca: "visa" },
-  { titulo: "LATAM Pass / Mastercard", marca: "mastercard" },
-];
+import { mensajeError } from "core";
+import { formatMonto } from "core";
 
 interface Props {
   cuentas: Cuenta[];
@@ -135,9 +21,8 @@ interface Props {
   categorias: Categoria[];
   onCrear: (input: Omit<Cuenta, "id" | "createdAt">) => Promise<void>;
   onEliminar: (id: string) => Promise<void>;
-  onRegistrarPago: (cuentaId: string, monto: number) => Promise<void>;
+  onRegistrarPago: (cuentaId: string, monto: number, cuentaOrigenId?: string) => Promise<void>;
   onCrearGasto: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
-  onCrearIngreso: (input: Omit<Ingreso, "id" | "createdAt">) => Promise<void>;
 }
 
 export default function Tarjetas({
@@ -150,18 +35,18 @@ export default function Tarjetas({
   onEliminar,
   onRegistrarPago,
   onCrearGasto,
-  onCrearIngreso,
 }: Props) {
+  const tarjetas = cuentas.filter((c) => c.tipo === "credito");
   const [seleccionadaId, setSeleccionadaId] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
 
   useEffect(() => {
-    if (!cuentas.some((c) => c.id === seleccionadaId)) {
-      setSeleccionadaId(cuentas[0]?.id ?? null);
+    if (!tarjetas.some((c) => c.id === seleccionadaId)) {
+      setSeleccionadaId(tarjetas[0]?.id ?? null);
     }
-  }, [cuentas, seleccionadaId]);
+  }, [tarjetas, seleccionadaId]);
 
-  const cuentaSeleccionada = cuentas.find((c) => c.id === seleccionadaId);
+  const tarjetaSeleccionada = tarjetas.find((c) => c.id === seleccionadaId);
 
   async function crearYCerrar(input: Omit<Cuenta, "id" | "createdAt">) {
     await onCrear(input);
@@ -171,36 +56,37 @@ export default function Tarjetas({
   return (
     <>
       {mostrarForm ? (
-        <NuevaCuenta onCrear={crearYCerrar} onCancelar={() => setMostrarForm(false)} />
+        <NuevaTarjeta onCrear={crearYCerrar} onCancelar={() => setMostrarForm(false)} />
       ) : (
         <button className="btn btn-primary" style={{ marginBottom: 24 }} onClick={() => setMostrarForm(true)}>
           <IconoMas /> Agregar tarjeta
         </button>
       )}
 
-      {cuentas.length === 0 ? (
+      {tarjetas.length === 0 ? (
         <EstadoVacio
           icono={<IconoTarjetas />}
-          titulo="Todavía no agregaste cuentas ni tarjetas"
-          subtitulo="Crea una arriba para empezar a controlar su cupo o saldo."
+          titulo="Todavía no agregaste tarjetas de crédito"
+          subtitulo="Crea una arriba para empezar a controlar su cupo."
         />
       ) : (
         <>
           <div className="galeria-estilos" style={{ marginBottom: 24 }}>
-            {cuentas.map((cuenta) => (
+            {tarjetas.map((cuenta) => (
               <TarjetaVisual
                 key={cuenta.id}
                 cuenta={cuenta}
                 compacta
-                seleccionada={cuenta.id === cuentaSeleccionada?.id}
+                seleccionada={cuenta.id === tarjetaSeleccionada?.id}
                 onClick={() => setSeleccionadaId(cuenta.id)}
               />
             ))}
           </div>
 
-          {cuentaSeleccionada && (
+          {tarjetaSeleccionada && (
             <DetalleTarjeta
-              cuenta={cuentaSeleccionada}
+              cuenta={tarjetaSeleccionada}
+              cuentas={cuentas}
               gastos={gastos}
               pagosTarjeta={pagosTarjeta}
               ingresos={ingresos}
@@ -208,7 +94,6 @@ export default function Tarjetas({
               onEliminar={onEliminar}
               onRegistrarPago={onRegistrarPago}
               onCrearGasto={onCrearGasto}
-              onCrearIngreso={onCrearIngreso}
             />
           )}
         </>
@@ -219,6 +104,7 @@ export default function Tarjetas({
 
 function DetalleTarjeta({
   cuenta,
+  cuentas,
   gastos,
   pagosTarjeta,
   ingresos,
@@ -226,23 +112,22 @@ function DetalleTarjeta({
   onEliminar,
   onRegistrarPago,
   onCrearGasto,
-  onCrearIngreso,
 }: {
   cuenta: Cuenta;
+  cuentas: Cuenta[];
   gastos: Gasto[];
   pagosTarjeta: PagoTarjeta[];
   ingresos: Ingreso[];
   categorias: Categoria[];
   onEliminar: (id: string) => Promise<void>;
-  onRegistrarPago: (cuentaId: string, monto: number) => Promise<void>;
+  onRegistrarPago: (cuentaId: string, monto: number, cuentaOrigenId?: string) => Promise<void>;
   onCrearGasto: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
-  onCrearIngreso: (input: Omit<Ingreso, "id" | "createdAt">) => Promise<void>;
 }) {
   const [verEstadoCuenta, setVerEstadoCuenta] = useState(false);
-  const esCredito = cuenta.tipo === "credito";
-
   const movimientos = movimientosDe(cuenta.id, gastos, pagosTarjeta, ingresos, categorias);
   const recientes = movimientos.slice(0, 5);
+  const categoriasGasto = categorias.filter((c) => c.tipo === "gasto");
+  const cuentasOrigen = cuentas.filter((c) => c.tipo === "ahorro" || c.tipo === "debito");
 
   return (
     <>
@@ -252,9 +137,8 @@ function DetalleTarjeta({
 
           <div className="tarjeta-visual-acciones" style={{ marginTop: 14 }}>
             <div className="tarjeta-detalle-acciones-rapidas">
-              {esCredito && <PagarTarjeta cuenta={cuenta} onRegistrarPago={onRegistrarPago} />}
-              {!esCredito && <RegistrarSueldoInline cuenta={cuenta} onCrear={onCrearIngreso} />}
-              <RegistrarGastoInline cuenta={cuenta} categorias={categorias.filter((c) => c.tipo === "gasto")} onCrear={onCrearGasto} />
+              <PagarTarjeta cuenta={cuenta} cuentasOrigen={cuentasOrigen} onRegistrarPago={onRegistrarPago} />
+              <RegistrarGastoInline cuenta={cuenta} categorias={categoriasGasto} onCrear={onCrearGasto} />
             </div>
             <button className="btn-icon" title="Eliminar tarjeta" onClick={() => onEliminar(cuenta.id)}>
               <IconoPapelera />
@@ -275,7 +159,7 @@ function DetalleTarjeta({
             <EstadoVacio
               icono={<IconoGastos />}
               titulo="Todavía no hay movimientos"
-              subtitulo="Usa los botones de arriba para registrar un gasto o un ingreso en esta cuenta: el saldo se ajusta solo."
+              subtitulo="Usa los botones de arriba para registrar un gasto o un pago en esta tarjeta: el cupo se ajusta solo."
             />
           ) : (
             <ul className="actividad-lista">
@@ -290,12 +174,12 @@ function DetalleTarjeta({
       {verEstadoCuenta && (
         <EstadoCuentaModal
           cuenta={cuenta}
+          cuentasOrigen={cuentasOrigen}
           movimientos={movimientos}
-          categorias={categorias}
+          categoriasGasto={categoriasGasto}
           onEliminar={onEliminar}
           onRegistrarPago={onRegistrarPago}
           onCrearGasto={onCrearGasto}
-          onCrearIngreso={onCrearIngreso}
           onCerrar={() => setVerEstadoCuenta(false)}
         />
       )}
@@ -305,27 +189,25 @@ function DetalleTarjeta({
 
 function EstadoCuentaModal({
   cuenta,
+  cuentasOrigen,
   movimientos,
-  categorias,
+  categoriasGasto,
   onEliminar,
   onRegistrarPago,
   onCrearGasto,
-  onCrearIngreso,
   onCerrar,
 }: {
   cuenta: Cuenta;
-  movimientos: MovimientoTarjeta[];
-  categorias: Categoria[];
+  cuentasOrigen: Cuenta[];
+  movimientos: MovimientoCuenta[];
+  categoriasGasto: Categoria[];
   onEliminar: (id: string) => Promise<void>;
-  onRegistrarPago: (cuentaId: string, monto: number) => Promise<void>;
+  onRegistrarPago: (cuentaId: string, monto: number, cuentaOrigenId?: string) => Promise<void>;
   onCrearGasto: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
-  onCrearIngreso: (input: Omit<Ingreso, "id" | "createdAt">) => Promise<void>;
   onCerrar: () => void;
 }) {
-  const esCredito = cuenta.tipo === "credito";
-  const usado = esCredito && cuenta.cupoTotal !== undefined ? cuenta.cupoTotal - cuenta.disponible : undefined;
-  const usoPorcentaje =
-    esCredito && cuenta.cupoTotal ? ((cuenta.cupoTotal - cuenta.disponible) / cuenta.cupoTotal) * 100 : undefined;
+  const usado = cuenta.cupoTotal !== undefined ? cuenta.cupoTotal - cuenta.disponible : undefined;
+  const usoPorcentaje = cuenta.cupoTotal ? ((cuenta.cupoTotal - cuenta.disponible) / cuenta.cupoTotal) * 100 : undefined;
   const grupos = agruparPorFecha(movimientos);
 
   async function eliminarYCerrar() {
@@ -348,36 +230,35 @@ function EstadoCuentaModal({
             <TarjetaVisual cuenta={cuenta} />
 
             <div className="estado-cuenta-resumen">
-              {esCredito && cuenta.cupoTotal !== undefined ? (
+              {cuenta.cupoTotal !== undefined ? (
                 <>
                   <span className="estado-cuenta-badge">
-                    ${cuenta.disponible.toFixed(2)}
+                    {formatMonto(cuenta.disponible)}
                     <small>Cupo disponible</small>
                   </span>
                   <BarraProgreso porcentaje={usoPorcentaje ?? 0} />
                   <div className="estado-cuenta-cupo-linea">
                     <div>
-                      <span className="valor">${(usado ?? 0).toFixed(2)}</span>
+                      <span className="valor">{formatMonto(usado ?? 0)}</span>
                       <span className="etiqueta">Cupo utilizado</span>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <span className="valor">${cuenta.cupoTotal.toFixed(2)}</span>
+                      <span className="valor">{formatMonto(cuenta.cupoTotal)}</span>
                       <span className="etiqueta">Cupo aprobado</span>
                     </div>
                   </div>
                 </>
               ) : (
                 <span className="estado-cuenta-badge">
-                  ${cuenta.disponible.toFixed(2)}
+                  {formatMonto(cuenta.disponible)}
                   <small>Saldo</small>
                 </span>
               )}
 
               <div className="tarjeta-visual-acciones" style={{ marginTop: 16 }}>
                 <div className="tarjeta-detalle-acciones-rapidas">
-                  {esCredito && <PagarTarjeta cuenta={cuenta} onRegistrarPago={onRegistrarPago} />}
-                  {!esCredito && <RegistrarSueldoInline cuenta={cuenta} onCrear={onCrearIngreso} />}
-                  <RegistrarGastoInline cuenta={cuenta} categorias={categorias.filter((c) => c.tipo === "gasto")} onCrear={onCrearGasto} />
+                  <PagarTarjeta cuenta={cuenta} cuentasOrigen={cuentasOrigen} onRegistrarPago={onRegistrarPago} />
+                  <RegistrarGastoInline cuenta={cuenta} categorias={categoriasGasto} onCrear={onCrearGasto} />
                 </div>
                 <button className="btn-icon" title="Eliminar tarjeta" onClick={eliminarYCerrar}>
                   <IconoPapelera />
@@ -391,7 +272,7 @@ function EstadoCuentaModal({
             <EstadoVacio
               icono={<IconoGastos />}
               titulo="Todavía no hay movimientos"
-              subtitulo="Usa los botones de arriba para registrar un gasto o un ingreso en esta cuenta: el saldo se ajusta solo."
+              subtitulo="Usa los botones de arriba para registrar un gasto o un pago en esta tarjeta: el cupo se ajusta solo."
             />
           ) : (
             grupos.map((grupo) => (
@@ -411,193 +292,7 @@ function EstadoCuentaModal({
   );
 }
 
-function PagarTarjeta({
-  cuenta,
-  onRegistrarPago,
-}: {
-  cuenta: Cuenta;
-  onRegistrarPago: (cuentaId: string, monto: number) => Promise<void>;
-}) {
-  const [monto, setMonto] = useState("");
-  const [abriendo, setAbriendo] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-
-  if (!abriendo) {
-    return (
-      <button className="btn" onClick={() => setAbriendo(true)}>
-        Registrar pago
-      </button>
-    );
-  }
-
-  async function confirmar() {
-    if (!monto) return;
-    setGuardando(true);
-    try {
-      await onRegistrarPago(cuenta.id, Number(monto));
-      setMonto("");
-      setAbriendo(false);
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  return (
-    <div className="pago-tarjeta-inline">
-      <input
-        className="input"
-        type="number"
-        step="0.01"
-        min="0"
-        placeholder="Monto"
-        value={monto}
-        onChange={(e) => setMonto(e.target.value)}
-      />
-      <button className="btn btn-primary" onClick={confirmar} disabled={guardando}>
-        {guardando ? "…" : "Pagar"}
-      </button>
-      <button className="btn" onClick={() => setAbriendo(false)}>
-        Cancelar
-      </button>
-    </div>
-  );
-}
-
-function RegistrarSueldoInline({
-  cuenta,
-  onCrear,
-}: {
-  cuenta: Cuenta;
-  onCrear: (input: Omit<Ingreso, "id" | "createdAt">) => Promise<void>;
-}) {
-  const [monto, setMonto] = useState("");
-  const [abriendo, setAbriendo] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-
-  if (!abriendo) {
-    return (
-      <button className="btn" onClick={() => setAbriendo(true)}>
-        Registrar sueldo
-      </button>
-    );
-  }
-
-  async function confirmar() {
-    if (!monto) return;
-    setGuardando(true);
-    try {
-      await onCrear({ monto: Number(monto), descripcion: "Sueldo", cuentaId: cuenta.id, fecha: hoy() });
-      setMonto("");
-      setAbriendo(false);
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  return (
-    <div className="pago-tarjeta-inline">
-      <input
-        className="input"
-        type="number"
-        step="0.01"
-        min="0"
-        placeholder="Monto"
-        value={monto}
-        onChange={(e) => setMonto(e.target.value)}
-      />
-      <button className="btn btn-primary" onClick={confirmar} disabled={guardando}>
-        {guardando ? "…" : "Guardar"}
-      </button>
-      <button className="btn" onClick={() => setAbriendo(false)}>
-        Cancelar
-      </button>
-    </div>
-  );
-}
-
-function RegistrarGastoInline({
-  cuenta,
-  categorias,
-  onCrear,
-}: {
-  cuenta: Cuenta;
-  categorias: Categoria[];
-  onCrear: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
-}) {
-  const [monto, setMonto] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [categoriaId, setCategoriaId] = useState(categorias[0]?.id ?? "");
-  const [abriendo, setAbriendo] = useState(false);
-  const [guardando, setGuardando] = useState(false);
-
-  if (!abriendo) {
-    return (
-      <button className="btn" onClick={() => setAbriendo(true)}>
-        Registrar gasto
-      </button>
-    );
-  }
-
-  async function confirmar() {
-    if (!monto || !categoriaId) return;
-    setGuardando(true);
-    try {
-      await onCrear({
-        monto: Number(monto),
-        descripcion: descripcion || "Gasto",
-        categoriaId,
-        cuentaId: cuenta.id,
-        fecha: hoy(),
-      });
-      setMonto("");
-      setDescripcion("");
-      setAbriendo(false);
-    } finally {
-      setGuardando(false);
-    }
-  }
-
-  return (
-    <div className="pago-tarjeta-inline">
-      <input
-        className="input"
-        placeholder="Descripción"
-        value={descripcion}
-        onChange={(e) => setDescripcion(e.target.value)}
-        style={{ flex: "1 1 120px" }}
-      />
-      <select
-        className="input"
-        value={categoriaId}
-        onChange={(e) => setCategoriaId(e.target.value)}
-        style={{ flex: "1 1 120px" }}
-      >
-        {categorias.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.nombre}
-          </option>
-        ))}
-      </select>
-      <input
-        className="input"
-        type="number"
-        step="0.01"
-        min="0"
-        placeholder="Monto"
-        value={monto}
-        onChange={(e) => setMonto(e.target.value)}
-      />
-      <button className="btn btn-primary" onClick={confirmar} disabled={guardando || !categoriaId}>
-        {guardando ? "…" : "Guardar"}
-      </button>
-      <button className="btn" onClick={() => setAbriendo(false)}>
-        Cancelar
-      </button>
-    </div>
-  );
-}
-
-function NuevaCuenta({
+function NuevaTarjeta({
   onCrear,
   onCancelar,
 }: {
@@ -605,21 +300,18 @@ function NuevaCuenta({
   onCancelar: () => void;
 }) {
   const [nombre, setNombre] = useState("");
-  const [tipo, setTipo] = useState<TipoCuenta>("credito");
   const [banco, setBanco] = useState<Banco>("banco_guayaquil");
   const [marca, setMarca] = useState<Marca>("amex");
   const [estilo, setEstilo] = useState<string>("");
   const [cupoTotal, setCupoTotal] = useState("");
-  const [saldoInicial, setSaldoInicial] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  const esCredito = tipo === "credito";
-  const hayCatalogo = esCredito && banco === "banco_guayaquil";
+  const hayCatalogo = bancoTieneCatalogo(banco);
 
   function elegirBanco(b: Banco) {
     setBanco(b);
-    if (b !== "banco_guayaquil") setEstilo("");
+    if (!bancoTieneCatalogo(b)) setEstilo("");
   }
 
   function elegirDelCatalogo(id: string, nombreProducto: string, marcaProducto: Marca) {
@@ -633,21 +325,20 @@ function NuevaCuenta({
     setError(null);
     setGuardando(true);
     try {
-      const cupo = esCredito ? Number(cupoTotal) : undefined;
+      const cupo = Number(cupoTotal);
       await onCrear({
         nombre,
-        tipo,
+        tipo: "credito",
         banco,
-        marca: esCredito ? marca : undefined,
+        marca,
         estilo: hayCatalogo && estilo ? estilo : undefined,
         cupoTotal: cupo,
-        disponible: esCredito ? cupo ?? 0 : Number(saldoInicial || 0),
+        disponible: cupo,
       });
       setNombre("");
       setCupoTotal("");
-      setSaldoInicial("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(mensajeError(err));
     } finally {
       setGuardando(false);
     }
@@ -655,20 +346,20 @@ function NuevaCuenta({
 
   const vistaPrevia: Cuenta = {
     id: "vista-previa",
-    nombre: nombre || (hayCatalogo && estilo ? CATALOGO_TARJETAS.find((p) => p.id === estilo)?.nombre : undefined) || "Mi tarjeta",
-    tipo,
+    nombre: nombre || (hayCatalogo && estilo ? productoDe(estilo)?.nombre : undefined) || "Mi tarjeta",
+    tipo: "credito",
     banco,
-    marca: esCredito ? marca : undefined,
+    marca,
     estilo: hayCatalogo && estilo ? estilo : undefined,
-    cupoTotal: esCredito && cupoTotal ? Number(cupoTotal) : esCredito ? 0 : undefined,
-    disponible: esCredito ? Number(cupoTotal || 0) : Number(saldoInicial || 0),
+    cupoTotal: cupoTotal ? Number(cupoTotal) : 0,
+    disponible: Number(cupoTotal || 0),
     createdAt: "",
   };
 
   return (
     <form onSubmit={agregar} className="card" style={{ marginBottom: 24 }}>
       <div className="form-gasto-header">
-        <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Nueva cuenta / tarjeta</h3>
+        <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Nueva tarjeta de crédito</h3>
         <button type="button" className="btn" onClick={onCancelar}>
           Cancelar
         </button>
@@ -686,47 +377,18 @@ function NuevaCuenta({
           />
         </div>
         <div className="campo">
-          <label htmlFor="tipo-cuenta">Tipo</label>
-          <select
-            id="tipo-cuenta"
+          <label htmlFor="cupo-cuenta">Cupo asignado</label>
+          <input
+            id="cupo-cuenta"
             className="input"
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as TipoCuenta)}
-          >
-            <option value="credito">Tarjeta de crédito</option>
-            <option value="debito">Tarjeta de débito</option>
-            <option value="ahorro">Cuenta de ahorros</option>
-            <option value="efectivo">Efectivo</option>
-          </select>
+            type="number"
+            step="0.01"
+            min="0"
+            value={cupoTotal}
+            onChange={(e) => setCupoTotal(e.target.value)}
+            required
+          />
         </div>
-        {esCredito ? (
-          <div className="campo">
-            <label htmlFor="cupo-cuenta">Cupo asignado</label>
-            <input
-              id="cupo-cuenta"
-              className="input"
-              type="number"
-              step="0.01"
-              min="0"
-              value={cupoTotal}
-              onChange={(e) => setCupoTotal(e.target.value)}
-              required
-            />
-          </div>
-        ) : (
-          <div className="campo">
-            <label htmlFor="saldo-cuenta">Saldo inicial</label>
-            <input
-              id="saldo-cuenta"
-              className="input"
-              type="number"
-              step="0.01"
-              min="0"
-              value={saldoInicial}
-              onChange={(e) => setSaldoInicial(e.target.value)}
-            />
-          </div>
-        )}
         <button type="submit" className="btn btn-primary" disabled={guardando}>
           {guardando ? "Guardando…" : "Agregar"}
         </button>
@@ -736,27 +398,25 @@ function NuevaCuenta({
         <label>Banco</label>
         <div className="galeria-estilos">
           {OPCIONES_BANCO.map((b) => (
-            <button
+            <SwatchBanco
               key={b}
-              type="button"
-              className={`swatch-banco ${banco === b ? "swatch-banco-activo" : ""}`}
-              style={{ background: GRADIENTE_BANCO[b] }}
+              banco={b}
+              colorFondo={cssGradiente(GRADIENTE_BANCO[b])}
+              seleccionado={banco === b}
               onClick={() => elegirBanco(b)}
-            >
-              {ETIQUETA_BANCO[b]}
-            </button>
+            />
           ))}
         </div>
       </div>
 
       {hayCatalogo ? (
         <div className="campo">
-          <label>Diseño de la tarjeta (catálogo Banco Guayaquil)</label>
-          {GRUPOS_CATALOGO.map((grupo) => (
-            <div key={grupo.titulo} className="galeria-estilos-grupo">
-              <span className="galeria-estilos-titulo">{grupo.titulo}</span>
+          <label>Diseño de la tarjeta (catálogo {ETIQUETA_BANCO[banco]})</label>
+          {gruposDelCatalogo(banco).map((grupo) => (
+            <div key={grupo.familia} className="galeria-estilos-grupo">
+              <span className="galeria-estilos-titulo">{grupo.familia}</span>
               <div className="galeria-estilos">
-                {CATALOGO_TARJETAS.filter((p) => p.marca === grupo.marca).map((producto) => (
+                {grupo.items.map((producto) => (
                   <TarjetaVisual
                     key={producto.id}
                     compacta
@@ -779,30 +439,28 @@ function NuevaCuenta({
           ))}
         </div>
       ) : (
-        esCredito && (
-          <div className="campo">
-            <label>Marca</label>
-            <div className="galeria-estilos">
-              {OPCIONES_MARCA.map((m) => (
-                <TarjetaVisual
-                  key={m}
-                  compacta
-                  seleccionada={marca === m}
-                  onClick={() => setMarca(m)}
-                  cuenta={{
-                    id: m,
-                    nombre: nombre || "Mi tarjeta",
-                    tipo: "credito",
-                    banco,
-                    marca: m,
-                    disponible: 0,
-                    createdAt: "",
-                  }}
-                />
-              ))}
-            </div>
+        <div className="campo">
+          <label>Marca</label>
+          <div className="galeria-estilos">
+            {OPCIONES_MARCA.map((m) => (
+              <TarjetaVisual
+                key={m}
+                compacta
+                seleccionada={marca === m}
+                onClick={() => setMarca(m)}
+                cuenta={{
+                  id: m,
+                  nombre: nombre || "Mi tarjeta",
+                  tipo: "credito",
+                  banco,
+                  marca: m,
+                  disponible: 0,
+                  createdAt: "",
+                }}
+              />
+            ))}
           </div>
-        )
+        </div>
       )}
 
       <div className="campo" style={{ marginTop: 8 }}>

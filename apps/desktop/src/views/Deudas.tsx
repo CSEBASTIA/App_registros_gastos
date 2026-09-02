@@ -3,6 +3,7 @@ import type { Cuenta, Deuda, Endeudamiento, TipoDeuda } from "core";
 import BarraProgreso from "../components/BarraProgreso";
 import { IconoDeudas, IconoPapelera } from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
+import { mensajeError } from "core";
 
 interface Props {
   deudas: Deuda[];
@@ -112,7 +113,10 @@ function FilaDeuda({
 
   return (
     <tr>
-      <td>{deuda.nombre}</td>
+      <td>
+        {deuda.nombre}
+        {deuda.gastoId && <span className="etiqueta-diferido">Generada automáticamente</span>}
+      </td>
       <td>{etiquetaTipo(deuda.tipo)}</td>
       <td>{nombreCuenta ?? "—"}</td>
       <td>${deuda.saldoPendiente.toFixed(2)}</td>
@@ -153,7 +157,16 @@ function FilaDeuda({
 }
 
 function etiquetaTipo(tipo: TipoDeuda) {
-  return tipo === "prestamo" ? "Préstamo" : tipo === "tarjeta" ? "Tarjeta" : "Otro";
+  switch (tipo) {
+    case "prestamo":
+      return "Préstamo";
+    case "tarjeta":
+      return "Tarjeta";
+    case "diferido":
+      return "Diferido";
+    default:
+      return "Otro";
+  }
 }
 
 function NuevaDeuda({
@@ -193,7 +206,7 @@ function NuevaDeuda({
       setProximoPago("");
       setCuentaId("");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(mensajeError(err));
     } finally {
       setGuardando(false);
     }

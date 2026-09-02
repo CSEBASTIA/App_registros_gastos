@@ -48,6 +48,7 @@ export type Database = {
           cuenta_id: string | null;
           metodo_pago: string | null;
           factura_path: string | null;
+          meses_diferido: number | null;
           fecha: string;
           created_at: string;
           usuario_id: string;
@@ -61,6 +62,7 @@ export type Database = {
           cuenta_id?: string | null;
           metodo_pago?: string | null;
           factura_path?: string | null;
+          meses_diferido?: number | null;
           fecha?: string;
           created_at?: string;
           usuario_id?: string;
@@ -74,6 +76,7 @@ export type Database = {
           cuenta_id?: string | null;
           metodo_pago?: string | null;
           factura_path?: string | null;
+          meses_diferido?: number | null;
           fecha?: string;
           created_at?: string;
           usuario_id?: string;
@@ -183,6 +186,7 @@ export type Database = {
         Row: {
           id: string;
           cuenta_id: string;
+          cuenta_origen_id: string | null;
           monto: number;
           fecha: string;
           created_at: string;
@@ -191,6 +195,7 @@ export type Database = {
         Insert: {
           id?: string;
           cuenta_id: string;
+          cuenta_origen_id?: string | null;
           monto: number;
           fecha?: string;
           created_at?: string;
@@ -199,6 +204,7 @@ export type Database = {
         Update: {
           id?: string;
           cuenta_id?: string;
+          cuenta_origen_id?: string | null;
           monto?: number;
           fecha?: string;
           created_at?: string;
@@ -218,6 +224,7 @@ export type Database = {
           fecha_inicio: string;
           proximo_pago: string | null;
           cuenta_id: string | null;
+          gasto_id: string | null;
           created_at: string;
           usuario_id: string;
         };
@@ -232,6 +239,7 @@ export type Database = {
           fecha_inicio?: string;
           proximo_pago?: string | null;
           cuenta_id?: string | null;
+          gasto_id?: string | null;
           created_at?: string;
           usuario_id?: string;
         };
@@ -246,6 +254,7 @@ export type Database = {
           fecha_inicio?: string;
           proximo_pago?: string | null;
           cuenta_id?: string | null;
+          gasto_id?: string | null;
           created_at?: string;
           usuario_id?: string;
         };

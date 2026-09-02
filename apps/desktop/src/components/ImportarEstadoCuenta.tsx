@@ -1,6 +1,7 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import type { Categoria, Cuenta, Gasto } from "core";
 import { leerEstadoCuenta, parseEstadoCuenta, type TransaccionExtraida } from "../lib/estadoCuenta";
+import { mensajeError } from "core";
 
 interface Fila extends TransaccionExtraida {
   id: number;
@@ -56,7 +57,7 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
       );
       setFase("revisar");
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(mensajeError(err));
       setFase("elegir");
     }
   }
@@ -83,7 +84,7 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
       );
       onCerrar();
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+      setError(mensajeError(err));
       setFase("revisar");
     }
   }

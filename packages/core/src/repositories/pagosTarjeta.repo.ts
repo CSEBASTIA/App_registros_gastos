@@ -8,6 +8,7 @@ function filaAPago(row: PagoRow): PagoTarjeta {
   return {
     id: row.id,
     cuentaId: row.cuenta_id,
+    cuentaOrigenId: row.cuenta_origen_id ?? undefined,
     monto: Number(row.monto),
     fecha: row.fecha,
     createdAt: row.created_at,
@@ -30,6 +31,7 @@ export async function crearPagoTarjeta(
     .from("pagos_tarjeta")
     .insert({
       cuenta_id: pago.cuentaId,
+      cuenta_origen_id: pago.cuentaOrigenId ?? null,
       monto: pago.monto,
       fecha: pago.fecha,
     })

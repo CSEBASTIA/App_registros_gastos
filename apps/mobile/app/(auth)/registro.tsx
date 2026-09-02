@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View, Text, TextInput, Pressable, StyleSheet } from "react-native";
 import { Link, useRouter } from "expo-router";
+import { mensajeError } from "core";
 import { supabase } from "../../lib/supabase";
 
 export default function Registro() {
@@ -16,7 +17,7 @@ export default function Registro() {
     const { error } = await supabase.auth.signUp({ email, password });
     setCargando(false);
     if (error) {
-      setError(error.message);
+      setError(mensajeError(error));
       return;
     }
     router.replace("/login");

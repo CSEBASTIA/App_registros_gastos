@@ -84,6 +84,7 @@ function NuevaCuenta({
   const [tipo, setTipo] = useState<TipoCuenta>("ahorro");
   const [banco, setBanco] = useState<Banco>("banco_guayaquil");
   const [saldoInicial, setSaldoInicial] = useState("");
+  const [identificador, setIdentificador] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -95,9 +96,16 @@ function NuevaCuenta({
     setError(null);
     setGuardando(true);
     try {
-      await onCrear({ nombre, tipo, banco, disponible: Number(saldoInicial || 0) });
+      await onCrear({
+        nombre,
+        tipo,
+        banco,
+        disponible: Number(saldoInicial || 0),
+        identificador: identificador.trim() || undefined,
+      });
       setNombre("");
       setSaldoInicial("");
+      setIdentificador("");
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -119,6 +127,14 @@ function NuevaCuenta({
         opciones={OPCIONES_TIPO.map((o) => ({ valor: o.valor, etiqueta: o.etiqueta }))}
       />
       <Campo etiqueta="Saldo inicial" keyboardType="decimal-pad" value={saldoInicial} onChangeText={setSaldoInicial} />
+      <Campo
+        etiqueta="Últimos dígitos (opcional)"
+        placeholder="1234"
+        keyboardType="number-pad"
+        maxLength={4}
+        value={identificador}
+        onChangeText={setIdentificador}
+      />
       <SelectorChips
         titulo="Banco"
         valor={banco}

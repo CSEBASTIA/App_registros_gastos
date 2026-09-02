@@ -20,7 +20,7 @@ export default function Registro() {
       setError(mensajeError(error));
       return;
     }
-    router.replace("/login");
+    router.replace("/conectar-correo");
   }
 
   return (

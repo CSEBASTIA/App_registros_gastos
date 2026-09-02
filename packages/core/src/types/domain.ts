@@ -49,8 +49,32 @@ export interface Cuenta {
   estilo?: string;
   /** Solo aplica a cuentas de tipo "credito". */
   cupoTotal?: number;
+  /** Últimos 3-4 dígitos de la cuenta/tarjeta — para distinguir cuál cuenta es cuando hay más de una del mismo banco al leer un correo bancario. */
+  identificador?: string;
   /** Saldo usable: para crédito es el cupo disponible, para el resto es el saldo. */
   disponible: number;
+  createdAt: string;
+}
+
+export type TipoTransaccionDetectada = "gasto" | "ingreso";
+export type EstadoTransaccionDetectada = "pendiente" | "confirmado" | "descartado";
+
+/** Un gasto/ingreso que la app detectó sola leyendo un correo bancario, pendiente de revisión antes de guardarse. */
+export interface TransaccionDetectada {
+  id: string;
+  /** Id del mensaje en el proveedor de correo — evita procesar el mismo aviso dos veces. */
+  mensajeId: string;
+  tipo: TipoTransaccionDetectada;
+  monto: number;
+  descripcion: string;
+  /** undefined = no se pudo identificar el banco del remitente. */
+  banco?: Banco;
+  /** undefined = no se pudo desambiguar la cuenta (ej. dos cuentas del mismo banco); el usuario la elige al revisar. */
+  cuentaId?: string;
+  categoriaId?: string;
+  fecha: string;
+  correoAsunto?: string;
+  estado: EstadoTransaccionDetectada;
   createdAt: string;
 }
 

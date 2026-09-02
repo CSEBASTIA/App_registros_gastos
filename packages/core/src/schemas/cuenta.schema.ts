@@ -8,6 +8,7 @@ export const cuentaSchema = z
     marca: z.enum(["amex", "visa", "mastercard", "diners", "otro"]).optional(),
     estilo: z.string().min(1).optional(),
     cupoTotal: z.number().positive().optional(),
+    identificador: z.string().trim().min(3).max(4).regex(/^\d+$/, "Solo dígitos").optional(),
     disponible: z.number(),
   })
   .refine((c) => c.tipo !== "credito" || c.cupoTotal !== undefined, {

@@ -3,7 +3,7 @@ import * as pdfjsLib from "pdfjs-dist";
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
 // Vite resuelve esto a una URL del archivo del worker (necesario para que pdf.js corra fuera del hilo principal).
 import pdfjsWorkerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { normalizarNumero, sugerirCategoria } from "./ocr";
+import { normalizarNumero, sugerirCategoria } from "core";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorkerUrl;
 

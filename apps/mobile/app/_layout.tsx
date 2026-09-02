@@ -26,10 +26,17 @@ export default function RootLayout() {
     // tab por defecto es "resumen") — pasa también en el arranque en frío
     // con sesión ya guardada.
     const enRaiz = segments.length === 0;
+    // último paso del registro: si la confirmación de email está apagada,
+    // signUp ya deja sesión activa acá — no hay que sacar al usuario antes
+    // de que decida si conecta el correo o no (esa pantalla navega ella
+    // misma cuando termina).
+    const enConectarCorreo = segments[1] === "conectar-correo";
 
     if (!session && !enGrupoAuth) {
       router.replace("/login");
-    } else if (session && (enGrupoAuth || enRaiz)) {
+    } else if (session && enRaiz) {
+      router.replace("/resumen");
+    } else if (session && enGrupoAuth && !enConectarCorreo) {
       router.replace("/resumen");
     }
   }, [session, segments]);
@@ -55,6 +62,8 @@ export default function RootLayout() {
       <Stack.Screen name="tarjeta/[id]" options={{ title: "Tarjeta" }} />
       <Stack.Screen name="gasto/nuevo" options={{ title: "Nuevo gasto", presentation: "modal" }} />
       <Stack.Screen name="ingreso/nuevo" options={{ title: "Nuevo ingreso", presentation: "modal" }} />
+      <Stack.Screen name="correo" options={{ title: "Correo" }} />
+      <Stack.Screen name="bandeja" options={{ title: "Bandeja de revisión" }} />
     </Stack>
   );
 }

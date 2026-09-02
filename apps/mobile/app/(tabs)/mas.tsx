@@ -1,6 +1,8 @@
+import { useCallback, useState } from "react";
 import { View, Text, Pressable, StyleSheet, ScrollView } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { listarTransaccionesPendientes } from "core";
 import { supabase } from "../../lib/supabase";
 import { color, radius, spacing } from "../../lib/theme";
 
@@ -9,14 +11,40 @@ const ITEMS: { titulo: string; subtitulo: string; ruta: string; icono: keyof typ
   { titulo: "Deudas", subtitulo: "Préstamos, endeudamiento", ruta: "/deudas", icono: "alert-circle-outline" },
   { titulo: "Recordatorios", subtitulo: "Pagos y cuotas próximas", ruta: "/recordatorios", icono: "notifications-outline" },
   { titulo: "Categorías", subtitulo: "Organizá gastos e ingresos", ruta: "/categorias", icono: "pricetag-outline" },
+  { titulo: "Correo", subtitulo: "Conectar Outlook para detectar movimientos", ruta: "/correo", icono: "mail-outline" },
 ];
 
 export default function Mas() {
   const router = useRouter();
+  const [pendientes, setPendientes] = useState(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      listarTransaccionesPendientes()
+        .then((items) => setPendientes(items.length))
+        .catch(() => setPendientes(0));
+    }, [])
+  );
 
   return (
     <ScrollView style={styles.contenedor} contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
       <Text style={styles.titulo}>Más</Text>
+
+      <Pressable style={styles.fila} onPress={() => router.push("/bandeja")}>
+        <View style={styles.icono}>
+          <Ionicons name="file-tray-full-outline" size={20} color={color.primary} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.filaTitulo}>Bandeja de revisión</Text>
+          <Text style={styles.filaSubtitulo}>Movimientos detectados en tu correo, sin confirmar</Text>
+        </View>
+        {pendientes > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeTexto}>{pendientes}</Text>
+          </View>
+        )}
+        <Ionicons name="chevron-forward" size={18} color={color.textMuted} />
+      </Pressable>
 
       {ITEMS.map((item) => (
         <Pressable key={item.ruta} style={styles.fila} onPress={() => router.push(item.ruta as never)}>
@@ -64,5 +92,7 @@ const styles = StyleSheet.create({
   },
   filaTitulo: { fontSize: 15, fontWeight: "600", color: color.text },
   filaSubtitulo: { fontSize: 12, color: color.textMuted },
+  badge: { backgroundColor: color.danger, borderRadius: radius.pill, paddingHorizontal: 8, paddingVertical: 2 },
+  badgeTexto: { color: "#fff", fontSize: 11, fontWeight: "700" },
   salir: { marginTop: spacing(4) },
 });

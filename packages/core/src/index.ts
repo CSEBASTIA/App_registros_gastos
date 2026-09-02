@@ -7,6 +7,8 @@ export * from "./lib/mensajeError";
 export * from "./lib/formatMonto";
 export * from "./lib/categorias";
 export * from "./lib/metodoPago";
+export * from "./lib/textoFinanciero";
+export * from "./lib/correoBancario";
 export * from "./schemas/gasto.schema";
 export * from "./schemas/presupuesto.schema";
 export * from "./schemas/cuenta.schema";
@@ -45,6 +47,12 @@ export {
   eliminarRecordatorio,
   marcarCompletado,
 } from "./repositories/recordatorios.repo";
+export {
+  listarTransaccionesPendientes,
+  insertarTransaccionesDetectadas,
+  marcarTransaccionDetectada,
+  type TransaccionDetectadaInsert,
+} from "./repositories/transaccionesDetectadas.repo";
 
 export * from "./usecases/crearCategoria";
 export * from "./usecases/crearGasto";

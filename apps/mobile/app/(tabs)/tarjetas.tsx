@@ -80,6 +80,7 @@ function NuevaTarjeta({
   const [banco, setBanco] = useState<Banco>("banco_guayaquil");
   const [marca, setMarca] = useState<Marca>("visa");
   const [cupoTotal, setCupoTotal] = useState("");
+  const [identificador, setIdentificador] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -102,9 +103,11 @@ function NuevaTarjeta({
         marca,
         cupoTotal: Number(cupoTotal),
         disponible: Number(cupoTotal),
+        identificador: identificador.trim() || undefined,
       });
       setNombre("");
       setCupoTotal("");
+      setIdentificador("");
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -120,6 +123,14 @@ function NuevaTarjeta({
       </View>
       <Campo etiqueta="Nombre" placeholder="Visa Clásica" value={nombre} onChangeText={setNombre} />
       <Campo etiqueta="Cupo total" keyboardType="decimal-pad" value={cupoTotal} onChangeText={setCupoTotal} />
+      <Campo
+        etiqueta="Últimos dígitos (opcional)"
+        placeholder="1234"
+        keyboardType="number-pad"
+        maxLength={4}
+        value={identificador}
+        onChangeText={setIdentificador}
+      />
       <SelectorChips
         titulo="Banco"
         valor={banco}

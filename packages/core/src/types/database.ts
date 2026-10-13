@@ -116,6 +116,7 @@ export type Database = {
           marca: string | null;
           estilo: string | null;
           cupo_total: number | null;
+          identificador: string | null;
           disponible: number;
           created_at: string;
           usuario_id: string;
@@ -128,6 +129,7 @@ export type Database = {
           marca?: string | null;
           estilo?: string | null;
           cupo_total?: number | null;
+          identificador?: string | null;
           disponible?: number;
           created_at?: string;
           usuario_id?: string;
@@ -140,7 +142,56 @@ export type Database = {
           marca?: string | null;
           estilo?: string | null;
           cupo_total?: number | null;
+          identificador?: string | null;
           disponible?: number;
+          created_at?: string;
+          usuario_id?: string;
+        };
+        Relationships: [];
+      };
+      transacciones_detectadas: {
+        Row: {
+          id: string;
+          mensaje_id: string;
+          tipo: string;
+          monto: number;
+          descripcion: string;
+          banco: string | null;
+          cuenta_id: string | null;
+          categoria_id: string | null;
+          fecha: string;
+          correo_asunto: string | null;
+          estado: string;
+          created_at: string;
+          usuario_id: string;
+        };
+        Insert: {
+          id?: string;
+          mensaje_id: string;
+          tipo: string;
+          monto: number;
+          descripcion: string;
+          banco?: string | null;
+          cuenta_id?: string | null;
+          categoria_id?: string | null;
+          fecha: string;
+          correo_asunto?: string | null;
+          estado?: string;
+          created_at?: string;
+          usuario_id?: string;
+        };
+        Update: {
+          id?: string;
+          mensaje_id?: string;
+          tipo?: string;
+          monto?: number;
+          descripcion?: string;
+          banco?: string | null;
+          cuenta_id?: string | null;
+          categoria_id?: string | null;
+          fecha?: string;
+          correo_asunto?: string | null;
+          estado?: string;
           created_at?: string;
           usuario_id?: string;
         };

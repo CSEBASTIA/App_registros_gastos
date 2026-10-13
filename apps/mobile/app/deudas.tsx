@@ -1,5 +1,14 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, Alert, StyleSheet } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  Alert,
+  StyleSheet,
+} from "react-native";
 import { useFocusEffect } from "expo-router";
 import {
   listarDeudas,
@@ -21,7 +30,8 @@ import ErrorTexto from "../components/ErrorTexto";
 import SelectorChips from "../components/SelectorChips";
 import BarraProgreso from "../components/BarraProgreso";
 import EstadoVacio from "../components/EstadoVacio";
-import { color, radius, spacing } from "../lib/theme";
+import { radius, spacing, useTheme, font, type Colors } from "../lib/theme";
+import { BlurFade } from "../components/Motion";
 
 function mesActual() {
   return new Date().toISOString().slice(0, 7);
@@ -37,22 +47,36 @@ const ETIQUETA_TIPO: Record<TipoDeuda, string> = {
   otro: "Otro",
 };
 const ETIQUETA_NIVEL = { bajo: "Bajo", moderado: "Moderado", alto: "Alto" };
-const COLOR_NIVEL = { bajo: color.success, moderado: "#e0a53f", alto: color.danger };
 
 export default function DeudasScreen() {
+  const [cargando, setCargando] = useState(true);
+  const { color } = useTheme();
+  const styles = createStyles(color);
+  const COLOR_NIVEL = {
+    bajo: color.success,
+    moderado: color.warning,
+    alto: color.danger,
+  };
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [ingresoMensual, setIngresoMensual] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
+    setCargando(true);
+    setError(null);
     Promise.all([listarDeudas(), listarCuentas(), listarIngresos()])
       .then(([d, c, i]) => {
         setDeudas(d);
         setCuentas(c);
-        setIngresoMensual(i.filter((x) => x.fecha.startsWith(mesActual())).reduce((a, x) => a + x.monto, 0));
+        setIngresoMensual(
+          i
+            .filter((x) => x.fecha.startsWith(mesActual()))
+            .reduce((a, x) => a + x.monto, 0),
+        );
       })
-      .catch((err) => setError(mensajeError(err)));
+      .catch((err) => setError(mensajeError(err)))
+      .finally(() => setCargando(false));
   }, []);
 
   useFocusEffect(cargar);
@@ -62,56 +86,147 @@ export default function DeudasScreen() {
   function confirmarEliminar(deuda: Deuda) {
     Alert.alert("Eliminar deuda", `¿Eliminar "${deuda.nombre}"?`, [
       { text: "Cancelar", style: "cancel" },
-      { text: "Eliminar", style: "destructive", onPress: () => eliminarDeuda(deuda.id).then(cargar) },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: () => eliminarDeuda(deuda.id).then(cargar),
+      },
     ]);
   }
 
-  return (
-    <ScrollView style={styles.contenedor} contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      <Tarjeta>
-        <View style={styles.resumenFila}>
-          <View>
-            <Text style={styles.etiqueta}>Saldo pendiente total</Text>
-            <Text style={styles.valorGrande}>${endeudamiento.totalPendiente.toFixed(2)}</Text>
-          </View>
-          <View>
-            <Text style={styles.etiqueta}>Cuotas mensuales</Text>
-            <Text style={styles.valorGrande}>${endeudamiento.cuotasMensuales.toFixed(2)}</Text>
-          </View>
-        </View>
-        <View style={{ gap: spacing(1.5) }}>
-          <View style={styles.resumenFila}>
-            <Text style={styles.etiqueta}>Nivel de endeudamiento</Text>
-            <Text style={[styles.nivel, { color: COLOR_NIVEL[endeudamiento.nivel] }]}>
-              {endeudamiento.porcentaje.toFixed(0)}% · {ETIQUETA_NIVEL[endeudamiento.nivel]}
-            </Text>
-          </View>
-          <BarraProgreso porcentaje={endeudamiento.porcentaje} />
-        </View>
-      </Tarjeta>
-
-      <NuevaDeuda cuentas={cuentas} onCreada={cargar} />
-
-      {error && <ErrorTexto>{error}</ErrorTexto>}
-
-      {deudas.length === 0 ? (
-        <EstadoVacio
-          icono="alert-circle-outline"
-          titulo="No tenés deudas ni préstamos registrados"
-          subtitulo="Cuando agregues una, vas a ver acá tu nivel de endeudamiento."
+  if (cargando)
+    return (
+      <View
+        style={[
+          styles.contenedor,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing(6),
+            gap: spacing(3),
+          },
+        ]}
+        accessibilityLiveRegion="polite"
+      >
+        <ActivityIndicator
+          color={color.primary}
+          accessibilityLabel="Cargando"
         />
-      ) : (
-        <View style={{ gap: spacing(3) }}>
-          {deudas.map((d) => (
-            <FilaDeuda key={d.id} deuda={d} onCambio={cargar} onEliminar={() => confirmarEliminar(d)} />
-          ))}
-        </View>
-      )}
-    </ScrollView>
+        <Text
+          style={{
+            fontFamily: font.body,
+            fontSize: 14,
+            color: color.textMuted,
+          }}
+        >
+          Cargando tus datos…
+        </Text>
+      </View>
+    );
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: color.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        style={styles.contenedor}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{
+          padding: spacing(5),
+          paddingBottom: spacing(8),
+          gap: spacing(4),
+        }}
+      >
+        <BlurFade style={{ gap: spacing(2) }}>
+          <Text accessibilityRole="header" style={styles.screenTitle}>
+            Deudas
+          </Text>
+          <Text style={styles.screenIntro}>
+            Tus saldos y cuotas pendientes.
+          </Text>
+        </BlurFade>
+        <Tarjeta>
+          <View style={styles.resumenFila}>
+            <View>
+              <Text style={styles.etiqueta}>Saldo pendiente total</Text>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+                style={styles.valorGrande}
+              >
+                ${endeudamiento.totalPendiente.toFixed(2)}
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.etiqueta}>Cuotas mensuales</Text>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.65}
+                style={styles.valorGrande}
+              >
+                ${endeudamiento.cuotasMensuales.toFixed(2)}
+              </Text>
+            </View>
+          </View>
+          <View style={{ gap: spacing(1.5) }}>
+            <View style={styles.resumenFila}>
+              <Text style={styles.etiqueta}>Nivel de endeudamiento</Text>
+              <Text
+                style={[
+                  styles.nivel,
+                  { color: COLOR_NIVEL[endeudamiento.nivel] },
+                ]}
+              >
+                {endeudamiento.porcentaje.toFixed(0)}% ·{" "}
+                {ETIQUETA_NIVEL[endeudamiento.nivel]}
+              </Text>
+            </View>
+            <BarraProgreso porcentaje={endeudamiento.porcentaje} />
+          </View>
+        </Tarjeta>
+
+        <NuevaDeuda cuentas={cuentas} onCreada={cargar} />
+
+        {error && <ErrorTexto>{error}</ErrorTexto>}
+
+        {deudas.length === 0 ? (
+          <EstadoVacio
+            icono="alert-circle-outline"
+            titulo="No tenés deudas ni préstamos registrados"
+            subtitulo="Cuando agregues una, vas a ver acá tu nivel de endeudamiento."
+          />
+        ) : (
+          <View style={{ gap: spacing(3) }}>
+            {deudas.map((d) => (
+              <FilaDeuda
+                key={d.id}
+                deuda={d}
+                onCambio={cargar}
+                onEliminar={() => confirmarEliminar(d)}
+              />
+            ))}
+          </View>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-function FilaDeuda({ deuda, onCambio, onEliminar }: { deuda: Deuda; onCambio: () => void; onEliminar: () => void }) {
+function FilaDeuda({
+  deuda,
+  onCambio,
+  onEliminar,
+}: {
+  deuda: Deuda;
+  onCambio: () => void;
+  onEliminar: () => void;
+}) {
+  const { color } = useTheme();
+  const styles = createStyles(color);
   const [abonando, setAbonando] = useState(false);
   const [monto, setMonto] = useState("");
 
@@ -128,23 +243,45 @@ function FilaDeuda({ deuda, onCambio, onEliminar }: { deuda: Deuda; onCambio: ()
       <View style={styles.resumenFila}>
         <View style={{ flex: 1 }}>
           <Text style={styles.deudaNombre}>{deuda.nombre}</Text>
-          {deuda.gastoId && <Text style={styles.etiquetaAuto}>Generada automáticamente</Text>}
+          {deuda.gastoId && (
+            <Text style={styles.etiquetaAuto}>Generada automáticamente</Text>
+          )}
         </View>
         <Text style={styles.tipoTexto}>{ETIQUETA_TIPO[deuda.tipo]}</Text>
       </View>
       <View style={styles.resumenFila}>
         <View>
           <Text style={styles.etiqueta}>Saldo pendiente</Text>
-          <Text style={styles.valorMedio}>${deuda.saldoPendiente.toFixed(2)}</Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+            style={styles.valorMedio}
+          >
+            ${deuda.saldoPendiente.toFixed(2)}
+          </Text>
         </View>
         <View>
           <Text style={styles.etiqueta}>Cuota mensual</Text>
-          <Text style={styles.valorMedio}>${deuda.cuotaMensual.toFixed(2)}</Text>
+          <Text
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            minimumFontScale={0.65}
+            style={styles.valorMedio}
+          >
+            ${deuda.cuotaMensual.toFixed(2)}
+          </Text>
         </View>
       </View>
       {abonando ? (
-        <View style={{ flexDirection: "row", gap: spacing(2), alignItems: "center" }}>
-          <Campo etiqueta="" placeholder="Monto" keyboardType="decimal-pad" value={monto} onChangeText={setMonto} style={{ flex: 1 }} />
+        <View style={{ gap: spacing(3) }}>
+          <Campo
+            etiqueta=""
+            placeholder="Monto"
+            keyboardType="decimal-pad"
+            value={monto}
+            onChangeText={setMonto}
+          />
           <Boton titulo="Abonar" variante="primario" onPress={confirmar} />
           <Boton titulo="Cancelar" onPress={() => setAbonando(false)} />
         </View>
@@ -163,7 +300,15 @@ function FilaDeuda({ deuda, onCambio, onEliminar }: { deuda: Deuda; onCambio: ()
   );
 }
 
-function NuevaDeuda({ cuentas, onCreada }: { cuentas: Cuenta[]; onCreada: () => void }) {
+function NuevaDeuda({
+  cuentas,
+  onCreada,
+}: {
+  cuentas: Cuenta[];
+  onCreada: () => void;
+}) {
+  const { color } = useTheme();
+  const styles = createStyles(color);
   const [nombre, setNombre] = useState("");
   const [tipo, setTipo] = useState<Exclude<TipoDeuda, "diferido">>("prestamo");
   const [montoTotal, setMontoTotal] = useState("");
@@ -174,7 +319,12 @@ function NuevaDeuda({ cuentas, onCreada }: { cuentas: Cuenta[]; onCreada: () => 
   const [abierto, setAbierto] = useState(false);
 
   if (!abierto) {
-    return <Boton titulo="+ Nueva deuda / préstamo" onPress={() => setAbierto(true)} />;
+    return (
+      <Boton
+        titulo="+ Nueva deuda / préstamo"
+        onPress={() => setAbierto(true)}
+      />
+    );
   }
 
   async function agregar() {
@@ -212,7 +362,12 @@ function NuevaDeuda({ cuentas, onCreada }: { cuentas: Cuenta[]; onCreada: () => 
         <Text style={styles.deudaNombre}>Nueva deuda / préstamo</Text>
         <Boton titulo="Cancelar" onPress={() => setAbierto(false)} />
       </View>
-      <Campo etiqueta="Nombre" placeholder="Préstamo carro" value={nombre} onChangeText={setNombre} />
+      <Campo
+        etiqueta="Nombre"
+        placeholder="Préstamo carro"
+        value={nombre}
+        onChangeText={setNombre}
+      />
       <SelectorChips
         titulo="Tipo"
         valor={tipo}
@@ -223,36 +378,95 @@ function NuevaDeuda({ cuentas, onCreada }: { cuentas: Cuenta[]; onCreada: () => 
           { valor: "otro", etiqueta: "Otro" },
         ]}
       />
-      <Campo etiqueta="Monto total" keyboardType="decimal-pad" value={montoTotal} onChangeText={setMontoTotal} />
-      <Campo etiqueta="Cuota mensual" keyboardType="decimal-pad" value={cuotaMensual} onChangeText={setCuotaMensual} />
+      <Campo
+        etiqueta="Monto total"
+        keyboardType="decimal-pad"
+        value={montoTotal}
+        onChangeText={setMontoTotal}
+      />
+      <Campo
+        etiqueta="Cuota mensual"
+        keyboardType="decimal-pad"
+        value={cuotaMensual}
+        onChangeText={setCuotaMensual}
+      />
       <SelectorChips
         titulo="Cuenta asociada"
         valor={cuentaId}
         onCambiar={setCuentaId}
-        opciones={[{ valor: "", etiqueta: "Sin asignar" }, ...cuentas.map((c) => ({ valor: c.id, etiqueta: c.nombre }))]}
+        opciones={[
+          { valor: "", etiqueta: "Sin asignar" },
+          ...cuentas.map((c) => ({ valor: c.id, etiqueta: c.nombre })),
+        ]}
       />
       {error && <ErrorTexto>{error}</ErrorTexto>}
-      <Boton titulo={guardando ? "Guardando…" : "Agregar"} variante="primario" onPress={agregar} disabled={guardando} />
+      <Boton
+        titulo={guardando ? "Guardando…" : "Agregar"}
+        variante="primario"
+        onPress={agregar}
+        loading={guardando}
+        disabled={guardando}
+      />
     </Tarjeta>
   );
 }
 
-const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: color.bg },
-  resumenFila: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  etiqueta: { fontSize: 12, color: color.textMuted, fontWeight: "600" },
-  valorGrande: { fontSize: 18, fontWeight: "800", color: color.text, marginTop: 2 },
-  valorMedio: { fontSize: 15, fontWeight: "700", color: color.text, marginTop: 2 },
-  nivel: { fontSize: 13, fontWeight: "700" },
-  deudaNombre: { fontSize: 15, fontWeight: "700", color: color.text },
-  etiquetaAuto: { fontSize: 11, color: "#b8790a", marginTop: 2 },
-  tipoTexto: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: color.textMuted,
-    backgroundColor: color.bg,
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: radius.pill,
-  },
-});
+const createStyles = (color: Colors) =>
+  StyleSheet.create({
+    screenTitle: {
+      fontFamily: font.display,
+      fontSize: 30,
+      lineHeight: 36,
+      color: color.text,
+    },
+    screenIntro: {
+      fontFamily: font.body,
+      fontSize: 14,
+      lineHeight: 21,
+      color: color.textMuted,
+    },
+    contenedor: { flex: 1, backgroundColor: color.bg },
+    resumenFila: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing(3),
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    etiqueta: {
+      fontFamily: font.semibold,
+      fontSize: 12,
+      color: color.textMuted,
+      fontWeight: "600",
+    },
+    valorGrande: {
+      fontFamily: font.mono,
+      fontSize: 18,
+      color: color.text,
+      marginTop: 2,
+    },
+    valorMedio: {
+      fontFamily: font.mono,
+      fontSize: 15,
+      color: color.text,
+      marginTop: 2,
+    },
+    nivel: { fontFamily: font.semibold, fontSize: 13, fontWeight: "700" },
+    deudaNombre: { fontFamily: font.display, fontSize: 15, color: color.text },
+    etiquetaAuto: {
+      fontFamily: font.body,
+      fontSize: 11,
+      color: color.warning,
+      marginTop: 2,
+    },
+    tipoTexto: {
+      fontFamily: font.semibold,
+      fontSize: 11,
+      fontWeight: "600",
+      color: color.textMuted,
+      backgroundColor: color.bg,
+      paddingVertical: 3,
+      paddingHorizontal: 8,
+      borderRadius: radius.pill,
+    },
+  });

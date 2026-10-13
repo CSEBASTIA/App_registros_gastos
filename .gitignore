@@ -14,6 +14,8 @@ apps/desktop/src-tauri/target/
 # expo
 .expo/
 *.jsbundle
+# exports web de verificación visual (expo export), se regeneran
+apps/mobile/dist-*/
 
 # supabase local
 supabase/.branches/

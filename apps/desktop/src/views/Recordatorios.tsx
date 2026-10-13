@@ -1,3 +1,4 @@
+import RippleButton from "../components/RippleButton";
 import { useState, type FormEvent } from "react";
 import type { Deuda, Frecuencia, Recordatorio, TipoRecordatorio } from "core";
 import { IconoPapelera, IconoRecordatorios } from "../components/iconos";
@@ -11,17 +12,33 @@ function hoy() {
 interface Props {
   recordatorios: Recordatorio[];
   deudas: Deuda[];
-  onCrear: (input: Omit<Recordatorio, "id" | "createdAt" | "completado">) => Promise<void>;
+  onCrear: (
+    input: Omit<Recordatorio, "id" | "createdAt" | "completado">,
+  ) => Promise<void>;
   onToggle: (id: string, completado: boolean) => Promise<void>;
   onEliminar: (id: string) => Promise<void>;
 }
 
-export default function Recordatorios({ recordatorios, deudas, onCrear, onToggle, onEliminar }: Props) {
-  const ordenados = [...recordatorios].sort((a, b) => a.fecha.localeCompare(b.fecha));
+export default function Recordatorios({
+  recordatorios,
+  deudas,
+  onCrear,
+  onToggle,
+  onEliminar,
+}: Props) {
+  const ordenados = [...recordatorios].sort((a, b) =>
+    a.fecha.localeCompare(b.fecha),
+  );
   const hoyStr = hoy();
 
   return (
     <>
+      <p
+        className="etiqueta"
+        style={{ margin: "0 0 24px", fontSize: "0.95rem", lineHeight: 1.6 }}
+      >
+        Organizá tus próximos pagos y vencimientos.
+      </p>
       <NuevoRecordatorio deudas={deudas} onCrear={onCrear} />
 
       {ordenados.length === 0 ? (
@@ -38,7 +55,7 @@ export default function Recordatorios({ recordatorios, deudas, onCrear, onToggle
                 <th></th>
                 <th>Título</th>
                 <th>Tipo</th>
-                <th>Monto</th>
+                <th className="tabla-monto">Monto</th>
                 <th>Fecha</th>
                 <th></th>
               </tr>
@@ -57,12 +74,24 @@ export default function Recordatorios({ recordatorios, deudas, onCrear, onToggle
                     </td>
                     <td>{r.titulo}</td>
                     <td>{etiquetaTipo(r.tipo)}</td>
-                    <td>{r.monto ? `$${r.monto.toFixed(2)}` : "—"}</td>
-                    <td style={vencido ? { color: "var(--color-danger)", fontWeight: 600 } : undefined}>
+                    <td className="tabla-monto">
+                      {r.monto ? `${r.monto.toFixed(2)}` : "—"}
+                    </td>
+                    <td
+                      style={
+                        vencido
+                          ? { color: "var(--color-danger)", fontWeight: 600 }
+                          : undefined
+                      }
+                    >
                       {r.fecha} {vencido && "· vencido"}
                     </td>
                     <td>
-                      <button className="btn-icon" title="Eliminar" onClick={() => onEliminar(r.id)}>
+                      <button
+                        className="btn-icon"
+                        title="Eliminar"
+                        onClick={() => onEliminar(r.id)}
+                      >
                         <IconoPapelera />
                       </button>
                     </td>
@@ -95,7 +124,9 @@ function NuevoRecordatorio({
   onCrear,
 }: {
   deudas: Deuda[];
-  onCrear: (input: Omit<Recordatorio, "id" | "createdAt" | "completado">) => Promise<void>;
+  onCrear: (
+    input: Omit<Recordatorio, "id" | "createdAt" | "completado">,
+  ) => Promise<void>;
 }) {
   const [titulo, setTitulo] = useState("");
   const [tipo, setTipo] = useState<TipoRecordatorio>("pago");
@@ -134,7 +165,9 @@ function NuevoRecordatorio({
 
   return (
     <form onSubmit={agregar} className="card" style={{ marginBottom: 24 }}>
-      <h3 style={{ margin: "0 0 12px", fontSize: "0.95rem" }}>Nuevo recordatorio</h3>
+      <h3 style={{ margin: "0 0 12px", fontSize: "0.95rem" }}>
+        Nuevo recordatorio
+      </h3>
       <div className="form-gasto">
         <div className="campo">
           <label htmlFor="titulo-recordatorio">Título</label>
@@ -223,9 +256,13 @@ function NuevoRecordatorio({
             <option value="anual">Anual</option>
           </select>
         </div>
-        <button type="submit" className="btn btn-primary" disabled={guardando}>
+        <RippleButton
+          type="submit"
+          className="btn btn-primary"
+          disabled={guardando}
+        >
           {guardando ? "Guardando…" : "Agregar"}
-        </button>
+        </RippleButton>
       </div>
       {error && (
         <p className="error" style={{ marginTop: 12 }}>

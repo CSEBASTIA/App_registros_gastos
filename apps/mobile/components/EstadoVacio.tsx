@@ -1,6 +1,7 @@
+import { BlurFade } from "./Motion";
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { color, spacing } from "../lib/theme";
+import { useTheme, font, radius, spacing, type Colors } from "../lib/theme";
 
 /** Paralelo a `EstadoVacio.tsx` de desktop. */
 export default function EstadoVacio({
@@ -12,17 +13,19 @@ export default function EstadoVacio({
   titulo: string;
   subtitulo: string;
 }) {
+  const { color: color } = useTheme();
+  const styles = makeStyles(color);
   return (
-    <View style={styles.contenedor}>
+    <BlurFade style={styles.contenedor}>
       <Ionicons name={icono} size={32} color={color.textMuted} />
       <Text style={styles.titulo}>{titulo}</Text>
       <Text style={styles.subtitulo}>{subtitulo}</Text>
-    </View>
+    </BlurFade>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (color: Colors) => StyleSheet.create({
   contenedor: { alignItems: "center", padding: spacing(8), gap: spacing(2) },
-  titulo: { fontSize: 15, fontWeight: "600", color: color.text, textAlign: "center" },
-  subtitulo: { fontSize: 13, color: color.textMuted, textAlign: "center" },
+  titulo: { fontFamily: font.display, fontSize: 15, fontWeight: "600", color: color.text, textAlign: "center" },
+  subtitulo: { fontFamily: font.body, fontSize: 13, color: color.textMuted, textAlign: "center" },
 });

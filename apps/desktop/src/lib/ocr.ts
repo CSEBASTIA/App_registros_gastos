@@ -1,4 +1,5 @@
 import { recognize } from "tesseract.js";
+import { normalizarNumero, sugerirCategoria } from "core";
 
 export interface ReciboExtraido {
   monto?: number;
@@ -7,14 +8,6 @@ export interface ReciboExtraido {
   categoriaSugerida?: string;
   textoCrudo: string;
 }
-
-/** Palabras clave del comercio → nombre de categoría sugerido (debe coincidir con el catálogo de `categorias`). */
-const PALABRAS_POR_CATEGORIA: Record<string, string[]> = {
-  Comida: ["supermaxi", "megamaxi", "mi comisariato", "coral", "restaurante", "market", "food"],
-  Transporte: ["uber", "cabify", "indriver", "taxi", "gasolina", "combustible", "peaje"],
-  Ocio: ["netflix", "spotify", "cine", "cinemark", "supercines", "steam"],
-  Servicios: ["cnel", "cnt", "movistar", "claro", "agua potable", "electricidad"],
-};
 
 /** Corre OCR local (tesseract.js, español) sobre una imagen de recibo/factura. */
 export async function leerImagen(archivo: File): Promise<string> {
@@ -41,12 +34,6 @@ function extraerMonto(texto: string): number | undefined {
   return Math.max(...todos);
 }
 
-export function normalizarNumero(valor: string): number {
-  // "1.234,56" o "1234.56" -> 1234.56
-  const limpio = valor.replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".");
-  return Number(limpio);
-}
-
 function extraerFecha(texto: string): string | undefined {
   const conGuionOBarra = texto.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
   if (conGuionOBarra) {
@@ -65,16 +52,6 @@ function extraerComercio(texto: string): string | undefined {
     .map((l) => l.trim())
     .find((l) => l.length >= 3 && /[a-zA-Z]/.test(l));
   return primeraLinea;
-}
-
-export function sugerirCategoria(texto: string): string | undefined {
-  const textoNormalizado = texto.toLowerCase();
-  for (const [categoria, palabras] of Object.entries(PALABRAS_POR_CATEGORIA)) {
-    if (palabras.some((palabra) => textoNormalizado.includes(palabra))) {
-      return categoria;
-    }
-  }
-  return undefined;
 }
 
 /** Parsea el texto crudo del OCR por reglas (regex/keywords). Nada de esto se guarda solo: el usuario siempre revisa/corrige antes de confirmar. */

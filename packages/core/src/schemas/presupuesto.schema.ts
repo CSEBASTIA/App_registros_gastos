@@ -1,9 +1,10 @@
 import { z } from "zod";
+import { MES_ISO, montoPositivo } from "./limites";
 
 export const presupuestoSchema = z.object({
   categoriaId: z.string().uuid(),
-  montoLimite: z.number().positive(),
-  mes: z.string().regex(/^\d{4}-\d{2}$/, "Formato esperado: YYYY-MM"),
+  montoLimite: montoPositivo(),
+  mes: z.string().regex(MES_ISO, "Formato esperado: YYYY-MM"),
 });
 
 export type PresupuestoInput = z.infer<typeof presupuestoSchema>;

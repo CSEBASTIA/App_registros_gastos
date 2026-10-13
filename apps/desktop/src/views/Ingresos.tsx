@@ -1,3 +1,5 @@
+import AnimatedBackground from "../components/AnimatedBackground";
+import RippleButton from "../components/RippleButton";
 import { useState, type FormEvent } from "react";
 import type { Categoria, Cuenta, Ingreso } from "core";
 import { IconoIngresos, IconoMas, IconoPapelera } from "../components/iconos";
@@ -6,7 +8,7 @@ import GraficoBarras from "../components/GraficoBarras";
 import { semanasDelMes, enRangoSemana, ultimosMeses, etiquetaMes } from "core";
 import { mensajeError } from "core";
 
-const COLOR_INGRESOS = "#16a34a";
+const COLOR_INGRESOS = "var(--color-success)";
 
 function hoy() {
   return new Date().toISOString().slice(0, 10);
@@ -21,7 +23,14 @@ interface Props {
   onEliminar: (id: string) => Promise<void>;
 }
 
-export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, onEliminar }: Props) {
+export default function Ingresos({
+  mes,
+  ingresos,
+  cuentas,
+  categorias,
+  onCrear,
+  onEliminar,
+}: Props) {
   const ingresosDelMes = ingresos.filter((i) => i.fecha.startsWith(mes));
   const categoriasIngreso = categorias.filter((c) => c.tipo === "ingreso");
   const [mostrarForm, setMostrarForm] = useState(false);
@@ -29,13 +38,17 @@ export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, 
 
   const datosSemana = semanasDelMes(mes).map((s) => ({
     etiqueta: `Semana ${s.numero}`,
-    valor: ingresosDelMes.filter((i) => enRangoSemana(i.fecha, s)).reduce((acc, i) => acc + i.monto, 0),
+    valor: ingresosDelMes
+      .filter((i) => enRangoSemana(i.fecha, s))
+      .reduce((acc, i) => acc + i.monto, 0),
     color: COLOR_INGRESOS,
   }));
 
   const datosMes = ultimosMeses(mes, 6).map((m) => ({
     etiqueta: etiquetaMes(m),
-    valor: ingresos.filter((i) => i.fecha.startsWith(m)).reduce((acc, i) => acc + i.monto, 0),
+    valor: ingresos
+      .filter((i) => i.fecha.startsWith(m))
+      .reduce((acc, i) => acc + i.monto, 0),
     color: COLOR_INGRESOS,
   }));
 
@@ -53,20 +66,38 @@ export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, 
 
   return (
     <>
+      <p
+        className="etiqueta"
+        style={{ margin: "0 0 24px", fontSize: "0.95rem", lineHeight: 1.6 }}
+      >
+        Seguí tus ingresos y compará cada período.
+      </p>
       {mostrarForm ? (
-        <NuevoIngreso cuentas={cuentas} categorias={categoriasIngreso} onCrear={crearYCerrar} onCancelar={() => setMostrarForm(false)} />
+        <NuevoIngreso
+          cuentas={cuentas}
+          categorias={categoriasIngreso}
+          onCrear={crearYCerrar}
+          onCancelar={() => setMostrarForm(false)}
+        />
       ) : (
-        <button className="btn btn-primary" style={{ marginBottom: 24 }} onClick={() => setMostrarForm(true)}>
+        <RippleButton
+          className="btn btn-primary"
+          style={{ marginBottom: 24 }}
+          onClick={() => setMostrarForm(true)}
+        >
           <IconoMas /> Nuevo ingreso
-        </button>
+        </RippleButton>
       )}
 
       <div className="card" style={{ marginBottom: 24 }}>
         <div className="form-gasto-header">
           <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Ingresos</h3>
-          <div className="periodo-toggle">
+          <AnimatedBackground value={periodo} className="periodo-toggle">
             <button
               type="button"
+              style={{ background: "transparent" }}
+              data-selection-id="semana"
+              aria-pressed={periodo === "semana"}
               className={periodo === "semana" ? "periodo-toggle-activo" : ""}
               onClick={() => setPeriodo("semana")}
             >
@@ -74,12 +105,15 @@ export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, 
             </button>
             <button
               type="button"
+              style={{ background: "transparent" }}
+              data-selection-id="mes"
+              aria-pressed={periodo === "mes"}
               className={periodo === "mes" ? "periodo-toggle-activo" : ""}
               onClick={() => setPeriodo("mes")}
             >
               Por mes
             </button>
-          </div>
+          </AnimatedBackground>
         </div>
         <GraficoBarras
           datos={periodo === "semana" ? datosSemana : datosMes}
@@ -103,7 +137,7 @@ export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, 
                 <th>Descripción</th>
                 <th>Fuente</th>
                 <th>Cuenta</th>
-                <th>Monto</th>
+                <th className="tabla-monto">Monto</th>
                 <th></th>
               </tr>
             </thead>
@@ -117,18 +151,27 @@ export default function Ingresos({ mes, ingresos, cuentas, categorias, onCrear, 
                     <td>
                       {cat ? (
                         <span className="categoria-tag">
-                          <span className="categoria-punto" style={{ background: cat.color }} />
+                          <span
+                            className="categoria-punto"
+                            style={{ background: cat.color }}
+                          />
                           {cat.nombre}
-                          {cat.nombre === "Otros" && i.categoriaDetalle ? ` · ${i.categoriaDetalle}` : ""}
+                          {cat.nombre === "Otros" && i.categoriaDetalle
+                            ? ` · ${i.categoriaDetalle}`
+                            : ""}
                         </span>
                       ) : (
                         "—"
                       )}
                     </td>
                     <td>{cuentaDe(i.cuentaId)?.nombre ?? "—"}</td>
-                    <td>${i.monto.toFixed(2)}</td>
+                    <td className="tabla-monto">${i.monto.toFixed(2)}</td>
                     <td>
-                      <button className="btn-icon" title="Eliminar" onClick={() => onEliminar(i.id)}>
+                      <button
+                        className="btn-icon"
+                        title="Eliminar"
+                        onClick={() => onEliminar(i.id)}
+                      >
                         <IconoPapelera />
                       </button>
                     </td>
@@ -288,9 +331,13 @@ function NuevoIngreso({
             required
           />
         </div>
-        <button type="submit" className="btn btn-primary" disabled={guardando}>
+        <RippleButton
+          type="submit"
+          className="btn btn-primary"
+          disabled={guardando}
+        >
           {guardando ? "Guardando…" : "Agregar"}
-        </button>
+        </RippleButton>
       </div>
       {error && (
         <p className="error" style={{ marginTop: 12 }}>

@@ -1,5 +1,6 @@
+import { BlurFade } from "./Motion";
 import { View, StyleSheet, type StyleProp, type ViewStyle } from "react-native";
-import { color, radius, spacing } from "../lib/theme";
+import { useTheme, font, radius, spacing, type Colors } from "../lib/theme";
 
 /** Contenedor tipo "card", paralelo a `.card` de desktop. */
 export default function Tarjeta({
@@ -9,16 +10,18 @@ export default function Tarjeta({
   children: React.ReactNode;
   style?: StyleProp<ViewStyle>;
 }) {
-  return <View style={[styles.card, style]}>{children}</View>;
+  const { color: color } = useTheme();
+  const styles = makeStyles(color);
+  return <BlurFade style={[styles.card, style]}>{children}</BlurFade>;
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (color: Colors) => StyleSheet.create({
   card: {
     backgroundColor: color.surface,
     borderWidth: 1,
     borderColor: color.border,
     borderRadius: radius.md,
-    padding: spacing(4),
+    padding: spacing(4), shadowColor: color.text, shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 1,
     gap: spacing(3),
   },
 });

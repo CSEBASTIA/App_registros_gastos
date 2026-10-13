@@ -1,5 +1,5 @@
 import { View, Text, StyleSheet } from "react-native";
-import { color, spacing } from "../lib/theme";
+import { useTheme, font, radius, spacing, type Colors } from "../lib/theme";
 
 export interface BarraDato {
   etiqueta: string;
@@ -21,6 +21,8 @@ export default function GraficoBarras({
   alto?: number;
   mensajeVacio?: string;
 }) {
+  const { color: color } = useTheme();
+  const styles = makeStyles(color);
   if (datos.length === 0) {
     return (
       <View style={[styles.vacio, { height: alto }]}>
@@ -59,14 +61,14 @@ export default function GraficoBarras({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (color: Colors) => StyleSheet.create({
   vacio: { alignItems: "center", justifyContent: "center" },
-  vacioTexto: { color: color.textMuted, fontSize: 13 },
+  vacioTexto: { color: color.textMuted, fontFamily: font.body, fontSize: 13 },
   lienzo: { flexDirection: "row", alignItems: "flex-end", gap: spacing(2) },
   columna: { flex: 1, alignItems: "center", height: "100%", justifyContent: "flex-end", gap: spacing(1) },
-  valor: { fontSize: 10, fontWeight: "700", color: color.textMuted },
+  valor: { fontFamily: font.mono, fontSize: 10, fontWeight: "700", color: color.textMuted },
   pista: { flex: 1, width: "100%", justifyContent: "flex-end" },
   barra: { width: "100%", borderRadius: 4, minHeight: 3 },
   etiquetas: { flexDirection: "row", gap: spacing(2), marginTop: spacing(1.5) },
-  etiqueta: { flex: 1, fontSize: 10, color: color.textMuted, textAlign: "center" },
+  etiqueta: { flex: 1, fontFamily: font.body, fontSize: 10, color: color.textMuted, textAlign: "center" },
 });

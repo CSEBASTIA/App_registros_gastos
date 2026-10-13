@@ -1,11 +1,13 @@
 import { Text, StyleSheet } from "react-native";
-import { color } from "../lib/theme";
+import { useTheme, font, radius, spacing, type Colors } from "../lib/theme";
 
 /** Paralelo a `<p className="error">` de desktop. */
 export default function ErrorTexto({ children }: { children: string }) {
-  return <Text style={styles.texto}>{children}</Text>;
+  const { color: color } = useTheme();
+  const styles = makeStyles(color);
+  return <Text accessibilityRole="alert" style={styles.texto}>{children}</Text>;
 }
 
-const styles = StyleSheet.create({
-  texto: { color: color.danger, fontSize: 13, backgroundColor: color.dangerBg, padding: 10, borderRadius: 8 },
+const makeStyles = (color: Colors) => StyleSheet.create({
+  texto: { color: color.danger, fontFamily: font.body, fontSize: 13, backgroundColor: color.dangerBg, padding: 10, borderRadius: 8 },
 });

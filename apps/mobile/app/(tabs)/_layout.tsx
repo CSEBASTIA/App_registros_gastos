@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { color } from "../../lib/theme";
+import { useTheme } from "../../lib/theme";
+import Dock from "../../components/Dock";
 
 const ICONOS: Record<string, keyof typeof Ionicons.glyphMap> = {
   resumen: "home-outline",
@@ -11,8 +12,10 @@ const ICONOS: Record<string, keyof typeof Ionicons.glyphMap> = {
 };
 
 export default function TabsLayout() {
+  const { color } = useTheme();
   return (
     <Tabs
+      tabBar={(props) => <Dock {...props} />}
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarActiveTintColor: color.primary,

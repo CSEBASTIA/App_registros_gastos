@@ -1,22 +1,33 @@
 :root {
-  --color-bg: #f3f4f8;
+  --color-bg: #f1f2f7;
   --color-surface: #ffffff;
-  --color-border: #e5e7eb;
-  --color-text: #1a1c23;
-  --color-text-muted: #6b7280;
-  --color-primary: #3b6ff2;
-  --color-primary-hover: #2f5bd0;
-  --color-primary-bg: #eef2ff;
-  --gradiente-primario: linear-gradient(135deg, #3b6ff2, #7c5cff);
-  --color-danger: #e0453f;
-  --color-danger-bg: #fdecec;
-  --color-success: #16a34a;
-  --color-success-bg: #eafbf1;
-  --color-warning: #b8790a;
-  --color-warning-bg: #fdf4e6;
-  --radius: 12px;
-  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
-  --shadow-lg: 0 8px 24px rgba(16, 24, 40, 0.1), 0 2px 6px rgba(16, 24, 40, 0.06);
+  --color-surface-2: #e9ebf3;
+  --color-border: #d8dae3;
+  --color-text: #14151d;
+  --color-brand-base: #14151d;
+  --color-text-muted: #52566b;
+  --color-text-faint: #8a8ea3;
+  --color-primary: #3552d1;
+  --color-primary-hover: #2941ac;
+  --color-primary-bg: #e7ebfb;
+  --color-danger: #c23b34;
+  --color-danger-bg: #fbeae9;
+  --color-success: #157a4b;
+  --color-success-bg: #e5f4ec;
+  --color-warning: #a5690a;
+  --color-warning-bg: #f8ecda;
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(20, 21, 29, 0.05), 0 10px 30px -12px rgba(20, 21, 29, 0.14);
+  --shadow-lg: 0 4px 10px rgba(20, 21, 29, 0.08), 0 24px 48px -16px rgba(20, 21, 29, 0.22);
+
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* posición del puntero para el spotlight de las tarjetas (magic card) */
+  --magic-x: 50%;
+  --magic-y: 50%;
 }
 
 * {
@@ -27,8 +38,16 @@ body {
   margin: 0;
   background: var(--color-bg);
   color: var(--color-text);
-  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  font-family: var(--font-body);
   -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-display);
+  letter-spacing: -0.01em;
 }
 
 button,
@@ -36,6 +55,14 @@ input,
 select {
   font: inherit;
   color: inherit;
+}
+
+/* la app nunca tuvo un anillo de foco propio (dependía del default del
+   navegador); con la nueva identidad usamos el acento en vez del genérico. */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* ---- layout: shell con sidebar ---- */
@@ -93,6 +120,25 @@ select {
   font-weight: 500;
   font-size: 0.92rem;
   color: var(--color-text-muted);
+  position: relative;
+  transition: background 0.14s ease, color 0.14s ease;
+}
+
+/* Indicador de selección: una línea fina que crece a la izquierda, en vez de
+   la pastilla rellena de antes. La regla del skill es no invertir filas
+   enteras para marcar selección; con la línea más un fondo apenas teñido la
+   pestaña activa se lee igual de rápido y el bloque no cambia de peso. */
+.nav-item::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  transform: translateY(-50%);
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primary);
+  transition: height 0.22s var(--ease-out);
 }
 
 .nav-item:hover {
@@ -102,9 +148,13 @@ select {
 
 .nav-item-activo,
 .nav-item-activo:hover {
-  background: var(--color-primary-bg);
+  background: color-mix(in srgb, var(--color-primary) 7%, transparent);
   color: var(--color-primary);
   font-weight: 600;
+}
+
+.nav-item-activo::before {
+  height: 58%;
 }
 
 .nav-salir {
@@ -157,12 +207,48 @@ select {
 /* ---- primitives ---- */
 
 .card {
+  position: relative;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 20px;
   transition: box-shadow 0.15s ease;
+}
+
+/* ---- magic card: spotlight que sigue al puntero (solo mouse fino) ---- */
+.card::before,
+.card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+.card::before {
+  padding: 1px;
+  background: radial-gradient(240px circle at var(--magic-x) var(--magic-y), var(--color-primary), transparent 70%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+
+.card::after {
+  background: radial-gradient(
+    240px circle at var(--magic-x) var(--magic-y),
+    color-mix(in srgb, var(--color-text) 5%, transparent),
+    transparent 70%
+  );
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .card:hover::before,
+  .card:hover::after {
+    opacity: 1;
+  }
 }
 
 .btn {
@@ -183,14 +269,32 @@ select {
 }
 
 .btn-primary {
-  background: var(--gradiente-primario);
+  position: relative;
+  overflow: hidden;
+  background: var(--color-primary);
   border-color: transparent;
   color: #fff;
 }
 
 .btn-primary:hover {
-  background: var(--gradiente-primario);
-  filter: brightness(1.05);
+  background: var(--color-primary-hover);
+}
+
+/* ---- ripple: feedback de clic en botones primarios ---- */
+.ripple {
+  position: absolute;
+  border-radius: 50%;
+  transform: scale(0);
+  background: color-mix(in srgb, currentColor 45%, transparent);
+  pointer-events: none;
+  animation: ripple-expandir 0.5s ease-out forwards;
+}
+
+@keyframes ripple-expandir {
+  to {
+    transform: scale(1);
+    opacity: 0;
+  }
 }
 
 .btn-primary:disabled {
@@ -230,6 +334,20 @@ select.input:focus {
   outline-offset: -1px;
 }
 
+/* solo para lectores de pantalla: anuncia estados (p. ej. "cargando") que
+   visualmente ya se ven como esqueleto o como ícono */
+.vacio-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
 .campo {
   display: flex;
   flex-direction: column;
@@ -251,44 +369,103 @@ select.input:focus {
 
 /* ---- login ---- */
 
+/* El login era una tarjeta centrada sobre un degradado — la plantilla que
+   el skill marca como genérica. Ahora es un split editorial: a la izquierda
+   el panel de marca (el mismo fondo oscuro con gradiente en movimiento que
+   el balance del mes, para que la superficie de marca sea una sola en toda
+   la app) y a la derecha solo el formulario. */
 .login-wrap {
   min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(400px, 0.95fr);
+  background: var(--color-bg);
+}
+
+.login-arte {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 40px;
+  padding: 42px 46px;
+  background: var(--color-brand-base);
+  color: #fff;
+}
+
+.login-arte > *:not(.gradiente-animado) {
+  position: relative;
+  z-index: 1;
+}
+
+.login-arte-marca {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+}
+
+.login-arte-frase {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 3.2vw, 3rem);
+  font-weight: 600;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  max-width: 15ch;
+  margin: 0;
+}
+
+.login-formulario {
   display: flex;
   align-items: center;
   justify-content: center;
-  background:
-    radial-gradient(circle at 15% 15%, rgba(124, 92, 255, 0.16), transparent 45%),
-    radial-gradient(circle at 85% 85%, rgba(59, 111, 242, 0.14), transparent 45%),
-    var(--color-bg);
+  padding: 32px;
 }
 
 .login-card {
-  width: 340px;
+  width: 100%;
+  max-width: 360px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   box-shadow: var(--shadow-lg);
 }
 
-.login-logo {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 4px;
-}
-
 .login-card h1 {
-  font-size: 1.35rem;
-  font-weight: 800;
-  margin: 0 0 4px;
-  text-align: center;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0 0 6px;
   letter-spacing: -0.01em;
 }
 
-.login-card p.subtitulo {
-  text-align: center;
-  color: var(--color-text-muted);
-  font-size: 0.88rem;
-  margin: -10px 0 6px;
+@media (max-width: 880px) {
+  .login-wrap {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr;
+  }
+
+  .login-arte {
+    min-height: 210px;
+    padding: 26px 24px;
+  }
+
+  /* sin minmax(0, …) la pista de la grilla no baja del min-content de la
+     columna del formulario y la página se desborda a lo ancho */
+  .login-formulario,
+  .login-arte {
+    min-width: 0;
+  }
+
+  .login-arte-frase {
+    font-size: 1.55rem;
+    max-width: none;
+  }
+
+  .login-formulario {
+    padding: 24px 20px 40px;
+  }
 }
 
 /* ---- resumen ---- */
@@ -313,6 +490,7 @@ select.input:focus {
 
 .resumen .valor,
 .valor {
+  font-family: var(--font-display);
   font-size: 1.6rem;
   font-weight: 600;
 }
@@ -362,8 +540,8 @@ select.input:focus {
   width: 42px;
   height: 42px;
   border-radius: 50%;
-  background: var(--gradiente-primario);
-  color: #fff;
+  background: var(--color-primary);
+  color: var(--color-on-primary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -396,12 +574,41 @@ select.input:focus {
 }
 
 .saldo-hero {
-  background: linear-gradient(135deg, #1c2140, #3b6ff2 70%, #7c5cff);
+  background: radial-gradient(130% 160% at 100% 0%, color-mix(in srgb, var(--color-primary) 60%, transparent), transparent 60%),
+    var(--color-brand-base);
   color: #fff;
   border-radius: 18px;
-  padding: 26px 28px;
+  padding: 30px 32px 30px 36px;
   margin-bottom: 24px;
   box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+
+/* "lomo" de acento sólido a la izquierda: la misma idea que el lomo de un
+   libro/cuaderno — una firma gráfica que se repite en el resto del Resumen
+   (ver .resumen-grid .card más abajo), no un detalle suelto. Va como
+   pseudo-elemento y ya no como inset box-shadow: el gradiente animado se
+   pinta sobre el fondo de la caja y taparía una sombra interior. */
+.saldo-hero::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 6px;
+  background: var(--color-primary);
+  z-index: 2;
+}
+
+/* el contenido va sobre el gradiente animado, que se queda en z-index 0 */
+.saldo-hero > *:not(.gradiente-animado) {
+  position: relative;
+  z-index: 1;
+}
+
+/* se atenúa la capa para que el blanco del saldo mantenga contraste contra
+   el fondo oscuro pase por donde pase un blob */
+.saldo-hero .gradiente-animado-capa {
+  opacity: 0.55;
 }
 
 .saldo-hero-header {
@@ -413,10 +620,12 @@ select.input:focus {
 }
 
 .saldo-hero-valor {
-  font-size: 2.6rem;
-  font-weight: 700;
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 5vw, 4.6rem);
+  font-weight: 600;
   letter-spacing: -0.02em;
-  margin: 6px 0 22px;
+  line-height: 1;
+  margin: 10px 0 26px;
 }
 
 .saldo-hero-stats {
@@ -492,6 +701,42 @@ select.input:focus {
   }
 }
 
+/* ---- firma editorial del Resumen: banda de color detrás del título de
+   cada tarjeta (en vez de un simple <h3> sobre blanco) + etiquetas
+   secundarias en mono/mayúsculas, el mismo "lomo" de acento que el hero.
+   Todo escapado bajo .resumen-grid para no tocar el resto de la app. ---- */
+.resumen-grid .card > .form-gasto-header {
+  margin: -20px -20px 18px;
+  padding: 16px 20px 13px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.resumen-grid .card > .form-gasto-header h3 {
+  font-size: 1.05rem !important;
+  color: var(--color-text);
+}
+
+.resumen-grid .card .etiqueta,
+.resumen-grid .card .form-gasto-header span[class^="nivel-"] {
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.68rem;
+}
+
+.saludo-nombre {
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.saludo-avatar {
+  width: 48px;
+  height: 48px;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+}
+
 .grafico-semanal {
   display: flex;
   align-items: end;
@@ -510,24 +755,31 @@ select.input:focus {
   height: 100%;
 }
 
+/* la columna entera es la pista del gráfico: así un día de $9 se sigue
+   leyendo contra su columna en vez de quedar como una pastilla suelta
+   flotando (que era como se veía con la barra al 6% de altura) */
 .barra-dia-pista {
   flex: 1;
   width: 100%;
   display: flex;
   align-items: end;
   justify-content: center;
+  background: color-mix(in srgb, var(--color-primary) 6%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
 }
 
 .barra-dia-relleno {
-  width: 60%;
-  min-width: 10px;
-  border-radius: 999px 999px 4px 4px;
-  background: var(--color-border);
+  /* el radio de 999px convertía los días sin gasto (altura mínima 6%) en
+     cúpulas; con la pista de fondo la barra ocupa la columna entera */
+  width: 100%;
+  border-radius: 4px 4px 0 0;
+  background: color-mix(in srgb, var(--color-primary) 30%, transparent);
   transition: height 0.2s ease;
 }
 
 .barra-dia-relleno-activa {
-  background: var(--gradiente-primario);
+  background: var(--color-primary);
 }
 
 .barra-dia-etiqueta {
@@ -644,13 +896,32 @@ select.input:focus {
   overflow: hidden;
 }
 
+/* cabeceras de tabla como en un libro contable: mono, versalitas y muy
+   compactas, para que la fila de datos sea lo que pesa visualmente */
 .tabla th {
   text-align: left;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-text-faint);
   font-weight: 500;
-  padding: 10px 14px;
+  padding: 11px 14px;
   border-bottom: 1px solid var(--color-border);
+}
+
+/* columna de importes: alineada a la derecha y en mono, para poder comparar
+   cifras de un vistazo */
+.tabla-monto,
+th.tabla-monto {
+  text-align: right;
+  white-space: nowrap;
+}
+
+td.tabla-monto {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .tabla td {
@@ -869,6 +1140,7 @@ select.input:focus {
 /* ---- tarjetas visuales (cuentas/tarjetas) ---- */
 
 .tarjeta-visual {
+  position: relative;
   color: #fff;
   border-radius: 16px;
   padding: 20px;
@@ -889,9 +1161,32 @@ select.input:focus {
   cursor: pointer;
 }
 
+/* ---- magic card: mismo spotlight, versión clara para fondos de marca ---- */
+.tarjeta-visual::after,
+.cuenta-visual::after,
+.tarjeta-visual-imagen-cont::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(220px circle at var(--magic-x) var(--magic-y), rgba(255, 255, 255, 0.35), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tarjeta-visual:hover::after,
+  .cuenta-visual:hover::after,
+  .tarjeta-visual-imagen-cont:hover::after {
+    opacity: 1;
+  }
+}
+
 /* ---- tarjeta con imagen real: foto completa arriba + info abajo ---- */
 
 .tarjeta-visual-imagen-cont {
+  position: relative;
   border-radius: 16px;
   overflow: hidden;
   background: var(--color-surface);
@@ -1000,6 +1295,7 @@ select.input:focus {
 }
 
 .tarjeta-visual-saldo {
+  font-family: var(--font-display);
   font-size: 1.4rem;
   font-weight: 600;
   margin-top: 12px;
@@ -1046,6 +1342,7 @@ select.input:focus {
 /* ---- cuenta (ahorro/débito/efectivo): banner horizontal por banco ---- */
 
 .cuenta-visual {
+  position: relative;
   color: #fff;
   border-radius: 16px;
   padding: 20px 24px;
@@ -1121,6 +1418,7 @@ select.input:focus {
 }
 
 .cuenta-visual-saldo-monto {
+  font-family: var(--font-display);
   font-size: 1.5rem;
   font-weight: 700;
 }
@@ -1309,6 +1607,7 @@ select.input:focus {
   gap: 6px;
   background: var(--color-primary-bg);
   color: var(--color-primary);
+  font-family: var(--font-display);
   font-size: 1.3rem;
   font-weight: 700;
   padding: 8px 14px;
@@ -1746,4 +2045,339 @@ select.input:focus {
 
 .factura-link:hover {
   color: var(--color-primary-hover);
+}
+
+/* ==========================================================================
+   Motion — vocabulario reutilizado en toda la interfaz de escritorio:
+   1) blur fade de entrada en paneles/heros al montar cada vista (nunca sobre
+      la tabla o el formulario en sí, solo sobre su contenedor tipo panel);
+   2) lista animada para la actividad reciente del Resumen;
+   3) texto animado (palabra por palabra) en el título de la barra superior;
+   4) magic card / spotlight de puntero en tarjetas (definido más arriba);
+   5) ripple al hacer clic en botones primarios (definido más arriba).
+   Todo se apaga con prefers-reduced-motion, ver el bloque al final.
+   ========================================================================== */
+
+@keyframes revelar-blur {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+.card,
+.saludo,
+.saldo-hero,
+.resumen,
+.estado-vacio,
+.veredicto-financiero-cuerpo {
+  /* "backwards" (no "forwards"/"both"): al terminar, el elemento vuelve a su
+     estilo normal — que no declara filter/transform — así el resultado es
+     filter:none/transform:none literal, no blur(0)/translateY(0), que en
+     varios navegadores siguen contando como capa de composición. */
+  animation: revelar-blur 0.48s var(--ease-out) backwards;
+}
+
+@keyframes revelar-fila {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.actividad-item {
+  animation: revelar-fila 0.38s var(--ease-out) backwards;
+}
+
+.actividad-item:nth-child(1) {
+  animation-delay: 0.02s;
+}
+.actividad-item:nth-child(2) {
+  animation-delay: 0.07s;
+}
+.actividad-item:nth-child(3) {
+  animation-delay: 0.12s;
+}
+.actividad-item:nth-child(4) {
+  animation-delay: 0.17s;
+}
+.actividad-item:nth-child(5) {
+  animation-delay: 0.22s;
+}
+.actividad-item:nth-child(n + 6) {
+  animation-delay: 0.26s;
+}
+
+/* ---- texto animado: título de la barra superior, palabra por palabra ---- */
+.titulo-animado {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 0.28em;
+}
+
+.titulo-animado span {
+  display: inline-block;
+  /* mismo motivo que arriba: "backwards" en vez de "forwards" para que el
+     estado final sea filter:none/transform:none real. El estado inicial
+     (oculto/borroso) vive en el 0% del keyframe, no en esta regla — así,
+     durante el delay de cada palabra, "backwards" aplica ese 0% en vez de
+     mostrar la palabra ya asentada antes de tiempo. */
+  animation: revelar-palabra 0.6s var(--ease-out) backwards;
+}
+
+@keyframes revelar-palabra {
+  from {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+/* ---- cifras de libro contable: todo importe en tabular-nums para que las
+   columnas de montos queden alineadas dígito a dígito, y los importes de
+   listas/tablas en mono. El número grande del hero y los .valor de las
+   tarjetas de estadística se quedan en la display (Fraunces): son la cifra
+   protagonista, no una columna que haya que comparar. ---- */
+.valor,
+.saldo-hero-valor,
+.saldo-hero-stat-valor,
+.actividad-monto,
+.semana-desglose-monto,
+.semana-desglose-porcentaje,
+.semana-resumen-total .valor,
+.tarjeta-visual-saldo,
+.tarjeta-visual-cupo-linea,
+.cuenta-visual-saldo-monto,
+.estado-cuenta-badge,
+.grafico-barras-valor,
+.tabla td {
+  font-variant-numeric: tabular-nums;
+}
+
+.actividad-monto,
+.semana-desglose-monto,
+.semana-desglose-porcentaje,
+.tarjeta-visual-saldo,
+.tarjeta-visual-cupo-linea,
+.cuenta-visual-saldo-monto {
+  font-family: var(--font-mono);
+  letter-spacing: -0.02em;
+}
+
+/* ---- esqueleto de carga: mientras llegan los datos de Supabase la pantalla
+   mostraba un "Cargando…" suelto. Un esqueleto con la forma real del panel
+   (hero + dos columnas) evita el salto de layout al montar el Resumen. ---- */
+.esqueleto {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface-2) 25%,
+    color-mix(in srgb, var(--color-surface-2) 55%, var(--color-surface)) 37%,
+    var(--color-surface-2) 63%
+  );
+  background-size: 400% 100%;
+  animation: esqueleto-brillo 1.4s ease-in-out infinite;
+  border-radius: 8px;
+}
+
+@keyframes esqueleto-brillo {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: 0 0;
+  }
+}
+
+.esqueleto-hero {
+  height: 178px;
+  border-radius: 18px;
+  margin-bottom: 24px;
+}
+
+.esqueleto-linea {
+  height: 12px;
+  margin-bottom: 10px;
+}
+
+.esqueleto-panel {
+  height: 200px;
+  border-radius: var(--radius);
+}
+
+/* ---- gradiente animado (puerto React del bloque animated-gradient-svg de
+   SV Animations; ver components/GradienteAnimado.tsx). Es una capa de fondo
+   decorativa: nunca envuelve contenido interactivo, así que el desenfoque
+   permanente no deja formularios ni tablas dentro de una capa compuesta. ---- */
+.gradiente-animado {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+.gradiente-animado-capa {
+  position: absolute;
+  inset: 0;
+  filter: blur(var(--gradiente-blur));
+}
+
+.gradiente-animado-suave {
+  --gradiente-blur: 28px;
+}
+
+.gradiente-animado-medio {
+  --gradiente-blur: 52px;
+}
+
+.gradiente-animado-fuerte {
+  --gradiente-blur: 96px;
+}
+
+.gradiente-animado svg {
+  position: absolute;
+  animation-name: gradiente-fondo;
+  animation-iteration-count: infinite;
+  animation-timing-function: ease-in-out;
+}
+
+@keyframes gradiente-fondo {
+  0%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20% {
+    transform: translate(calc(100% * var(--tx-1)), calc(100% * var(--ty-1)));
+  }
+  40% {
+    transform: translate(calc(100% * var(--tx-2)), calc(100% * var(--ty-2)));
+  }
+  60% {
+    transform: translate(calc(100% * var(--tx-3)), calc(100% * var(--ty-3)));
+  }
+  80% {
+    transform: translate(calc(100% * var(--tx-4)), calc(100% * var(--ty-4)));
+  }
+}
+
+/* ---- accesibilidad: nada de movimiento si el usuario lo pidió así ---- */
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .saludo,
+  .saldo-hero,
+  .resumen,
+  .estado-vacio,
+  .veredicto-financiero-cuerpo,
+  .actividad-item,
+  .titulo-animado span {
+    animation: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+  }
+
+  .card::before,
+  .card::after,
+  .tarjeta-visual::after,
+  .cuenta-visual::after,
+  .tarjeta-visual-imagen-cont::after {
+    display: none;
+  }
+
+  .ripple {
+    display: none;
+  }
+
+  /* el gradiente no se esconde, se congela: sigue siendo el fondo sobre el
+     que se lee el texto, así que quitarlo cambiaría el contraste. */
+  .gradiente-animado svg {
+    animation: none;
+  }
+
+  .esqueleto {
+    animation: none;
+  }
+
+  .nav-item::before {
+    transition: none;
+  }
+}
+
+/* Zallox web interaction layer. Bank/category accents remain content colors. */
+:root { --color-on-primary: #ffffff; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-bg: #11131d;
+  --color-surface: #1c1f2d;
+  --color-surface-2: #272b3d;
+  --color-border: #393e54;
+  --color-text: #f2f3fa;
+  --color-text-muted: #b4bad0;
+  --color-text-faint: #949cb8;
+  --color-primary: #9aafff;
+  --color-primary-hover: #b7c5ff;
+  --color-primary-bg: #2b365d;
+  --color-on-primary: #11131d;
+  --color-danger: #ffaaa4;
+  --color-danger-bg: #452827;
+  --color-success: #7fd6a6;
+  --color-success-bg: #203c30;
+  --color-warning: #edc17e;
+  --color-warning-bg: #423522;
+  --shadow: 0 1px 2px rgba(0,0,0,.15), 0 10px 30px -12px rgba(0,0,0,.4);
+  --shadow-lg: 0 4px 10px rgba(0,0,0,.2), 0 24px 48px -16px rgba(0,0,0,.6);
+}
+.btn-primary { color: var(--color-on-primary); }
+.ui-selection { position: relative; isolation: isolate; }
+.ui-selection-background { position: absolute; left: 0; top: 0; z-index: -1; border-radius: 12px; background: var(--color-primary-bg); pointer-events: none; transition: transform 180ms var(--ease-out), width 180ms var(--ease-out), height 180ms var(--ease-out); }
+.ui-with-dock { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
+.ui-dock-island { position: fixed; z-index: 40; bottom: max(16px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); border: 1px solid var(--color-border); border-radius: 26px; background: var(--color-surface); box-shadow: var(--shadow-lg); padding: 0 8px 8px; }
+.ui-dock-handle { width: 100%; height: 24px; display: flex; align-items: center; justify-content: center; border: 0; background: transparent; cursor: pointer; border-radius: 24px 24px 0 0; }
+.ui-dock-handle span { width: 30px; height: 3px; border-radius: 999px; background: var(--color-text-faint); }
+.ui-dock-handle:focus-visible { outline-offset: -3px; }
+.ui-dock-items { display: flex; gap: 4px; }
+.ui-dock-item { position: relative; flex: 1; min-width: 0; min-height: 58px; padding: 7px 2px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 0; border-radius: 14px; background: transparent; color: var(--color-text-muted); font: 500 11px var(--font-body); cursor: pointer; }
+.ui-dock-item[aria-current="page"] { color: var(--color-primary); font-weight: 600; }
+.ui-dock-icon { height: 22px; display: flex; align-items: center; justify-content: center; transition: transform 140ms var(--ease-out); }
+.ui-dock-item:active .ui-dock-icon { transform: scale(1.1) translateY(-2px); }
+.ui-dock-badge { position: absolute; top: 3px; right: 12%; background: var(--color-danger); color: var(--color-surface); font-size: 10px; padding: 1px 4px; border-radius: 999px; }
+.ui-dock-panel { position: absolute; bottom: calc(100% + 10px); left: 0; width: 100%; padding: 16px; border: 1px solid var(--color-border); border-radius: 20px; background: var(--color-surface); box-shadow: var(--shadow-lg); max-height: min(60vh, 420px); overflow-y: auto; }
+.ui-dock-more { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-bottom: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--color-border); }
+.ui-dock-more button { display: flex; align-items: center; gap: 9px; border: 1px solid var(--color-border); border-radius: 12px; background: var(--color-surface); color: var(--color-text); padding: 10px; min-height: 44px; cursor: pointer; text-align: left; font-size: 13px; }
+.ui-dock-more button[aria-current="page"] { background: var(--color-primary-bg); color: var(--color-primary); border-color: var(--color-primary); }
+.ui-theme-toggle { display: inline-flex; align-items: center; justify-content: center; gap: 10px; border: 1px solid var(--color-border); border-radius: 999px; color: var(--color-text); background: var(--color-surface-2); cursor: pointer; min-height: 44px; padding: 8px 16px; font: 500 13px var(--font-body); }
+.ui-theme-toggle > span:first-child { font-size: 20px; line-height: 1; }
+.ui-dock-panel .ui-theme-toggle { width: 100%; }
+.ui-blur-fade { animation: ui-blur-fade 240ms var(--ease-out) both; animation-delay: var(--ui-delay, 0ms); }
+@keyframes ui-blur-fade { from { opacity: 0; transform: translateY(6px); filter: blur(2px); } to { opacity: 1; transform: translateY(0); filter: none; } }
+.ui-ripple-button { position: relative; overflow: hidden; isolation: isolate; }
+.ui-ripple-button .ripple { pointer-events: none; background: currentColor; opacity: .2; }
+.ui-animated-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.ui-list-leaving { animation: ui-list-exit 180ms ease-in both; pointer-events: none; }
+@keyframes ui-list-exit { to { opacity: 0; transform: translateY(-4px) scale(.98); } }
+::view-transition-old(root), ::view-transition-new(root) { animation: none; mix-blend-mode: normal; }
+::view-transition-new(root) { z-index: 1; }
+@media (hover: hover) and (pointer: fine) { .ui-dock-item:hover .ui-dock-icon { transform: translateY(-2px) scale(1.08); } .ui-dock-more button:hover { border-color: var(--color-primary); } }
+@media (max-width: 380px) { .ui-dock-more { grid-template-columns: 1fr; } .ui-dock-item { font-size: 10px; } }
+@media (prefers-reduced-motion: reduce) {
+  .ui-selection-background, .ui-dock-icon { transition: none; }
+  .ui-blur-fade, .ui-list-leaving { animation: none; filter: none; transform: none; opacity: 1; }
+  .ui-dock-item:hover .ui-dock-icon, .ui-dock-item:active .ui-dock-icon { transform: none; }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { mensajeError } from "core";
 import {
@@ -41,6 +41,13 @@ import {
   type PagoTarjeta,
 } from "core";
 import { supabase } from "./lib/supabase";
+import { useInterfazMotion } from "./lib/interfazMotion";
+import TituloAnimado from "./components/TituloAnimado";
+import PanelCargando from "./components/PanelCargando";
+import Dock from "./components/Dock";
+import AnimatedBackground from "./components/AnimatedBackground";
+import BlurFade from "./components/BlurFade";
+import RippleButton from "./components/RippleButton";
 import Resumen from "./views/Resumen";
 import Gastos from "./views/Gastos";
 import Ingresos from "./views/Ingresos";
@@ -59,77 +66,86 @@ import {
   IconoDeudas,
   IconoRecordatorios,
   IconoCategorias,
-  IconoSalir,
 } from "./components/iconos";
 
+// LOGIN DESACTIVADO DE MOMENTO: no hay pantalla de login, la app entra
+// directo al dashboard. Las tablas exigen un usuario autenticado (RLS +
+// usuario_id = auth.uid()), así que para ver/guardar datos hace falta una
+// sesión real: si no hay una guardada, se inicia sola con VITE_DEV_EMAIL y
+// VITE_DEV_PASSWORD del .env. Sin sesión el dashboard se ve, pero vacío.
+//
+// Solo en `vite dev`: toda variable VITE_* se incrusta como texto en el
+// JavaScript que se publica. Con el guard de DEV, en `vite build` la
+// condición es `false` y el minificador elimina las credenciales del bundle.
+const DEV_EMAIL = import.meta.env.DEV ? import.meta.env.VITE_DEV_EMAIL : undefined;
+const DEV_PASSWORD = import.meta.env.DEV ? import.meta.env.VITE_DEV_PASSWORD : undefined;
+
 export default function App() {
+  // magic card (spotlight de puntero) + ripple en botones primarios: un solo
+  // listener a nivel de documento para toda la app (ver src/lib/interfazMotion.ts).
+  useInterfazMotion();
+
   // undefined = todavía no sabemos si hay sesión; null = no hay sesión.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
+  const [avisoSesion, setAvisoSesion] = useState<string | null>(null);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setSession(data.session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_evento, nuevaSesion) => {
-      setSession(nuevaSesion);
-    });
-    return () => listener.subscription.unsubscribe();
+    let activo = true;
+
+    async function iniciar() {
+      const { data } = await supabase.auth.getSession();
+      if (data.session) {
+        if (activo) setSession(data.session);
+        return;
+      }
+      if (!DEV_EMAIL || !DEV_PASSWORD) {
+        if (!activo) return;
+        setAvisoSesion(
+          "Sin sesión: pon VITE_DEV_EMAIL y VITE_DEV_PASSWORD en apps/desktop/.env para ver y guardar tus datos.",
+        );
+        setSession(null);
+        return;
+      }
+      const { data: login, error } = await supabase.auth.signInWithPassword({
+        email: DEV_EMAIL,
+        password: DEV_PASSWORD,
+      });
+      if (!activo) return;
+      if (error)
+        setAvisoSesion(
+          `Sin sesión: el login automático falló (${error.message}).`,
+        );
+      setSession(login.session);
+    }
+    iniciar();
+
+    const { data: listener } = supabase.auth.onAuthStateChange(
+      (evento, nuevaSesion) => {
+        // la sesión inicial la resuelve iniciar()
+        if (evento === "INITIAL_SESSION") return;
+        setSession(nuevaSesion);
+        if (nuevaSesion) setAvisoSesion(null);
+      },
+    );
+    return () => {
+      activo = false;
+      listener.subscription.unsubscribe();
+    };
   }, []);
 
-  if (session === undefined) return <p className="contenedor">Cargando…</p>;
-  if (!session) return <Login />;
-  return <Dashboard onSalir={() => supabase.auth.signOut()} session={session} />;
-}
-
-function Login() {
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [cargando, setCargando] = useState(false);
-
-  async function iniciarSesion(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setCargando(true);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) setError(error.message);
-    setCargando(false);
-  }
-
+  if (session === undefined)
+    return (
+      <div className="contenedor">
+        <PanelCargando />
+      </div>
+    );
+  // si la sesión cambia de usuario, se remonta el dashboard para recargar datos
   return (
-    <main className="login-wrap">
-      <form onSubmit={iniciarSesion} className="card login-card">
-        <div className="login-logo">
-          <Logo size={44} />
-        </div>
-        <h1>Gastos App</h1>
-        <p className="subtitulo">Tus gastos, ingresos y tarjetas en un solo lugar</p>
-        <div className="campo">
-          <label htmlFor="email">Email</label>
-          <input
-            id="email"
-            className="input"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-          />
-        </div>
-        <div className="campo">
-          <label htmlFor="password">Contraseña</label>
-          <input
-            id="password"
-            className="input"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-          />
-        </div>
-        {error && <p className="error">{error}</p>}
-        <button type="submit" className="btn btn-primary" disabled={cargando}>
-          {cargando ? "Ingresando…" : "Ingresar"}
-        </button>
-      </form>
-    </main>
+    <Dashboard
+      key={session?.user.id ?? "sin-sesion"}
+      session={session}
+      avisoSesion={avisoSesion}
+    />
   );
 }
 
@@ -158,7 +174,13 @@ const TABS: { id: Tab; etiqueta: string; icono: typeof IconoResumen }[] = [
   { id: "categorias", etiqueta: "Categorías", icono: IconoCategorias },
 ];
 
-function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session }) {
+function Dashboard({
+  session,
+  avisoSesion,
+}: {
+  session: Session | null;
+  avisoSesion: string | null;
+}) {
   const [tab, setTab] = useState<Tab>("resumen");
   const [mes, setMes] = useState(mesActual());
 
@@ -203,17 +225,33 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
     recargar();
   }, []);
 
-  const gastosDelMes = useMemo(() => gastos.filter((g) => g.fecha.startsWith(mes)), [gastos, mes]);
-  const ingresosDelMes = useMemo(() => ingresos.filter((i) => i.fecha.startsWith(mes)), [ingresos, mes]);
-  const balance = useMemo(() => balanceGeneral(gastosDelMes, ingresosDelMes), [gastosDelMes, ingresosDelMes]);
+  const gastosDelMes = useMemo(
+    () => gastos.filter((g) => g.fecha.startsWith(mes)),
+    [gastos, mes],
+  );
+  const ingresosDelMes = useMemo(
+    () => ingresos.filter((i) => i.fecha.startsWith(mes)),
+    [ingresos, mes],
+  );
+  const balance = useMemo(
+    () => balanceGeneral(gastosDelMes, ingresosDelMes),
+    [gastosDelMes, ingresosDelMes],
+  );
   const endeudamiento = useMemo(
     () => calcularEndeudamiento(deudas, balance.totalIngresos),
-    [deudas, balance.totalIngresos]
+    [deudas, balance.totalIngresos],
   );
   const recomendaciones = useMemo(
     () =>
-      generarRecomendaciones({ mes, gastos, ingresos, categorias, cuentas, endeudamiento }),
-    [mes, gastos, ingresos, categorias, cuentas, endeudamiento]
+      generarRecomendaciones({
+        mes,
+        gastos,
+        ingresos,
+        categorias,
+        cuentas,
+        endeudamiento,
+      }),
+    [mes, gastos, ingresos, categorias, cuentas, endeudamiento],
   );
 
   // --- handlers: todos recargan al final porque triggers en la base de
@@ -231,7 +269,9 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
     await eliminarGasto(id);
     await recargar();
   }
-  async function handleImportarGastos(inputs: Omit<Gasto, "id" | "createdAt">[]) {
+  async function handleImportarGastos(
+    inputs: Omit<Gasto, "id" | "createdAt">[],
+  ) {
     // Secuencial (no Promise.all): varias filas pueden compartir la misma
     // cuenta, y los triggers que ajustan `cuentas.disponible` no son seguros
     // ante inserts concurrentes sobre la misma fila.
@@ -260,7 +300,11 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
       setError(mensajeError(err));
     }
   }
-  async function handleRegistrarPago(cuentaId: string, monto: number, cuentaOrigenId?: string) {
+  async function handleRegistrarPago(
+    cuentaId: string,
+    monto: number,
+    cuentaOrigenId?: string,
+  ) {
     await registrarPagoTarjeta({
       cuentaId,
       cuentaOrigenId,
@@ -282,7 +326,7 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
     await recargar();
   }
   async function handleCrearRecordatorio(
-    input: Omit<Recordatorio, "id" | "createdAt" | "completado">
+    input: Omit<Recordatorio, "id" | "createdAt" | "completado">,
   ) {
     await crearRecordatorio(input);
     await recargar();
@@ -295,11 +339,18 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
     await eliminarRecordatorio(id);
     await recargar();
   }
-  async function handleCrearCategoria(input: { nombre: string; color: string; tipo: TipoCategoria }) {
+  async function handleCrearCategoria(input: {
+    nombre: string;
+    color: string;
+    tipo: TipoCategoria;
+  }) {
     await crearCategoria(input);
     await recargar();
   }
-  async function handleActualizarCategoria(id: string, cambios: { nombre: string; color: string }) {
+  async function handleActualizarCategoria(
+    id: string,
+    cambios: { nombre: string; color: string },
+  ) {
     await actualizarCategoria(id, cambios);
     await recargar();
   }
@@ -313,7 +364,7 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
   const [borrandoTodo, setBorrandoTodo] = useState(false);
   async function handleBorrarTodo() {
     const confirmado = window.confirm(
-      "¿Borrar TODOS tus datos (gastos, ingresos, cuentas, deudas, recordatorios, pagos y categorías propias)? Esto no se puede deshacer."
+      "¿Borrar TODOS tus datos (gastos, ingresos, cuentas, deudas, recordatorios, pagos y categorías propias)? Esto no se puede deshacer.",
     );
     if (!confirmado) return;
     setBorrandoTodo(true);
@@ -328,53 +379,72 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
   }
 
   return (
-    <div className="shell">
+    <div className="shell ui-with-dock">
       <aside className="sidebar">
         <div className="brand">
           <Logo size={28} />
           <span>Gastos App</span>
         </div>
-        <nav className="nav">
-          {TABS.map((t) => {
-            const Icono = t.icono;
-            return (
-              <button
-                key={t.id}
-                className={`nav-item ${tab === t.id ? "nav-item-activo" : ""}`}
-                onClick={() => setTab(t.id)}
-              >
-                <Icono />
-                {t.etiqueta}
-              </button>
-            );
-          })}
+        <nav aria-label="Navegación principal">
+          <AnimatedBackground value={tab} className="nav">
+            {TABS.map((t) => {
+              const Icono = t.icono;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  data-selection-id={t.id}
+                  style={{ background: "transparent" }}
+                  aria-current={tab === t.id ? "page" : undefined}
+                  className={`nav-item ${tab === t.id ? "nav-item-activo" : ""}`}
+                  onClick={() => setTab(t.id)}
+                >
+                  <Icono />
+                  {t.etiqueta}
+                </button>
+              );
+            })}
+          </AnimatedBackground>
         </nav>
-        <button
+        <RippleButton
           className="btn nav-salir"
-          style={{ marginBottom: 8, color: "var(--color-danger)", borderColor: "var(--color-danger-bg)" }}
+          style={{
+            marginBottom: 8,
+            color: "var(--color-danger)",
+            borderColor: "var(--color-danger-bg)",
+          }}
           onClick={handleBorrarTodo}
           disabled={borrandoTodo}
           title="Botón temporal de desarrollo: borra todos tus datos"
         >
           🗑️ {borrandoTodo ? "Borrando…" : "Borrar todo (temporal)"}
-        </button>
-        <button className="btn nav-salir" onClick={onSalir}>
-          <IconoSalir />
-          Salir
-        </button>
+        </RippleButton>
       </aside>
 
-      <div className="main">
+      <main className="main">
         <header className="topbar">
-          <h1>{TABS.find((t) => t.id === tab)?.etiqueta}</h1>
+          <TituloAnimado
+            texto={TABS.find((t) => t.id === tab)?.etiqueta ?? ""}
+          />
           {(tab === "resumen" || tab === "gastos" || tab === "ingresos") && (
             <div className="topbar-acciones">
-              <input type="month" className="input" value={mes} onChange={(e) => setMes(e.target.value)} />
+              <input
+                aria-label="Mes de los movimientos"
+                type="month"
+                className="input"
+                value={mes}
+                onChange={(e) => setMes(e.target.value)}
+              />
             </div>
           )}
         </header>
 
-        <div className="contenedor">
+        <div className="contenedor" id="contenido-principal">
+          {avisoSesion && (
+            <p role="alert" className="error" style={{ marginBottom: 16 }}>
+              {avisoSesion}
+            </p>
+          )}
           {error && (
             <p className="error" style={{ marginBottom: 16 }}>
               Error: {error}
@@ -382,9 +452,9 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
           )}
 
           {cargando ? (
-            <p>Cargando…</p>
+            <PanelCargando />
           ) : (
-            <>
+            <BlurFade key={tab}>
               {tab === "resumen" && (
                 <Resumen
                   balance={balance}
@@ -393,7 +463,7 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
                   gastos={gastos}
                   ingresos={ingresos}
                   categorias={categorias}
-                  correoUsuario={session.user.email ?? ""}
+                  correoUsuario={session?.user.email ?? ""}
                 />
               )}
               {tab === "ingresos" && (
@@ -470,10 +540,26 @@ function Dashboard({ onSalir, session }: { onSalir: () => void; session: Session
                   onEliminar={handleEliminarCategoria}
                 />
               )}
-            </>
+            </BlurFade>
           )}
         </div>
-      </div>
+      </main>
+      <Dock
+        items={TABS.slice(0, 4).map((item) => ({
+          id: item.id,
+          etiqueta: item.etiqueta,
+          icono: <item.icono />,
+        }))}
+        moreItems={TABS.slice(4).map((item) => ({
+          id: item.id,
+          etiqueta: item.etiqueta,
+          icono: <item.icono />,
+        }))}
+        value={tab}
+        onChange={(id) => {
+          if (TABS.some((item) => item.id === id)) setTab(id as Tab);
+        }}
+      />
     </div>
   );
 }

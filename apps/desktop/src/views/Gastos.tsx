@@ -1,14 +1,28 @@
+import AnimatedBackground from "../components/AnimatedBackground";
+import RippleButton from "../components/RippleButton";
 import { useRef, useState, type FormEvent } from "react";
 import type { CambiosGasto, Categoria, Cuenta, Gasto, MetodoPago } from "core";
 import { leerImagen, parseRecibo } from "../lib/ocr";
 import { subirFactura, urlFactura } from "../lib/storage";
 import { semanasDelMes, enRangoSemana, sumarMeses } from "core";
 import GraficoBarras from "../components/GraficoBarras";
-import { IconoCamara, IconoFactura, IconoGastos, IconoMas, IconoPapelera, IconoSubir } from "../components/iconos";
+import {
+  IconoCamara,
+  IconoFactura,
+  IconoGastos,
+  IconoMas,
+  IconoPapelera,
+  IconoSubir,
+} from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
 import ImportarEstadoCuenta from "../components/ImportarEstadoCuenta";
 import { mensajeError } from "core";
-import { agruparPorCategoriaODetalle, ETIQUETA_METODO_PAGO, OPCIONES_METODO_PAGO, OPCIONES_MESES_DIFERIDO } from "core";
+import {
+  agruparPorCategoriaODetalle,
+  ETIQUETA_METODO_PAGO,
+  OPCIONES_METODO_PAGO,
+  OPCIONES_MESES_DIFERIDO,
+} from "core";
 
 function hoy() {
   return new Date().toISOString().slice(0, 10);
@@ -24,7 +38,9 @@ interface Props {
   onCrear: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
   onActualizar: (id: string, cambios: CambiosGasto) => Promise<void>;
   onEliminar: (id: string) => Promise<void>;
-  onImportarVarios: (gastos: Omit<Gasto, "id" | "createdAt">[]) => Promise<void>;
+  onImportarVarios: (
+    gastos: Omit<Gasto, "id" | "createdAt">[],
+  ) => Promise<void>;
 }
 
 export default function Gastos({
@@ -44,7 +60,9 @@ export default function Gastos({
   const [semanaActiva, setSemanaActiva] = useState(1);
   const semanas = semanasDelMes(mes);
   const rango = semanas[semanaActiva - 1];
-  const gastosSemana = gastosDelMes.filter((g) => enRangoSemana(g.fecha, rango));
+  const gastosSemana = gastosDelMes.filter((g) =>
+    enRangoSemana(g.fecha, rango),
+  );
 
   const totalMes = gastosDelMes.reduce((acc, g) => acc + g.monto, 0);
   const totalSemana = gastosSemana.reduce((acc, g) => acc + g.monto, 0);
@@ -55,7 +73,11 @@ export default function Gastos({
     .filter((d) => d.monto > 0)
     .sort((a, b) => b.monto - a.monto);
 
-  const datosGrafico = desglose.map((d) => ({ etiqueta: d.etiqueta, valor: d.monto, color: d.color }));
+  const datosGrafico = desglose.map((d) => ({
+    etiqueta: d.etiqueta,
+    valor: d.monto,
+    color: d.color,
+  }));
 
   async function crearYCerrar(input: Omit<Gasto, "id" | "createdAt">) {
     await onCrear(input);
@@ -64,6 +86,12 @@ export default function Gastos({
 
   return (
     <>
+      <p
+        className="etiqueta"
+        style={{ margin: "0 0 24px", fontSize: "0.95rem", lineHeight: 1.6 }}
+      >
+        Comprendé tus gastos por semana y categoría.
+      </p>
       {mostrarForm ? (
         <NuevoGasto
           categorias={categoriasGasto}
@@ -73,9 +101,13 @@ export default function Gastos({
           onAbrirImportar={() => setMostrarImportar(true)}
         />
       ) : (
-        <button className="btn btn-primary" style={{ marginBottom: 24 }} onClick={() => setMostrarForm(true)}>
+        <RippleButton
+          className="btn btn-primary"
+          style={{ marginBottom: 24 }}
+          onClick={() => setMostrarForm(true)}
+        >
           <IconoMas /> Nuevo gasto
-        </button>
+        </RippleButton>
       )}
 
       {mostrarImportar && (
@@ -87,10 +119,13 @@ export default function Gastos({
         />
       )}
 
-      <div className="semanas-tabs">
+      <AnimatedBackground value={String(semanaActiva)} className="semanas-tabs">
         {semanas.map((s) => (
           <button
             key={s.numero}
+            data-selection-id={String(s.numero)}
+            style={{ background: "transparent" }}
+            aria-pressed={semanaActiva === s.numero}
             className={`semanas-tab ${semanaActiva === s.numero ? "semanas-tab-activo" : ""}`}
             onClick={() => setSemanaActiva(s.numero)}
           >
@@ -101,14 +136,17 @@ export default function Gastos({
             </span>
           </button>
         ))}
-      </div>
+      </AnimatedBackground>
 
       <div className="semana-layout">
         <div className="card">
           <h3 style={{ margin: "0 0 12px", fontSize: "0.95rem" }}>
             Gastos por categoría — Semana {semanaActiva}
           </h3>
-          <GraficoBarras datos={datosGrafico} mensajeVacio="Sin gastos en este período." />
+          <GraficoBarras
+            datos={datosGrafico}
+            mensajeVacio="Sin gastos en este período."
+          />
         </div>
 
         <div className="card">
@@ -124,13 +162,21 @@ export default function Gastos({
               {desglose.map((d) => (
                 <li key={d.clave} className="semana-desglose-fila">
                   <span className="categoria-tag">
-                    <span className="categoria-punto" style={{ background: d.color }} />
+                    <span
+                      className="categoria-punto"
+                      style={{ background: d.color }}
+                    />
                     <span>{d.etiqueta}</span>
                   </span>
                   <span className="semana-desglose-porcentaje">
-                    {totalSemana > 0 ? ((d.monto / totalSemana) * 100).toFixed(0) : 0}%
+                    {totalSemana > 0
+                      ? ((d.monto / totalSemana) * 100).toFixed(0)
+                      : 0}
+                    %
                   </span>
-                  <span className="semana-desglose-monto">${d.monto.toFixed(2)}</span>
+                  <span className="semana-desglose-monto">
+                    ${d.monto.toFixed(2)}
+                  </span>
                 </li>
               ))}
             </ul>
@@ -197,7 +243,7 @@ function TablaGastos({
               <th>Descripción</th>
               <th>Categoría</th>
               <th>Cuenta</th>
-              <th>Monto</th>
+              <th className="tabla-monto">Monto</th>
               <th></th>
               <th></th>
             </tr>
@@ -270,13 +316,26 @@ function FilaGasto({
     return (
       <tr>
         <td>
-          <input className="input" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
+          <input
+            className="input"
+            type="date"
+            value={fecha}
+            onChange={(e) => setFecha(e.target.value)}
+          />
         </td>
         <td>
-          <input className="input" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} />
+          <input
+            className="input"
+            value={descripcion}
+            onChange={(e) => setDescripcion(e.target.value)}
+          />
         </td>
         <td>
-          <select className="input" value={categoriaId} onChange={(e) => setCategoriaId(e.target.value)}>
+          <select
+            className="input"
+            value={categoriaId}
+            onChange={(e) => setCategoriaId(e.target.value)}
+          >
             {categorias
               .filter((c) => c.tipo === "gasto")
               .map((c) => (
@@ -287,7 +346,11 @@ function FilaGasto({
           </select>
         </td>
         <td>
-          <select className="input" value={cuentaId} onChange={(e) => setCuentaId(e.target.value)}>
+          <select
+            className="input"
+            value={cuentaId}
+            onChange={(e) => setCuentaId(e.target.value)}
+          >
             <option value="">Sin asignar</option>
             {cuentas.map((c) => (
               <option key={c.id} value={c.id}>
@@ -309,9 +372,13 @@ function FilaGasto({
         <td></td>
         <td>
           <div className="pago-tarjeta-inline">
-            <button className="btn btn-primary" onClick={guardar} disabled={guardando}>
+            <RippleButton
+              className="btn btn-primary"
+              onClick={guardar}
+              disabled={guardando}
+            >
               {guardando ? "…" : "Guardar"}
-            </button>
+            </RippleButton>
             <button className="btn" onClick={() => setEditando(false)}>
               Cancelar
             </button>
@@ -328,22 +395,32 @@ function FilaGasto({
         {gasto.descripcion}
         {gasto.metodoPago === "diferido" && gasto.mesesDiferido && (
           <span className="etiqueta-diferido">
-            Diferido a {gasto.mesesDiferido} meses · hasta {sumarMeses(gasto.fecha, gasto.mesesDiferido)}
+            Diferido a {gasto.mesesDiferido} meses · hasta{" "}
+            {sumarMeses(gasto.fecha, gasto.mesesDiferido)}
           </span>
         )}
       </td>
       <td>
         <span className="categoria-tag">
-          <span className="categoria-punto" style={{ background: categoria?.color ?? "#aaa" }} />
+          <span
+            className="categoria-punto"
+            style={{ background: categoria?.color ?? "#aaa" }}
+          />
           {categoria?.nombre ?? "Sin categoría"}
-          {categoria?.nombre === "Otros" && gasto.categoriaDetalle ? ` · ${gasto.categoriaDetalle}` : ""}
+          {categoria?.nombre === "Otros" && gasto.categoriaDetalle
+            ? ` · ${gasto.categoriaDetalle}`
+            : ""}
         </span>
       </td>
       <td>{cuenta?.nombre ?? "—"}</td>
-      <td>${gasto.monto.toFixed(2)}</td>
+      <td className="tabla-monto">${gasto.monto.toFixed(2)}</td>
       <td className="tabla-celda-factura">
         {gasto.facturaPath && (
-          <button className="factura-link" title="Ver factura" onClick={() => onAbrirFactura(gasto.facturaPath!)}>
+          <button
+            className="factura-link"
+            title="Ver factura"
+            onClick={() => onAbrirFactura(gasto.facturaPath!)}
+          >
             <IconoFactura />
           </button>
         )}
@@ -353,7 +430,11 @@ function FilaGasto({
           <button className="btn" onClick={() => setEditando(true)}>
             Editar
           </button>
-          <button className="btn-icon" title="Eliminar" onClick={() => onEliminar(gasto.id)}>
+          <button
+            className="btn-icon"
+            title="Eliminar"
+            onClick={() => onEliminar(gasto.id)}
+          >
             <IconoPapelera />
           </button>
         </div>
@@ -455,11 +536,15 @@ function NuevoGasto({
       if (recibo.fecha) setFecha(recibo.fecha);
       if (recibo.comercio) setDescripcion(recibo.comercio);
       if (recibo.categoriaSugerida) {
-        const categoria = categorias.find((c) => c.nombre === recibo.categoriaSugerida);
+        const categoria = categorias.find(
+          (c) => c.nombre === recibo.categoriaSugerida,
+        );
         if (categoria) setCategoriaId(categoria.id);
       }
       if (!recibo.monto && !recibo.fecha && !recibo.comercio) {
-        setError("No se pudo leer el recibo con claridad. Completa los datos a mano.");
+        setError(
+          "No se pudo leer el recibo con claridad. Completa los datos a mano.",
+        );
       }
     } catch (err) {
       setError(mensajeError(err));
@@ -506,7 +591,11 @@ function NuevoGasto({
             onClick={() => inputFacturaRef.current?.click()}
           >
             <IconoFactura />
-            {factura ? (factura.name.length > 22 ? `${factura.name.slice(0, 19)}…` : factura.name) : "Adjuntar factura"}
+            {factura
+              ? factura.name.length > 22
+                ? `${factura.name.slice(0, 19)}…`
+                : factura.name
+              : "Adjuntar factura"}
           </button>
           <button type="button" className="btn" onClick={onCancelar}>
             Cancelar
@@ -530,7 +619,10 @@ function NuevoGasto({
         </div>
         <div className="campo">
           <label htmlFor="descripcion">
-            Descripción <span className="campo-contador">{descripcion.length}/{MAX_CARACTERES_DESCRIPCION}</span>
+            Descripción{" "}
+            <span className="campo-contador">
+              {descripcion.length}/{MAX_CARACTERES_DESCRIPCION}
+            </span>
           </label>
           <input
             id="descripcion"
@@ -544,7 +636,12 @@ function NuevoGasto({
         </div>
         <div className="campo">
           <label htmlFor="cuenta">Cuenta / tarjeta</label>
-          <select id="cuenta" className="input" value={cuentaId} onChange={(e) => setCuentaId(e.target.value)}>
+          <select
+            id="cuenta"
+            className="input"
+            value={cuentaId}
+            onChange={(e) => setCuentaId(e.target.value)}
+          >
             <option value="">Sin asignar</option>
             {cuentas.map((c) => (
               <option key={c.id} value={c.id}>
@@ -597,34 +694,56 @@ function NuevoGasto({
             required
           />
         </div>
-        <button type="submit" className="btn btn-primary" disabled={guardando}>
-          {subiendoFactura ? "Subiendo factura…" : guardando ? "Guardando…" : "Agregar"}
-        </button>
+        <RippleButton
+          type="submit"
+          className="btn btn-primary"
+          disabled={guardando}
+        >
+          {subiendoFactura
+            ? "Subiendo factura…"
+            : guardando
+              ? "Guardando…"
+              : "Agregar"}
+        </RippleButton>
       </div>
 
       {esDiferido && monto && Number(monto) > 0 && (
         <p className="campo-ayuda-diferido">
-          ${(Number(monto) / mesesDiferido).toFixed(2)}/mes · termina el {sumarMeses(fecha, mesesDiferido)} · esto
-          crea una deuda automáticamente.
+          ${(Number(monto) / mesesDiferido).toFixed(2)}/mes · termina el{" "}
+          {sumarMeses(fecha, mesesDiferido)} · esto crea una deuda
+          automáticamente.
         </p>
       )}
 
       <div className="campo" style={{ marginTop: 16 }}>
         <label>Categoría</label>
-        <div className="categorias-chips">
+        <AnimatedBackground value={categoriaId} className="categorias-chips">
           {categorias.map((c) => (
             <button
               key={c.id}
+              data-selection-id={c.id}
+              aria-pressed={categoriaId === c.id}
               type="button"
               className={`categoria-chip ${categoriaId === c.id ? "categoria-chip-activo" : ""}`}
-              style={categoriaId === c.id ? { borderColor: c.color, background: `${c.color}17`, color: c.color } : undefined}
+              style={
+                categoriaId === c.id
+                  ? {
+                      borderColor: c.color,
+                      background: `${c.color}17`,
+                      color: c.color,
+                    }
+                  : undefined
+              }
               onClick={() => setCategoriaId(c.id)}
             >
-              <span className="categoria-punto" style={{ background: c.color }} />
+              <span
+                className="categoria-punto"
+                style={{ background: c.color }}
+              />
               {c.nombre}
             </button>
           ))}
-        </div>
+        </AnimatedBackground>
         {esOtros && (
           <input
             className="input"

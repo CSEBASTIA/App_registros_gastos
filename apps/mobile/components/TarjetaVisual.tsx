@@ -12,7 +12,7 @@ import {
 } from "core";
 import { logoDeBanco } from "../lib/logosBanco";
 import BarraProgreso from "./BarraProgreso";
-import { radius, spacing } from "../lib/theme";
+import { useTheme, font, radius, spacing } from "../lib/theme";
 
 const ICONO_TIPO: Record<Cuenta["tipo"], keyof typeof Ionicons.glyphMap> = {
   credito: "card-outline",
@@ -44,6 +44,7 @@ export default function TarjetaVisual({
   seleccionada?: boolean;
   onPress?: () => void;
 }) {
+  const { color } = useTheme();
   const logo = logoDeBanco(cuenta.banco);
   const esCredito = cuenta.tipo === "credito";
   const usoPorcentaje = cuenta.cupoTotal ? ((cuenta.cupoTotal - cuenta.disponible) / cuenta.cupoTotal) * 100 : undefined;
@@ -124,7 +125,7 @@ export default function TarjetaVisual({
   if (!onPress) return contenido;
 
   return (
-    <Pressable onPress={onPress} style={seleccionada ? styles.seleccionada : undefined}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!seleccionada }} accessibilityLabel={cuenta.nombre} style={({ pressed }) => [seleccionada && styles.seleccionada, { borderColor: color.primary, opacity: pressed ? 0.86 : 1 }]}>
       {contenido}
     </Pressable>
   );
@@ -140,16 +141,16 @@ const styles = StyleSheet.create({
   },
   baseCompacta: { minHeight: 100, width: 190, padding: spacing(3.5) },
   cuentaBase: { minHeight: 110, justifyContent: "flex-start", gap: spacing(3) },
-  seleccionada: { borderWidth: 2.5, borderColor: "#3b6ff2", borderRadius: radius.lg + 3 },
+  seleccionada: { borderWidth: 2.5, borderRadius: radius.lg + 3 },
   encabezado: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  bancoTexto: { fontSize: 12, fontWeight: "700", color: "#fff", letterSpacing: 0.4, textTransform: "uppercase" },
+  bancoTexto: { fontFamily: font.body, fontSize: 12, fontWeight: "700", color: "#fff", letterSpacing: 0.4, textTransform: "uppercase" },
   logo: { height: 20, width: 90 },
-  nombre: { fontSize: 16, fontWeight: "700", color: "#fff" },
-  tipo: { fontSize: 12, color: "rgba(255,255,255,0.85)" },
-  saldo: { fontSize: 20, fontWeight: "700", color: "#fff", marginTop: spacing(2) },
-  marca: { fontSize: 13, fontWeight: "800", fontStyle: "italic", color: "#fff", alignSelf: "flex-end" },
+  nombre: { fontFamily: font.body, fontSize: 16, fontWeight: "700", color: "#fff" },
+  tipo: { fontFamily: font.body, fontSize: 12, color: "rgba(255,255,255,0.85)" },
+  saldo: { fontFamily: font.mono, fontSize: 20, fontWeight: "700", color: "#fff", marginTop: spacing(2) },
+  marca: { fontFamily: font.body, fontSize: 13, fontWeight: "800", fontStyle: "italic", color: "#fff", alignSelf: "flex-end" },
   cupoLinea: { flexDirection: "row", justifyContent: "space-between" },
-  cupoTexto: { fontSize: 11, color: "rgba(255,255,255,0.9)" },
+  cupoTexto: { fontFamily: font.mono, fontSize: 11, color: "rgba(255,255,255,0.9)" },
   cuentaCuerpo: { flexDirection: "row", alignItems: "center", gap: spacing(3) },
   iconoRedondo: {
     width: 40,

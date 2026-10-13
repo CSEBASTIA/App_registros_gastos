@@ -1,5 +1,14 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, Alert, StyleSheet } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  Alert,
+  StyleSheet,
+} from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   listarCuentas,
@@ -26,13 +35,17 @@ import ErrorTexto from "../../components/ErrorTexto";
 import SelectorChips from "../../components/SelectorChips";
 import ItemMovimiento from "../../components/ItemMovimiento";
 import EstadoVacio from "../../components/EstadoVacio";
-import { color, spacing } from "../../lib/theme";
+import { spacing, useTheme, font, type Colors } from "../../lib/theme";
+import { BlurFade } from "../../components/Motion";
 
 function hoy() {
   return new Date().toISOString().slice(0, 10);
 }
 
 export default function DetalleTarjeta() {
+  const [cargando, setCargando] = useState(true);
+  const { color } = useTheme();
+  const styles = createStyles(color);
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
@@ -44,7 +57,15 @@ export default function DetalleTarjeta() {
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
-    Promise.all([listarCuentas(), listarGastos(), listarIngresos(), listarPagosTarjeta(), listarCategorias()])
+    setCargando(true);
+    setError(null);
+    Promise.all([
+      listarCuentas(),
+      listarGastos(),
+      listarIngresos(),
+      listarPagosTarjeta(),
+      listarCategorias(),
+    ])
       .then(([todas, g, i, p, c]) => {
         setCuenta(todas.find((c) => c.id === id) ?? null);
         setCuentas(todas);
@@ -53,65 +74,158 @@ export default function DetalleTarjeta() {
         setPagos(p);
         setCategorias(c);
       })
-      .catch((err) => setError(mensajeError(err)));
+      .catch((err) => setError(mensajeError(err)))
+      .finally(() => setCargando(false));
   }, [id]);
 
   useFocusEffect(cargar);
 
-  if (!cuenta) return null;
+  if (cargando)
+    return (
+      <View
+        style={[
+          styles.contenedor,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing(6),
+            gap: spacing(3),
+          },
+        ]}
+        accessibilityLiveRegion="polite"
+      >
+        <ActivityIndicator
+          color={color.primary}
+          accessibilityLabel="Cargando"
+        />
+        <Text
+          style={{
+            fontFamily: font.body,
+            fontSize: 14,
+            color: color.textMuted,
+          }}
+        >
+          Cargando tus datos…
+        </Text>
+      </View>
+    );
 
-  const movimientos = movimientosDe(cuenta.id, gastos, pagos, ingresos, categorias).slice(0, 30);
-  const cuentasOrigen = cuentas.filter((c) => c.tipo === "ahorro" || c.tipo === "debito");
+  if (!cuenta)
+    return (
+      <View style={[styles.contenedor, { padding: spacing(5) }]}>
+        {error ? (
+          <ErrorTexto>{error}</ErrorTexto>
+        ) : (
+          <EstadoVacio
+            icono="wallet-outline"
+            titulo="No encontramos esta cuenta"
+            subtitulo="Volvé a la lista para elegir otra cuenta."
+          />
+        )}
+      </View>
+    );
+
+  const movimientos = movimientosDe(
+    cuenta.id,
+    gastos,
+    pagos,
+    ingresos,
+    categorias,
+  ).slice(0, 30);
+  const cuentasOrigen = cuentas.filter(
+    (c) => c.tipo === "ahorro" || c.tipo === "debito",
+  );
 
   function confirmarEliminar() {
-    Alert.alert("Eliminar tarjeta", `¿Eliminar "${cuenta!.nombre}"? Esto no se puede deshacer.`, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await eliminarCuenta(cuenta!.id);
-            router.back();
-          } catch (err) {
-            setError(mensajeError(err));
-          }
+    Alert.alert(
+      "Eliminar tarjeta",
+      `¿Eliminar "${cuenta!.nombre}"? Esto no se puede deshacer.`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await eliminarCuenta(cuenta!.id);
+              router.back();
+            } catch (err) {
+              setError(mensajeError(err));
+            }
+          },
         },
-      },
-    ]);
+      ],
+    );
   }
 
   return (
-    <ScrollView style={styles.contenedor} contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      <TarjetaVisual cuenta={cuenta} />
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: color.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        style={styles.contenedor}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{
+          padding: spacing(5),
+          paddingBottom: spacing(8),
+          gap: spacing(4),
+        }}
+      >
+        <BlurFade style={{ gap: spacing(2) }}>
+          <Text accessibilityRole="header" style={styles.screenTitle}>
+            Detalle de tarjeta
+          </Text>
+          <Text style={styles.screenIntro}>
+            Saldo y movimientos de tu cuenta.
+          </Text>
+        </BlurFade>
+        <TarjetaVisual cuenta={cuenta} />
 
-      <PagarTarjeta
-        cuentaId={cuenta.id}
-        cuentasOrigen={cuentasOrigen}
-        onPagado={cargar}
-        onError={setError}
-      />
-      <Boton
-        titulo="Registrar gasto"
-        onPress={() => router.push({ pathname: "/gasto/nuevo", params: { cuentaId: cuenta.id } })}
-      />
-      <Boton titulo="Eliminar tarjeta" variante="peligro" onPress={confirmarEliminar} />
+        <PagarTarjeta
+          cuentaId={cuenta.id}
+          cuentasOrigen={cuentasOrigen}
+          onPagado={cargar}
+          onError={setError}
+        />
+        <Boton
+          titulo="Registrar gasto"
+          onPress={() =>
+            router.push({
+              pathname: "/gasto/nuevo",
+              params: { cuentaId: cuenta.id },
+            })
+          }
+        />
+        <Boton
+          titulo="Eliminar tarjeta"
+          variante="peligro"
+          onPress={confirmarEliminar}
+        />
 
-      {error && <ErrorTexto>{error}</ErrorTexto>}
+        {error && <ErrorTexto>{error}</ErrorTexto>}
 
-      <Tarjeta style={{ padding: 0, paddingVertical: spacing(2) }}>
-        <Text style={[styles.titulo, { paddingHorizontal: spacing(4) }]}>Movimientos</Text>
-        {movimientos.length === 0 ? (
-          <EstadoVacio icono="document-text-outline" titulo="Todavía no hay movimientos" subtitulo="Registrá un gasto o un pago." />
-        ) : (
-          <View style={{ paddingHorizontal: spacing(4) }}>
-            {movimientos.map((item) => (
-              <ItemMovimiento key={`${item.tipo}-${item.id}`} item={item} />
-            ))}
-          </View>
-        )}
-      </Tarjeta>
-    </ScrollView>
+        <Tarjeta style={{ padding: 0, paddingVertical: spacing(2) }}>
+          <Text style={[styles.titulo, { paddingHorizontal: spacing(4) }]}>
+            Movimientos
+          </Text>
+          {movimientos.length === 0 ? (
+            <EstadoVacio
+              icono="document-text-outline"
+              titulo="Todavía no hay movimientos"
+              subtitulo="Registrá un gasto o un pago."
+            />
+          ) : (
+            <View style={{ paddingHorizontal: spacing(4) }}>
+              {movimientos.map((item) => (
+                <ItemMovimiento key={`${item.tipo}-${item.id}`} item={item} />
+              ))}
+            </View>
+          )}
+        </Tarjeta>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -126,6 +240,8 @@ function PagarTarjeta({
   onPagado: () => void;
   onError: (msg: string) => void;
 }) {
+  const { color } = useTheme();
+  const styles = createStyles(color);
   const [monto, setMonto] = useState("");
   const [cuentaOrigenId, setCuentaOrigenId] = useState("");
   const [guardando, setGuardando] = useState(false);
@@ -151,20 +267,50 @@ function PagarTarjeta({
 
   return (
     <Tarjeta>
-      <Text style={styles.titulo}>Registrar pago</Text>
+      <Text accessibilityRole="header" style={styles.titulo}>
+        Registrar pago
+      </Text>
       <SelectorChips
         titulo="Pagar desde"
         valor={cuentaOrigenId}
         onCambiar={setCuentaOrigenId}
-        opciones={[{ valor: "", etiqueta: "Sin especificar" }, ...cuentasOrigen.map((c) => ({ valor: c.id, etiqueta: c.nombre }))]}
+        opciones={[
+          { valor: "", etiqueta: "Sin especificar" },
+          ...cuentasOrigen.map((c) => ({ valor: c.id, etiqueta: c.nombre })),
+        ]}
       />
-      <Campo etiqueta="Monto" keyboardType="decimal-pad" value={monto} onChangeText={setMonto} placeholder="0.00" />
-      <Boton titulo={guardando ? "Pagando…" : "Pagar"} variante="primario" onPress={confirmar} disabled={guardando} />
+      <Campo
+        etiqueta="Monto"
+        keyboardType="decimal-pad"
+        value={monto}
+        onChangeText={setMonto}
+        placeholder="0.00"
+      />
+      <Boton
+        titulo={guardando ? "Pagando…" : "Pagar"}
+        variante="primario"
+        onPress={confirmar}
+        loading={guardando}
+        disabled={guardando}
+      />
     </Tarjeta>
   );
 }
 
-const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: color.bg },
-  titulo: { fontSize: 15, fontWeight: "700", color: color.text },
-});
+const createStyles = (color: Colors) =>
+  StyleSheet.create({
+    screenTitle: {
+      fontFamily: font.display,
+      fontSize: 30,
+      lineHeight: 36,
+      color: color.text,
+    },
+    screenIntro: {
+      fontFamily: font.body,
+      fontSize: 14,
+      lineHeight: 21,
+      color: color.textMuted,
+    },
+    contenedor: { flex: 1, backgroundColor: color.bg },
+    titulo: { fontFamily: font.display, fontSize: 15, color: color.text },
+  });

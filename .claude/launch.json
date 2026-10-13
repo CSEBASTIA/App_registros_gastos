@@ -1,0 +1,41 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "desktop", "exec", "vite", "--port", "5173", "--strictPort"],
+      "port": 5173
+    },
+    {
+      "name": "movil-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "mobile", "exec", "expo", "start", "--web", "--port", "8081"],
+      "port": 8081
+    },
+    {
+      "name": "telefono-app-registros",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--dir", "C:\\Users\\Lans_06\\Documents\\GitHub\\App_registros_gastos", "--filter", "mobile", "exec", "expo", "start", "--web", "--port", "8090", "--clear"],
+      "port": 8090
+    },
+    {
+      "name": "telefono-sin-login",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set EXPO_PUBLIC_SIN_LOGIN=1&& pnpm --dir C:\\Users\\Lans_06\\Documents\\GitHub\\App_registros_gastos --filter mobile exec expo start --web --port 8091"],
+      "port": 8091
+    },
+    {
+      "name": "telefono-aceptacion-demo",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set EXPO_PUBLIC_SIN_LOGIN=1&& set EXPO_PUBLIC_EXIGIR_ACEPTACION=1&& set EXPO_PUBLIC_URL_TERMINOS=http://localhost:8092/terminos.html&& set EXPO_PUBLIC_URL_PRIVACIDAD=http://localhost:8092/privacidad.html&& pnpm --dir C:\\Users\\Lans_06\\Documents\\GitHub\\App_registros_gastos --filter mobile exec expo start --web --port 8092"],
+      "port": 8092
+    },
+    {
+      "name": "telefono-aceptacion-registro",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set EXPO_PUBLIC_EXIGIR_ACEPTACION=1&& set EXPO_PUBLIC_URL_TERMINOS=http://localhost:8093/terminos.html&& set EXPO_PUBLIC_URL_PRIVACIDAD=http://localhost:8093/privacidad.html&& pnpm --dir C:\\Users\\Lans_06\\Documents\\GitHub\\App_registros_gastos --filter mobile exec expo start --web --port 8093"],
+      "port": 8093
+    }
+  ]
+}

@@ -33,6 +33,7 @@ import {
 } from "core";
 import { supabase } from "../../lib/supabase";
 import Tarjeta from "../../components/Tarjeta";
+import Boton from "../../components/Boton";
 import BarraProgreso from "../../components/BarraProgreso";
 import EstadoVacio from "../../components/EstadoVacio";
 import ItemMovimiento from "../../components/ItemMovimiento";
@@ -62,33 +63,47 @@ export default function ResumenScreen() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
-  const [correo, setCorreo] = useState("");
 
-  useFocusEffect(
-    useCallback(() => {
+  const cargar = useCallback(() => {
+    let activo = true;
+    async function cargarDatos() {
       setCargando(true);
       setError(null);
-      Promise.all([
-        listarGastos(),
-        listarIngresos(),
-        listarCategorias(),
-        listarCuentas(),
-        listarDeudas(),
-      ])
-        .then(([g, i, c, cu, d]) => {
-          setGastos(g);
-          setIngresos(i);
-          setCategorias(c);
-          setCuentas(cu);
-          setDeudas(d);
-        })
-        .catch((err) => setError(mensajeError(err)))
-        .finally(() => setCargando(false));
-      supabase.auth
-        .getSession()
-        .then(({ data }) => setCorreo(data.session?.user.email ?? ""));
-    }, []),
-  );
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!activo) return;
+        if (!data.session) {
+          setGastos([]);
+          setIngresos([]);
+          setCategorias([]);
+          setCuentas([]);
+          setDeudas([]);
+          setCargando(false);
+          return;
+        }
+        const [g, i, c, cu, d] = await Promise.all([
+          listarGastos(),
+          listarIngresos(),
+          listarCategorias(),
+          listarCuentas(),
+          listarDeudas(),
+        ]);
+        if (!activo) return;
+        setGastos(g);
+        setIngresos(i);
+        setCategorias(c);
+        setCuentas(cu);
+        setDeudas(d);
+      } catch (err) {
+        if (activo) setError(mensajeError(err));
+      } finally {
+        if (activo) setCargando(false);
+      }
+    }
+    void cargarDatos();
+    return () => { activo = false; };
+  }, []);
+  useFocusEffect(cargar);
 
   const gastosDelMes = gastos.filter((g) => g.fecha.startsWith(mes));
   const ingresosDelMes = ingresos.filter((i) => i.fecha.startsWith(mes));
@@ -103,7 +118,6 @@ export default function ResumenScreen() {
     endeudamiento,
   });
 
-  const nombre = nombreDesdeCorreo(correo);
   const semana = construirSemana(gastos);
   const actividad = construirActividad(
     gastos,
@@ -112,7 +126,6 @@ export default function ResumenScreen() {
     color,
   ).slice(0, 8);
   const veredicto = veredictoFinanciero(balance, endeudamiento);
-  const esPositivo = balance.balance >= 0;
 
   if (cargando)
     return (
@@ -144,6 +157,21 @@ export default function ResumenScreen() {
       </View>
     );
 
+  if (error)
+    return (
+      <SafeAreaView style={styles.contenedor} edges={["top"]}>
+        <ScrollView
+          contentContainerStyle={{ padding: spacing(5), gap: spacing(4) }}
+        >
+          <Text accessibilityRole="header" style={styles.tituloCard}>
+            Resumen
+          </Text>
+          <ErrorTexto>{error}</ErrorTexto>
+          <Boton titulo="Reintentar" onPress={cargar} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: color.bg }}
@@ -163,19 +191,10 @@ export default function ResumenScreen() {
             gap: spacing(4),
           }}
         >
-          {error && <ErrorTexto>{error}</ErrorTexto>}
-          <BlurFade style={styles.saludo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarTexto}>
-                {nombre.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
-            <View>
-              <Text style={styles.saludoHola}>Hola de nuevo,</Text>
-              <Text accessibilityRole="header" style={styles.saludoNombre}>
-                {nombre}
-              </Text>
-            </View>
+          <BlurFade style={styles.intro}>
+            <Text style={styles.introTexto}>
+              Ingresos y gastos de este mes, en un solo lugar.
+            </Text>
           </BlurFade>
 
           <View style={styles.hero}>
@@ -186,7 +205,8 @@ export default function ResumenScreen() {
               minimumFontScale={0.65}
               style={styles.heroValor}
             >
-              {esPositivo ? "+" : "-"}${Math.abs(balance.balance).toFixed(2)}
+              {balance.balance > 0 ? "+" : balance.balance < 0 ? "−" : ""}$
+              {Math.abs(balance.balance).toFixed(2)}
             </Text>
             <View style={styles.heroStats}>
               <View style={styles.heroStat}>
@@ -379,11 +399,6 @@ export default function ResumenScreen() {
   );
 }
 
-function nombreDesdeCorreo(correo: string) {
-  const local = correo.split("@")[0] || "Usuario";
-  return local.charAt(0).toUpperCase() + local.slice(1);
-}
-
 function construirSemana(gastos: Gasto[]) {
   const hoy = new Date();
   const dias: {
@@ -496,26 +511,13 @@ function veredictoFinanciero(
 const createStyles = (color: Colors) =>
   StyleSheet.create({
     contenedor: { flex: 1, backgroundColor: color.bg },
-    saludo: { flexDirection: "row", alignItems: "center", gap: spacing(3) },
-    avatar: {
-      width: 42,
-      height: 42,
-      borderRadius: radius.pill,
-      backgroundColor: color.primaryBg,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    avatarTexto: {
-      fontFamily: font.semibold,
-      color: color.primary,
-      fontWeight: "700",
-      fontSize: 16,
-    },
-    saludoHola: { fontFamily: font.body, fontSize: 12, color: color.textMuted },
-    saludoNombre: { fontFamily: font.display, fontSize: 26, color: color.text },
+    intro: { marginBottom: spacing(1) },
+    introTexto: { fontFamily: font.body, fontSize: 14, color: color.textMuted },
     hero: {
-      backgroundColor: color.primaryBg,
-      borderRadius: radius.lg,
+      backgroundColor: color.surface,
+      borderWidth: 1,
+      borderColor: color.border,
+      borderRadius: radius.md,
       padding: spacing(5),
       gap: spacing(2),
     },
@@ -525,7 +527,7 @@ const createStyles = (color: Colors) =>
       fontSize: 12,
       fontWeight: "600",
     },
-    heroValor: { fontFamily: font.mono, color: color.text, fontSize: 30 },
+    heroValor: { fontFamily: font.semibold, color: color.text, fontSize: 34, letterSpacing: -1.5 },
     heroStats: {
       flexDirection: "row",
       flexWrap: "wrap",

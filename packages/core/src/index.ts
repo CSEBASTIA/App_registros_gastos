@@ -43,6 +43,8 @@ export {
   listarDeudas,
   eliminarDeuda,
   registrarAbonoDeuda,
+  listarAbonosDeuda,
+  type OpcionesAbono,
 } from "./repositories/deudas.repo";
 export {
   listarRecordatorios,

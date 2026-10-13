@@ -4,7 +4,7 @@
 
 ## Dirección visual y alcance
 
-- **Zallox** se refiere al diseño actual de escritorio de este repositorio. Se toma como referencia de estilo: paleta, tipografía, jerarquía, superficies, radios, sombras y tratamiento de cifras. La composición se rediseña para teléfono.
+- **Zallox** se refiere al estilo de la captura que compartió el usuario: lienzo blanco, tipografía sans serif, titulares negros, texto secundario gris, bordes finos, tarjetas blancas redondeadas sin sombra marcada y navegación tipo dock. Esa captura prevalece sobre los tokens antiguos del repositorio. La composición se adapta a cada pantalla.
 - Los componentes de **Svelte Animations** aportan los patrones de interacción indicados abajo. Sus comandos `shadcn-svelte` son referencias de diseño; la web actual usa React y la app de teléfono usa Expo/React Native.
 - Primero se aplicarán esos patrones a la interfaz web de `apps/desktop`. Esa versión integrada será la referencia de implementación para la app móvil: sus 18 pantallas, navegación y 11 componentes visuales compartidos. Se conservarán rutas, consultas, autenticación y operaciones existentes.
 - La «isla dinámica» será un componente **dentro de la app**. La Dynamic Island del sistema iOS es una integración distinta y queda fuera de esta migración visual.
@@ -12,7 +12,7 @@
 
 ## Base que ya existe
 
-El escritorio tiene los tokens actuales en `apps/desktop/src/index.css`: fondo `#f1f2f7`, superficie `#ffffff`, superficie secundaria `#e9ebf3`, borde `#d8dae3`, texto `#14151d`, texto secundario `#52566b`, azul principal `#3552d1`, peligro `#c23b34`, éxito `#157a4b` y aviso `#a5690a`. Usa Fraunces para títulos, IBM Plex Sans para texto e IBM Plex Mono para importes de lectura comparativa.
+La nueva base visual usa fondo/superficie `#ffffff`, superficie secundaria `#f5f5f5`, borde `#dedede`, texto `#111111`, texto secundario `#62666c` y negro como color principal. Peligro, éxito y aviso mantienen colores semánticos discretos. IBM Plex Sans se usa en títulos y lectura; IBM Plex Mono queda para cifras comparables. El tema oscuro es opcional; el tema claro se muestra por defecto.
 
 La app móvil ya funciona en Expo/React Native y tiene rutas para acceso, resumen, ingresos, gastos, tarjetas, cuentas, deudas, recordatorios, categorías, correo y bandeja. Su `lib/theme.ts` conserva una paleta anterior; varias pantallas tienen colores literales. La barra de cinco pestañas es estándar, no hay selector de tema ni componentes de animación compartidos. Las tarjetas bancarias ya usan gradientes y colores propios de cada banco, que deben seguir siendo distinguibles.
 

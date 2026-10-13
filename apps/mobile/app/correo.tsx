@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -58,13 +58,22 @@ export default function CorreoScreen() {
   >(undefined);
   const [ultimaSync, setUltimaSync] = useState<string | null>(null);
   const [conectando, setConectando] = useState<ProveedorCorreo | null>(null);
+  const [desconectando, setDesconectando] = useState(false);
+  const desconexionEnCurso = useRef(false);
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
-    proveedorConectado().then(setConectado);
-    AsyncStorage.getItem(CLAVE_ULTIMA_SYNC).then(setUltimaSync);
+    proveedorConectado()
+      .then(setConectado)
+      .catch((err) => {
+        setError(mensajeError(err));
+        setConectado(null);
+      });
+    AsyncStorage.getItem(CLAVE_ULTIMA_SYNC)
+      .then(setUltimaSync)
+      .catch((err) => setError(mensajeError(err)));
   }, []);
   useFocusEffect(cargar);
 
@@ -82,11 +91,23 @@ export default function CorreoScreen() {
   }
 
   async function desconectar() {
-    await desconectarProveedorActivo();
-    setConectado(null);
+    if (desconexionEnCurso.current || buscando) return;
+    desconexionEnCurso.current = true;
+    setDesconectando(true);
+    setError(null);
+    try {
+      await desconectarProveedorActivo();
+      setConectado(null);
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      desconexionEnCurso.current = false;
+      setDesconectando(false);
+    }
   }
 
   async function buscarAhora() {
+    if (desconexionEnCurso.current) return;
     setError(null);
     setResultado(null);
     setBuscando(true);
@@ -221,9 +242,11 @@ export default function CorreoScreen() {
           </Text>
           {conectado ? (
             <Boton
-              titulo="Desconectar correo"
+              titulo={desconectando ? "Desconectando…" : "Desconectar correo"}
               variante="peligro"
               onPress={desconectar}
+              loading={desconectando}
+              disabled={desconectando || buscando}
             />
           ) : (
             <View style={{ gap: spacing(2) }}>
@@ -259,7 +282,7 @@ export default function CorreoScreen() {
               variante="primario"
               onPress={buscarAhora}
               loading={buscando}
-              disabled={buscando}
+              disabled={buscando || desconectando}
             />
             {resultado && <Text style={styles.textoOk}>{resultado}</Text>}
             <Boton

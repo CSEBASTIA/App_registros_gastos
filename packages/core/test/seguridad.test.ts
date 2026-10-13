@@ -120,3 +120,25 @@ test("categoriaSchema: color solo en formato #RRGGBB", () => {
     false
   );
 });
+
+test("abonoDeudaSchema: monto positivo, ids UUID y fecha válida", async () => {
+  const { abonoDeudaSchema } = await import("../src/schemas/deuda.schema.ts");
+  const id = gastoValido.categoriaId;
+  const base = { deudaId: id, monto: 50, fecha: "2026-10-14" };
+  assert.equal(abonoDeudaSchema.safeParse(base).success, true);
+  assert.equal(abonoDeudaSchema.safeParse({ ...base, cuentaId: id }).success, true);
+  assert.equal(abonoDeudaSchema.safeParse({ ...base, monto: 0 }).success, false);
+  assert.equal(abonoDeudaSchema.safeParse({ ...base, monto: -10 }).success, false);
+  assert.equal(abonoDeudaSchema.safeParse({ ...base, deudaId: "x' or '1'='1" }).success, false);
+  assert.equal(abonoDeudaSchema.safeParse({ ...base, fecha: "2026-02-30x" }).success, false);
+});
+
+test("mensajeError: los fallos de red se muestran en lenguaje claro", async () => {
+  const { mensajeError, MENSAJE_SIN_CONEXION } = await import("../src/lib/mensajeError.ts");
+  assert.equal(mensajeError(new TypeError("Failed to fetch")), MENSAJE_SIN_CONEXION);
+  assert.equal(mensajeError(new TypeError("Network request failed")), MENSAJE_SIN_CONEXION);
+  assert.equal(mensajeError(new TypeError("Load failed")), MENSAJE_SIN_CONEXION);
+  assert.equal(mensajeError(new Error("La cuenta indicada no existe o no es tuya.")), "La cuenta indicada no existe o no es tuya.");
+  assert.equal(mensajeError({ message: "TypeError: Failed to fetch" }), MENSAJE_SIN_CONEXION); // forma en que lo envuelve Supabase
+  assert.equal(mensajeError({ message: "duplicate key" }), "duplicate key");
+});

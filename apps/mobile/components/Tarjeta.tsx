@@ -21,7 +21,7 @@ const makeStyles = (color: Colors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: color.border,
     borderRadius: radius.md,
-    padding: spacing(4), shadowColor: color.text, shadowOpacity: 0.05, shadowRadius: 14, shadowOffset: { width: 0, height: 4 }, elevation: 1,
+    padding: spacing(4), shadowColor: color.text, shadowOpacity: 0, shadowRadius: 0, shadowOffset: { width: 0, height: 0 }, elevation: 0,
     gap: spacing(3),
   },
 });

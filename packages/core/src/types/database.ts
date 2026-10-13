@@ -353,8 +353,33 @@ export type Database = {
         };
         Relationships: [];
       };
+      abonos_deuda: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          deuda_id: string;
+          cuenta_id: string | null;
+          monto: number;
+          fecha: string;
+          created_at: string;
+        };
+        // Solo se escribe vía la función registrar_abono_deuda.
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      registrar_abono_deuda: {
+        Args: {
+          p_deuda_id: string;
+          p_monto: number;
+          p_cuenta_id?: string | null;
+          p_fecha?: string | null;
+        };
+        Returns: Database["public"]["Tables"]["deudas"]["Row"];
+      };
+    };
   };
 };

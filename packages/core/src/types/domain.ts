@@ -133,3 +133,13 @@ export interface Recordatorio {
   deudaId?: string;
   createdAt: string;
 }
+
+/** Un abono ya registrado a una deuda (historial; solo se crea vía registrarAbonoDeuda). */
+export interface AbonoDeuda {
+  id: string;
+  deudaId: string;
+  cuentaId?: string;
+  monto: number;
+  fecha: string;
+  createdAt: string;
+}

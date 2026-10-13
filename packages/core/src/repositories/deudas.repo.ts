@@ -1,6 +1,8 @@
 import { getSupabaseClient } from "../client";
-import type { Deuda } from "../types/domain";
+import type { AbonoDeuda, Deuda } from "../types/domain";
 import type { Database } from "../types/database";
+import { abonoDeudaSchema } from "../schemas/deuda.schema";
+import { fechaLocal } from "../lib/semanas";
 
 type DeudaRow = Database["public"]["Tables"]["deudas"]["Row"];
 
@@ -52,27 +54,57 @@ export async function crearDeuda(deuda: Omit<Deuda, "id" | "createdAt">): Promis
   return filaADeuda(data);
 }
 
-/** Registra un abono: descuenta el saldo pendiente y devuelve la deuda actualizada. */
-export async function registrarAbonoDeuda(id: string, monto: number): Promise<Deuda> {
-  const client = getSupabaseClient();
-  const { data: actual, error: errorLectura } = await client
-    .from("deudas")
-    .select("saldo_pendiente")
-    .eq("id", id)
-    .single();
-  if (errorLectura) throw errorLectura;
+export interface OpcionesAbono {
+  /** Cuenta de ahorro/débito/efectivo de la que sale el dinero. Sin ella, solo baja el saldo de la deuda. */
+  cuentaId?: string;
+  /** "YYYY-MM-DD"; por defecto, hoy en la zona horaria del dispositivo. */
+  fecha?: string;
+}
 
-  const nuevoSaldo = Math.max(0, Number(actual.saldo_pendiente) - monto);
+/**
+ * Registra un abono en una sola transacción de la base (función
+ * `registrar_abono_deuda`, con la deuda bloqueada): baja el saldo, descuenta
+ * de la cuenta de origen, libera cupo si es un diferido en tarjeta y mueve
+ * `proximoPago` un mes si se cubrió la cuota. Un abono mayor que el saldo se
+ * recorta al saldo. Devuelve la deuda actualizada.
+ */
+export async function registrarAbonoDeuda(
+  id: string,
+  monto: number,
+  opciones: OpcionesAbono = {}
+): Promise<Deuda> {
+  const abono = abonoDeudaSchema.parse({
+    deudaId: id,
+    monto,
+    cuentaId: opciones.cuentaId,
+    fecha: opciones.fecha ?? fechaLocal(),
+  });
 
-  const { data, error } = await client
-    .from("deudas")
-    .update({ saldo_pendiente: nuevoSaldo })
-    .eq("id", id)
-    .select()
-    .single();
+  const { data, error } = await getSupabaseClient().rpc("registrar_abono_deuda", {
+    p_deuda_id: abono.deudaId,
+    p_monto: abono.monto,
+    p_cuenta_id: abono.cuentaId ?? null,
+    p_fecha: abono.fecha,
+  });
 
   if (error) throw error;
-  return filaADeuda(data);
+  return filaADeuda(data as DeudaRow);
+}
+
+export async function listarAbonosDeuda(deudaId?: string): Promise<AbonoDeuda[]> {
+  let query = getSupabaseClient().from("abonos_deuda").select("*");
+  if (deudaId) query = query.eq("deuda_id", deudaId);
+
+  const { data, error } = await query.order("fecha", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    deudaId: row.deuda_id,
+    cuentaId: row.cuenta_id ?? undefined,
+    monto: Number(row.monto),
+    fecha: row.fecha,
+    createdAt: row.created_at,
+  }));
 }
 
 export async function eliminarDeuda(id: string): Promise<void> {

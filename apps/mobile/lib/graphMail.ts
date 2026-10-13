@@ -1,5 +1,8 @@
-import { htmlATexto } from "core";
+import { htmlATexto, crearFetchConTimeout } from "core";
 import { obtenerAccessToken } from "./outlookAuth";
+
+// Mismo criterio que Gmail: la llamada a Graph se corta a los 20 s.
+const fetchGraph = crearFetchConTimeout({ ms: 20_000 });
 
 export interface CorreoRecibido {
   mensajeId: string;
@@ -31,7 +34,7 @@ export async function traerCorreosNuevos(desde: Date, limite = 40): Promise<Corr
     `https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages` +
     `?$select=${select}&$filter=${filtro}&$orderby=receivedDateTime desc&$top=${limite}`;
 
-  const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } });
+  const res = await fetchGraph(url, { headers: { Authorization: `Bearer ${token}` } });
   if (!res.ok) {
     const detalle = await res.text().catch(() => "");
     throw new Error(`Microsoft Graph respondió ${res.status}: ${detalle.slice(0, 200)}`);

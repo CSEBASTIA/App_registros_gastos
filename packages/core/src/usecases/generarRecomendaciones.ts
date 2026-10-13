@@ -1,5 +1,6 @@
-import type { Categoria, Cuenta, Gasto, Ingreso } from "../types/domain";
+import type { Categoria, Cuenta, Gasto, Ingreso, Presupuesto } from "../types/domain";
 import type { Endeudamiento } from "./calcularEndeudamiento";
+import { estadoPresupuestos } from "./estadoPresupuestos";
 
 export type SeveridadRecomendacion = "info" | "alerta";
 
@@ -30,6 +31,8 @@ export interface ParametrosRecomendaciones {
   categorias: Categoria[];
   cuentas: Cuenta[];
   endeudamiento: Endeudamiento;
+  /** Opcional: límites por categoría; avisa al 80 % y alerta al pasarse. */
+  presupuestos?: Presupuesto[];
 }
 
 /**
@@ -38,7 +41,7 @@ export interface ParametrosRecomendaciones {
  * tarjetas y nivel de endeudamiento.
  */
 export function generarRecomendaciones(params: ParametrosRecomendaciones): Recomendacion[] {
-  const { mes, gastos, ingresos, categorias, cuentas, endeudamiento } = params;
+  const { mes, gastos, ingresos, categorias, cuentas, endeudamiento, presupuestos = [] } = params;
   const recomendaciones: Recomendacion[] = [];
 
   const gastosDelMes = gastos.filter((g) => g.fecha.startsWith(mes));
@@ -76,6 +79,21 @@ export function generarRecomendaciones(params: ParametrosRecomendaciones): Recom
       recomendaciones.push({
         severidad: "alerta",
         mensaje: `Gastaste ${incremento.toFixed(0)}% más en "${categoria.nombre}" que tu promedio de los últimos meses.`,
+      });
+    }
+  }
+
+  // Presupuestos por categoría.
+  for (const estado of estadoPresupuestos(mes, presupuestos, gastos, categorias)) {
+    if (estado.nivel === "excedido") {
+      recomendaciones.push({
+        severidad: "alerta",
+        mensaje: `Te pasaste del presupuesto de "${estado.categoriaNombre}": llevas $${estado.gastado.toFixed(2)} de $${estado.presupuesto.montoLimite.toFixed(2)}.`,
+      });
+    } else if (estado.nivel === "cerca") {
+      recomendaciones.push({
+        severidad: "info",
+        mensaje: `Ya usaste el ${estado.porcentaje.toFixed(0)}% del presupuesto de "${estado.categoriaNombre}". Te quedan $${estado.restante.toFixed(2)}.`,
       });
     }
   }

@@ -14,6 +14,8 @@ import { getSupabaseClient } from "../client";
 export async function eliminarTodosLosDatos(): Promise<void> {
   const client = getSupabaseClient();
   const tablas = [
+    "presupuestos",
+    "transacciones_detectadas",
     "recordatorios",
     "pagos_tarjeta",
     "gastos",

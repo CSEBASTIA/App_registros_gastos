@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "../client";
 import type { TransaccionDetectada } from "../types/domain";
 import type { Database } from "../types/database";
+import { LIMITES } from "../schemas/limites";
 
 type Row = Database["public"]["Tables"]["transacciones_detectadas"]["Row"];
 
@@ -44,16 +45,18 @@ export async function insertarTransaccionesDetectadas(items: TransaccionDetectad
   const { error } = await getSupabaseClient()
     .from("transacciones_detectadas")
     .upsert(
+      // El texto viene de correos de terceros: se recorta a los límites que
+      // impone la base, para que un asunto larguísimo no tumbe el lote entero.
       items.map((t) => ({
         mensaje_id: t.mensajeId,
         tipo: t.tipo,
         monto: t.monto,
-        descripcion: t.descripcion,
+        descripcion: t.descripcion.trim().slice(0, LIMITES.descripcion) || "Movimiento bancario",
         banco: t.banco ?? null,
         cuenta_id: t.cuentaId ?? null,
         categoria_id: t.categoriaId ?? null,
         fecha: t.fecha,
-        correo_asunto: t.correoAsunto ?? null,
+        correo_asunto: t.correoAsunto?.slice(0, LIMITES.asunto) ?? null,
       })),
       { onConflict: "usuario_id,mensaje_id", ignoreDuplicates: true }
     );

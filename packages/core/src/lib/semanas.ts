@@ -54,11 +54,26 @@ export function etiquetaMes(mesIso: string): string {
   return NOMBRES_MES[Number(mesStr) - 1] ?? mesIso;
 }
 
+const dosDigitos = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * "YYYY-MM-DD" en la zona horaria del dispositivo. No usar
+ * `toISOString().slice(0, 10)` para "hoy": eso es UTC, y en Ecuador (UTC-5)
+ * después de las 19:00 ya devuelve el día siguiente.
+ */
+export function fechaLocal(fecha: Date = new Date()): string {
+  return `${fecha.getFullYear()}-${dosDigitos(fecha.getMonth() + 1)}-${dosDigitos(fecha.getDate())}`;
+}
+
+/** "YYYY-MM" del mes actual en la zona horaria del dispositivo. */
+export function mesLocal(fecha: Date = new Date()): string {
+  return fechaLocal(fecha).slice(0, 7);
+}
+
 /** Suma `meses` a una fecha "YYYY-MM-DD" y devuelve el resultado en el mismo formato. */
 export function sumarMeses(fechaIso: string, meses: number): string {
   const [anio, mes, dia] = fechaIso.split("-").map(Number);
-  const fecha = new Date(anio, mes - 1 + meses, dia);
-  return fecha.toISOString().slice(0, 10);
+  return fechaLocal(new Date(anio, mes - 1 + meses, dia));
 }
 
 /** Mueve un mes "YYYY-MM" `delta` meses (positivo o negativo). */

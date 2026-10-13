@@ -20,11 +20,17 @@ function nivelDe(porcentaje: number): NivelEndeudamiento {
  * Nivel de endeudamiento = cuotas mensuales de deudas activas / ingreso
  * mensual. Umbrales estándar: <30% bajo, 30-50% moderado, >50% alto.
  */
-export function calcularEndeudamiento(deudas: Deuda[], ingresoMensual: number): Endeudamiento {
+export function calcularEndeudamiento(
+  deudas: Deuda[],
+  ingresoMensual: number,
+  /** Ingreso de referencia (p. ej. promedio de los últimos meses) para meses sin ingresos. */
+  ingresoReferencia = 0
+): Endeudamiento {
   const activas = deudas.filter((d) => d.saldoPendiente > 0);
   const totalPendiente = activas.reduce((acc, d) => acc + d.saldoPendiente, 0);
   const cuotasMensuales = activas.reduce((acc, d) => acc + d.cuotaMensual, 0);
-  const porcentaje = ingresoMensual > 0 ? (cuotasMensuales / ingresoMensual) * 100 : 0;
+  const ingreso = ingresoMensual > 0 ? ingresoMensual : ingresoReferencia;
+  const porcentaje = ingreso > 0 ? (cuotasMensuales / ingreso) * 100 : 0;
 
   return { totalPendiente, cuotasMensuales, porcentaje, nivel: nivelDe(porcentaje) };
 }

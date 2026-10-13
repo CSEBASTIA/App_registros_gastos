@@ -22,16 +22,25 @@ export async function listarPresupuestos(mes?: string): Promise<Presupuesto[]> {
   return (data ?? []).map(filaAPresupuesto);
 }
 
-export async function crearPresupuesto(
+/**
+ * Crea el límite de una categoría para un mes, o lo actualiza si ya existía:
+ * hay un solo presupuesto por (usuario, categoría, mes), garantizado por un
+ * índice único en la base. `usuario_id` no se envía: lo pone la base con
+ * `auth.uid()` y RLS impide escribir en nombre de otro usuario.
+ */
+export async function guardarPresupuesto(
   presupuesto: Omit<Presupuesto, "id">
 ): Promise<Presupuesto> {
   const { data, error } = await getSupabaseClient()
     .from("presupuestos")
-    .insert({
-      categoria_id: presupuesto.categoriaId,
-      monto_limite: presupuesto.montoLimite,
-      mes: presupuesto.mes,
-    })
+    .upsert(
+      {
+        categoria_id: presupuesto.categoriaId,
+        monto_limite: presupuesto.montoLimite,
+        mes: presupuesto.mes,
+      },
+      { onConflict: "usuario_id,categoria_id,mes" }
+    )
     .select()
     .single();
 

@@ -9,6 +9,8 @@ export * from "./lib/categorias";
 export * from "./lib/metodoPago";
 export * from "./lib/textoFinanciero";
 export * from "./lib/correoBancario";
+export * from "./lib/fetchConTimeout";
+export * from "./schemas/limites";
 export * from "./schemas/gasto.schema";
 export * from "./schemas/presupuesto.schema";
 export * from "./schemas/cuenta.schema";
@@ -56,7 +58,7 @@ export {
 
 export * from "./usecases/crearCategoria";
 export * from "./usecases/crearGasto";
-export * from "./usecases/crearPresupuesto";
+export * from "./usecases/guardarPresupuesto";
 export * from "./usecases/crearCuenta";
 export * from "./usecases/crearIngreso";
 export * from "./usecases/crearDeuda";
@@ -67,3 +69,6 @@ export * from "./usecases/balanceGeneral";
 export * from "./usecases/calcularEndeudamiento";
 export * from "./usecases/generarRecomendaciones";
 export * from "./usecases/eliminarTodosLosDatos";
+export * from "./usecases/estadoPresupuestos";
+export * from "./usecases/planDeudas";
+export * from "./usecases/scoreFinanciero";

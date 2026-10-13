@@ -1,4 +1,4 @@
-import { htmlATexto } from "core";
+import { htmlATexto, crearFetchConTimeout } from "core";
 import { obtenerAccessToken } from "./gmailAuth";
 import type { CorreoRecibido } from "./graphMail";
 
@@ -81,9 +81,13 @@ function extraerDireccion(from: string): string {
   return (match ? match[1] : from).trim();
 }
 
+// Cada llamada a Gmail se corta a los 20 s: con mala señal la sincronización
+// falla con un mensaje claro en vez de quedarse colgada.
+const fetchGmail = crearFetchConTimeout({ ms: 20_000 });
+
 async function llamarGmail(path: string): Promise<any> {
   const token = await obtenerAccessToken();
-  const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
+  const res = await fetchGmail(`https://gmail.googleapis.com/gmail/v1/users/me${path}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) {
@@ -100,7 +104,7 @@ export async function traerCorreosNuevos(desde: Date, limite = 40): Promise<Corr
   const ids: string[] = (lista.messages ?? []).map((m: { id: string }) => m.id);
 
   const mensajes = await Promise.all(
-    ids.map((id) => llamarGmail(`/messages/${id}?format=full`) as Promise<MensajeGmail>)
+    ids.map((id) => llamarGmail(`/messages/${encodeURIComponent(id)}?format=full`) as Promise<MensajeGmail>)
   );
 
   return mensajes.map((m) => {

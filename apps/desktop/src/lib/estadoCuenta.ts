@@ -143,7 +143,8 @@ export function parseEstadoCuenta(texto: string): TransaccionExtraida[] {
       .trim()
       .replace(/[-–|]+$/, "")
       .replace(/\s{2,}/g, " ")
-      .trim();
+      .trim()
+      .slice(0, 200); // mismo tope que `gastos.descripcion` en la base
     if (descripcion.length < 2) continue;
 
     const monto = Math.abs(normalizarNumero(matchMonto[0].replace(/[$\s]/g, "")));

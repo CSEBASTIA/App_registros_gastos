@@ -1,8 +1,19 @@
+import RippleButton from "../components/RippleButton";
 import { useEffect, useState, type FormEvent } from "react";
-import type { Banco, Categoria, Cuenta, Gasto, Ingreso, TipoCuenta } from "core";
+import type {
+  Banco,
+  Categoria,
+  Cuenta,
+  Gasto,
+  Ingreso,
+  TipoCuenta,
+} from "core";
 import TarjetaVisual from "../components/TarjetaVisual";
 import ItemMovimiento from "../components/ItemMovimiento";
-import { RegistrarGastoInline, RegistrarSueldoInline } from "../components/AccionesCuentaRapidas";
+import {
+  RegistrarGastoInline,
+  RegistrarSueldoInline,
+} from "../components/AccionesCuentaRapidas";
 import { agruparPorFecha, movimientosDe, type MovimientoCuenta } from "core";
 import { COLOR_CUENTA_BANCO, OPCIONES_BANCO } from "core";
 import SwatchBanco from "../components/SwatchBanco";
@@ -42,7 +53,9 @@ export default function Cuentas({
     }
   }, [cuentasBancarias, seleccionadaId]);
 
-  const cuentaSeleccionada = cuentasBancarias.find((c) => c.id === seleccionadaId);
+  const cuentaSeleccionada = cuentasBancarias.find(
+    (c) => c.id === seleccionadaId,
+  );
 
   async function crearYCerrar(input: Omit<Cuenta, "id" | "createdAt">) {
     await onCrear(input);
@@ -51,12 +64,25 @@ export default function Cuentas({
 
   return (
     <>
+      <p
+        className="etiqueta"
+        style={{ margin: "0 0 24px", fontSize: "0.95rem", lineHeight: 1.6 }}
+      >
+        Tus cuentas de ahorro, débito y efectivo, en un solo lugar.
+      </p>
       {mostrarForm ? (
-        <NuevaCuentaBancaria onCrear={crearYCerrar} onCancelar={() => setMostrarForm(false)} />
+        <NuevaCuentaBancaria
+          onCrear={crearYCerrar}
+          onCancelar={() => setMostrarForm(false)}
+        />
       ) : (
-        <button className="btn btn-primary" style={{ marginBottom: 24 }} onClick={() => setMostrarForm(true)}>
+        <RippleButton
+          className="btn btn-primary"
+          style={{ marginBottom: 24 }}
+          onClick={() => setMostrarForm(true)}
+        >
           <IconoMas /> Agregar cuenta
-        </button>
+        </RippleButton>
       )}
 
       {cuentasBancarias.length === 0 ? (
@@ -114,7 +140,13 @@ function DetalleCuenta({
   onCrearIngreso: (input: Omit<Ingreso, "id" | "createdAt">) => Promise<void>;
 }) {
   const [verEstadoCuenta, setVerEstadoCuenta] = useState(false);
-  const movimientos = movimientosDe(cuenta.id, gastos, [], ingresos, categorias);
+  const movimientos = movimientosDe(
+    cuenta.id,
+    gastos,
+    [],
+    ingresos,
+    categorias,
+  );
   const recientes = movimientos.slice(0, 5);
   const categoriasGasto = categorias.filter((c) => c.tipo === "gasto");
 
@@ -122,12 +154,19 @@ function DetalleCuenta({
     <>
       <div className="card tarjeta-detalle">
         <div>
-          <TarjetaVisual cuenta={cuenta} onClick={() => setVerEstadoCuenta(true)} />
+          <TarjetaVisual
+            cuenta={cuenta}
+            onClick={() => setVerEstadoCuenta(true)}
+          />
 
           <div className="tarjeta-visual-acciones" style={{ marginTop: 14 }}>
             <div className="tarjeta-detalle-acciones-rapidas">
               <RegistrarSueldoInline cuenta={cuenta} onCrear={onCrearIngreso} />
-              <RegistrarGastoInline cuenta={cuenta} categorias={categoriasGasto} onCrear={onCrearGasto} />
+              <RegistrarGastoInline
+                cuenta={cuenta}
+                categorias={categoriasGasto}
+                onCrear={onCrearGasto}
+              />
             </div>
             <button className="btn" onClick={() => onEliminar(cuenta.id)}>
               Eliminar cuenta
@@ -137,9 +176,15 @@ function DetalleCuenta({
 
         <div>
           <div className="form-gasto-header">
-            <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Movimientos de la cuenta</h3>
+            <h3 style={{ margin: 0, fontSize: "0.95rem" }}>
+              Movimientos de la cuenta
+            </h3>
             {movimientos.length > 0 && (
-              <button type="button" className="btn" onClick={() => setVerEstadoCuenta(true)}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setVerEstadoCuenta(true)}
+              >
                 Ver todo
               </button>
             )}
@@ -204,7 +249,12 @@ function EstadoCuentaModal({
       <div className="modal modal-ancho" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{cuenta.nombre}</h3>
-          <button className="btn-icon" onClick={onCerrar} title="Cerrar" type="button">
+          <button
+            className="btn-icon"
+            onClick={onCerrar}
+            title="Cerrar"
+            type="button"
+          >
             ✕
           </button>
         </div>
@@ -219,10 +269,20 @@ function EstadoCuentaModal({
                 <small>Saldo disponible</small>
               </span>
 
-              <div className="tarjeta-visual-acciones" style={{ marginTop: 16 }}>
+              <div
+                className="tarjeta-visual-acciones"
+                style={{ marginTop: 16 }}
+              >
                 <div className="tarjeta-detalle-acciones-rapidas">
-                  <RegistrarSueldoInline cuenta={cuenta} onCrear={onCrearIngreso} />
-                  <RegistrarGastoInline cuenta={cuenta} categorias={categoriasGasto} onCrear={onCrearGasto} />
+                  <RegistrarSueldoInline
+                    cuenta={cuenta}
+                    onCrear={onCrearIngreso}
+                  />
+                  <RegistrarGastoInline
+                    cuenta={cuenta}
+                    categorias={categoriasGasto}
+                    onCrear={onCrearGasto}
+                  />
                 </div>
                 <button className="btn" onClick={eliminarYCerrar}>
                   Eliminar cuenta
@@ -241,10 +301,15 @@ function EstadoCuentaModal({
           ) : (
             grupos.map((grupo) => (
               <div key={grupo.fecha} className="estado-cuenta-grupo">
-                <span className="estado-cuenta-grupo-fecha">{grupo.etiqueta}</span>
+                <span className="estado-cuenta-grupo-fecha">
+                  {grupo.etiqueta}
+                </span>
                 <ul className="actividad-lista">
                   {grupo.items.map((item) => (
-                    <ItemMovimiento key={`${item.tipo}-${item.id}`} item={item} />
+                    <ItemMovimiento
+                      key={`${item.tipo}-${item.id}`}
+                      item={item}
+                    />
                   ))}
                 </ul>
               </div>
@@ -275,7 +340,12 @@ function NuevaCuentaBancaria({
     setError(null);
     setGuardando(true);
     try {
-      await onCrear({ nombre, tipo, banco, disponible: Number(saldoInicial || 0) });
+      await onCrear({
+        nombre,
+        tipo,
+        banco,
+        disponible: Number(saldoInicial || 0),
+      });
       setNombre("");
       setSaldoInicial("");
     } catch (err) {
@@ -339,9 +409,13 @@ function NuevaCuentaBancaria({
             onChange={(e) => setSaldoInicial(e.target.value)}
           />
         </div>
-        <button type="submit" className="btn btn-primary" disabled={guardando}>
+        <RippleButton
+          type="submit"
+          className="btn btn-primary"
+          disabled={guardando}
+        >
           {guardando ? "Guardando…" : "Agregar"}
-        </button>
+        </RippleButton>
       </div>
 
       <div className="campo" style={{ marginTop: 16 }}>

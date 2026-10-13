@@ -1,5 +1,19 @@
+import { SafeAreaView } from "react-native-safe-area-context";
+import SelectorChips from "../../components/SelectorChips";
+import { mensajeError } from "core";
+import ErrorTexto from "../../components/ErrorTexto";
 import { useCallback, useState } from "react";
-import { View, Text, Pressable, ScrollView, Alert, StyleSheet } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  View,
+  Text,
+  Pressable,
+  ScrollView,
+  Alert,
+  StyleSheet,
+} from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import {
   listarIngresos,
@@ -19,15 +33,19 @@ import Boton from "../../components/Boton";
 import GraficoBarras from "../../components/GraficoBarras";
 import EstadoVacio from "../../components/EstadoVacio";
 import SelectorMes from "../../components/SelectorMes";
-import { color, radius, spacing } from "../../lib/theme";
-
-const COLOR_INGRESOS = "#16a34a";
+import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
+import { BlurFade } from "../../components/Motion";
 
 function mesActual() {
   return new Date().toISOString().slice(0, 7);
 }
 
 export default function IngresosScreen() {
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const { color } = useTheme();
+  const styles = createStyles(color);
+  const COLOR_INGRESOS = color.success;
   const router = useRouter();
   const [mes, setMes] = useState(mesActual());
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
@@ -36,11 +54,16 @@ export default function IngresosScreen() {
   const [periodo, setPeriodo] = useState<"semana" | "mes">("semana");
 
   const cargar = useCallback(() => {
-    Promise.all([listarIngresos(), listarCategorias(), listarCuentas()]).then(([i, c, cu]) => {
-      setIngresos(i);
-      setCategorias(c);
-      setCuentas(cu);
-    });
+    setCargando(true);
+    setError(null);
+    Promise.all([listarIngresos(), listarCategorias(), listarCuentas()])
+      .then(([i, c, cu]) => {
+        setIngresos(i);
+        setCategorias(c);
+        setCuentas(cu);
+      })
+      .catch((err) => setError(mensajeError(err)))
+      .finally(() => setCargando(false));
   }, []);
 
   useFocusEffect(cargar);
@@ -49,12 +72,16 @@ export default function IngresosScreen() {
 
   const datosSemana = semanasDelMes(mes).map((s) => ({
     etiqueta: `Sem ${s.numero}`,
-    valor: ingresosDelMes.filter((i) => enRangoSemana(i.fecha, s)).reduce((a, i) => a + i.monto, 0),
+    valor: ingresosDelMes
+      .filter((i) => enRangoSemana(i.fecha, s))
+      .reduce((a, i) => a + i.monto, 0),
     color: COLOR_INGRESOS,
   }));
   const datosMes = ultimosMeses(mes, 6).map((m) => ({
     etiqueta: etiquetaMes(m).slice(0, 3),
-    valor: ingresos.filter((i) => i.fecha.startsWith(m)).reduce((a, i) => a + i.monto, 0),
+    valor: ingresos
+      .filter((i) => i.fecha.startsWith(m))
+      .reduce((a, i) => a + i.monto, 0),
     color: COLOR_INGRESOS,
   }));
 
@@ -68,86 +95,195 @@ export default function IngresosScreen() {
   function confirmarEliminar(ingreso: Ingreso) {
     Alert.alert("Eliminar ingreso", `¿Eliminar "${ingreso.descripcion}"?`, [
       { text: "Cancelar", style: "cancel" },
-      { text: "Eliminar", style: "destructive", onPress: () => eliminarIngreso(ingreso.id).then(cargar) },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: () => eliminarIngreso(ingreso.id).then(cargar),
+      },
     ]);
   }
 
-  return (
-    <ScrollView style={styles.contenedor} contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      <View style={styles.encabezado}>
-        <SelectorMes mes={mes} onCambiar={setMes} />
-        <Boton titulo="+ Nuevo" variante="primario" onPress={() => router.push("/ingreso/nuevo")} />
+  if (cargando)
+    return (
+      <View
+        style={[
+          styles.contenedor,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing(6),
+            gap: spacing(3),
+          },
+        ]}
+        accessibilityLiveRegion="polite"
+      >
+        <ActivityIndicator
+          color={color.primary}
+          accessibilityLabel="Cargando"
+        />
+        <Text
+          style={{
+            fontFamily: font.body,
+            fontSize: 14,
+            color: color.textMuted,
+          }}
+        >
+          Cargando tus datos…
+        </Text>
       </View>
+    );
 
-      <Tarjeta>
-        <View style={styles.filaTitulo}>
-          <Text style={styles.tituloCard}>Ingresos</Text>
-          <View style={styles.toggle}>
-            <Pressable onPress={() => setPeriodo("semana")} style={[styles.toggleBtn, periodo === "semana" && styles.toggleActivo]}>
-              <Text style={[styles.toggleTexto, periodo === "semana" && styles.toggleTextoActivo]}>Semana</Text>
-            </Pressable>
-            <Pressable onPress={() => setPeriodo("mes")} style={[styles.toggleBtn, periodo === "mes" && styles.toggleActivo]}>
-              <Text style={[styles.toggleTexto, periodo === "mes" && styles.toggleTextoActivo]}>Mes</Text>
-            </Pressable>
+  return (
+    <SafeAreaView
+      style={{ flex: 1, backgroundColor: color.bg }}
+      edges={["top"]}
+    >
+      <KeyboardAvoidingView
+        style={{ flex: 1, backgroundColor: color.bg }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <ScrollView
+          style={styles.contenedor}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{
+            padding: spacing(5),
+            paddingBottom: spacing(8),
+            gap: spacing(4),
+          }}
+        >
+          <BlurFade style={{ gap: spacing(2) }}>
+            <Text accessibilityRole="header" style={styles.screenTitle}>
+              Ingresos
+            </Text>
+            <Text style={styles.screenIntro}>
+              Seguí tus entradas de dinero.
+            </Text>
+          </BlurFade>
+          {error && <ErrorTexto>{error}</ErrorTexto>}
+          <View style={styles.encabezado}>
+            <SelectorMes mes={mes} onCambiar={setMes} />
+            <Boton
+              titulo="+ Nuevo"
+              variante="primario"
+              onPress={() => router.push("/ingreso/nuevo")}
+            />
           </View>
-        </View>
-        <GraficoBarras datos={periodo === "semana" ? datosSemana : datosMes} mensajeVacio="Sin ingresos en este período." />
-      </Tarjeta>
 
-      <Tarjeta style={{ padding: 0, paddingVertical: spacing(2) }}>
-        {ingresosDelMes.length === 0 ? (
-          <EstadoVacio
-            icono="trending-up-outline"
-            titulo="Todavía no hay ingresos este mes"
-            subtitulo="Registrá tu sueldo, freelance u otra entrada de dinero."
-          />
-        ) : (
-          <View style={{ paddingHorizontal: spacing(4) }}>
-            {ingresosDelMes.map((i) => {
-              const cat = categoriaDe(i.categoriaId);
-              return (
-                <Pressable key={i.id} onLongPress={() => confirmarEliminar(i)} style={styles.fila}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.filaDescripcion} numberOfLines={1}>
-                      {i.descripcion}
-                    </Text>
-                    <Text style={styles.filaMeta} numberOfLines={1}>
-                      {cat?.nombre ?? "Sin fuente"}
-                      {cat?.nombre === "Otros" && i.categoriaDetalle ? ` · ${i.categoriaDetalle}` : ""}
-                      {" · "}
-                      {cuentaDe(i.cuentaId)?.nombre ?? "Sin cuenta"} · {i.fecha}
-                    </Text>
-                  </View>
-                  <Text style={styles.filaMonto}>${i.monto.toFixed(2)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-      </Tarjeta>
-    </ScrollView>
+          <Tarjeta>
+            <View style={styles.filaTitulo}>
+              <Text style={styles.tituloCard}>Ingresos</Text>
+              <SelectorChips
+                titulo="Período"
+                valor={periodo}
+                onCambiar={(v) => setPeriodo(v as "semana" | "mes")}
+                opciones={[
+                  { valor: "semana", etiqueta: "Semana" },
+                  { valor: "mes", etiqueta: "Mes" },
+                ]}
+              />
+            </View>
+            <GraficoBarras
+              datos={periodo === "semana" ? datosSemana : datosMes}
+              mensajeVacio="Sin ingresos en este período."
+            />
+          </Tarjeta>
+
+          <Tarjeta style={{ padding: 0, paddingVertical: spacing(2) }}>
+            {ingresosDelMes.length === 0 ? (
+              <EstadoVacio
+                icono="trending-up-outline"
+                titulo="Todavía no hay ingresos este mes"
+                subtitulo="Registrá tu sueldo, freelance u otra entrada de dinero."
+              />
+            ) : (
+              <View style={{ paddingHorizontal: spacing(4) }}>
+                {ingresosDelMes.map((i) => {
+                  const cat = categoriaDe(i.categoriaId);
+                  return (
+                    <Pressable
+                      key={i.id}
+                      onLongPress={() => confirmarEliminar(i)}
+                      style={styles.fila}
+                    >
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.filaDescripcion} numberOfLines={1}>
+                          {i.descripcion}
+                        </Text>
+                        <Text style={styles.filaMeta} numberOfLines={1}>
+                          {cat?.nombre ?? "Sin fuente"}
+                          {cat?.nombre === "Otros" && i.categoriaDetalle
+                            ? ` · ${i.categoriaDetalle}`
+                            : ""}
+                          {" · "}
+                          {cuentaDe(i.cuentaId)?.nombre ?? "Sin cuenta"} ·{" "}
+                          {i.fecha}
+                        </Text>
+                      </View>
+                      <Text style={styles.filaMonto}>
+                        ${i.monto.toFixed(2)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            )}
+          </Tarjeta>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: color.bg },
-  encabezado: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  filaTitulo: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  tituloCard: { fontSize: 14, fontWeight: "700", color: color.text },
-  toggle: { flexDirection: "row", backgroundColor: color.bg, borderRadius: radius.pill, padding: 2 },
-  toggleBtn: { paddingVertical: spacing(1), paddingHorizontal: spacing(3), borderRadius: radius.pill },
-  toggleActivo: { backgroundColor: color.surface },
-  toggleTexto: { fontSize: 11.5, color: color.textMuted, fontWeight: "600" },
-  toggleTextoActivo: { color: color.text },
-  fila: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing(2),
-    paddingVertical: spacing(3),
-    borderTopWidth: 1,
-    borderTopColor: color.border,
-  },
-  filaDescripcion: { fontSize: 14, fontWeight: "600", color: color.text },
-  filaMeta: { fontSize: 11.5, color: color.textMuted, marginTop: 2 },
-  filaMonto: { fontSize: 14, fontWeight: "700", color: color.success },
-});
+const createStyles = (color: Colors) =>
+  StyleSheet.create({
+    screenTitle: {
+      fontFamily: font.display,
+      fontSize: 30,
+      lineHeight: 36,
+      color: color.text,
+    },
+    screenIntro: {
+      fontFamily: font.body,
+      fontSize: 14,
+      lineHeight: 21,
+      color: color.textMuted,
+    },
+    contenedor: { flex: 1, backgroundColor: color.bg },
+    encabezado: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing(3),
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    filaTitulo: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing(3),
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    tituloCard: { fontFamily: font.display, fontSize: 20, color: color.text },
+    fila: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing(2),
+      paddingVertical: spacing(3),
+      borderTopWidth: 1,
+      borderTopColor: color.border,
+    },
+    filaDescripcion: {
+      fontFamily: font.semibold,
+      fontSize: 14,
+      fontWeight: "600",
+      color: color.text,
+    },
+    filaMeta: {
+      fontFamily: font.body,
+      fontSize: 13,
+      color: color.textMuted,
+      marginTop: 2,
+    },
+    filaMonto: { fontFamily: font.mono, fontSize: 14, color: color.success },
+  });

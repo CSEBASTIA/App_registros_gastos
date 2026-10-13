@@ -1,5 +1,13 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  ActivityIndicator,
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
 import { useFocusEffect } from "expo-router";
 import {
   listarTransaccionesPendientes,
@@ -20,9 +28,12 @@ import Boton from "../components/Boton";
 import ErrorTexto from "../components/ErrorTexto";
 import SelectorChips from "../components/SelectorChips";
 import EstadoVacio from "../components/EstadoVacio";
-import { color, spacing } from "../lib/theme";
+import { spacing, useTheme, font, type Colors } from "../lib/theme";
+import { BlurFade } from "../components/Motion";
 
 export default function BandejaScreen() {
+  const { color } = useTheme();
+  const styles = createStyles(color);
   const [items, setItems] = useState<TransaccionDetectada[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
@@ -32,7 +43,11 @@ export default function BandejaScreen() {
   const cargar = useCallback(() => {
     setCargando(true);
     setError(null);
-    Promise.all([listarTransaccionesPendientes(), listarCategorias(), listarCuentas()])
+    Promise.all([
+      listarTransaccionesPendientes(),
+      listarCategorias(),
+      listarCuentas(),
+    ])
       .then(([t, c, cu]) => {
         setItems(t);
         setCategorias(c);
@@ -44,21 +59,79 @@ export default function BandejaScreen() {
 
   useFocusEffect(cargar);
 
-  return (
-    <ScrollView style={styles.contenedor} contentContainerStyle={{ padding: spacing(4), gap: spacing(3) }}>
-      {error && <ErrorTexto>{error}</ErrorTexto>}
-      {!cargando && !error && items.length === 0 ? (
-        <EstadoVacio
-          icono="checkmark-done-outline"
-          titulo="No hay nada pendiente de revisar"
-          subtitulo="Los movimientos que la app detecte en tu correo van a aparecer acá."
+  if (cargando)
+    return (
+      <View
+        style={[
+          styles.contenedor,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing(6),
+            gap: spacing(3),
+          },
+        ]}
+        accessibilityLiveRegion="polite"
+      >
+        <ActivityIndicator
+          color={color.primary}
+          accessibilityLabel="Cargando"
         />
-      ) : (
-        items.map((item) => (
-          <ItemBandeja key={item.id} item={item} categorias={categorias} cuentas={cuentas} onResuelto={cargar} />
-        ))
-      )}
-    </ScrollView>
+        <Text
+          style={{
+            fontFamily: font.body,
+            fontSize: 14,
+            color: color.textMuted,
+          }}
+        >
+          Cargando tus datos…
+        </Text>
+      </View>
+    );
+
+  return (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: color.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        style={styles.contenedor}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{
+          padding: spacing(5),
+          paddingBottom: spacing(8),
+          gap: spacing(3),
+        }}
+      >
+        <BlurFade style={{ gap: spacing(2) }}>
+          <Text accessibilityRole="header" style={styles.screenTitle}>
+            Bandeja de revisión
+          </Text>
+          <Text style={styles.screenIntro}>
+            Revisá cada movimiento antes de confirmarlo.
+          </Text>
+        </BlurFade>
+        {error && <ErrorTexto>{error}</ErrorTexto>}
+        {!cargando && !error && items.length === 0 ? (
+          <EstadoVacio
+            icono="checkmark-done-outline"
+            titulo="No hay nada pendiente de revisar"
+            subtitulo="Los movimientos que la app detecte en tu correo van a aparecer acá."
+          />
+        ) : (
+          items.map((item) => (
+            <ItemBandeja
+              key={item.id}
+              item={item}
+              categorias={categorias}
+              cuentas={cuentas}
+              onResuelto={cargar}
+            />
+          ))
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -73,6 +146,8 @@ function ItemBandeja({
   cuentas: Cuenta[];
   onResuelto: () => void;
 }) {
+  const { color } = useTheme();
+  const styles = createStyles(color);
   const [monto, setMonto] = useState(String(item.monto));
   const [descripcion, setDescripcion] = useState(item.descripcion);
   const [categoriaId, setCategoriaId] = useState(item.categoriaId ?? "");
@@ -94,7 +169,8 @@ function ItemBandeja({
         fecha: item.fecha,
       };
       if (item.tipo === "gasto") {
-        if (!categoriaId) throw new Error("Elegí una categoría antes de confirmar.");
+        if (!categoriaId)
+          throw new Error("Elegí una categoría antes de confirmar.");
         await crearGasto({ ...datos, categoriaId });
       } else {
         await crearIngreso(datos);
@@ -121,25 +197,41 @@ function ItemBandeja({
   return (
     <Tarjeta>
       <View style={styles.encabezado}>
-        <Text style={styles.tipo}>{item.tipo === "gasto" ? "Gasto detectado" : "Ingreso detectado"}</Text>
+        <Text style={styles.tipo}>
+          {item.tipo === "gasto" ? "Gasto detectado" : "Ingreso detectado"}
+        </Text>
         <Text style={styles.fecha}>{item.fecha}</Text>
       </View>
       {item.correoAsunto && (
         <Text style={styles.asunto} numberOfLines={2}>
-          “{item.correoAsunto}” {item.banco ? `· ${ETIQUETA_BANCO[item.banco]}` : ""}
+          “{item.correoAsunto}”{" "}
+          {item.banco ? `· ${ETIQUETA_BANCO[item.banco]}` : ""}
         </Text>
       )}
 
-      <View style={{ flexDirection: "row", gap: spacing(2) }}>
-        <Campo etiqueta="Monto" keyboardType="decimal-pad" value={monto} onChangeText={setMonto} style={{ flex: 1 }} />
-        <Campo etiqueta="Descripción" value={descripcion} onChangeText={setDescripcion} style={{ flex: 2 }} />
+      <View style={{ gap: spacing(3) }}>
+        <Campo
+          etiqueta="Monto"
+          keyboardType="decimal-pad"
+          value={monto}
+          onChangeText={setMonto}
+        />
+        <Campo
+          etiqueta="Descripción"
+          value={descripcion}
+          onChangeText={setDescripcion}
+        />
       </View>
 
       <SelectorChips
         titulo="Categoría"
         valor={categoriaId}
         onCambiar={setCategoriaId}
-        opciones={categoriasDelTipo.map((c) => ({ valor: c.id, etiqueta: c.nombre, color: c.color }))}
+        opciones={categoriasDelTipo.map((c) => ({
+          valor: c.id,
+          etiqueta: c.nombre,
+          color: c.color,
+        }))}
       />
 
       <SelectorChips
@@ -152,17 +244,60 @@ function ItemBandeja({
       {error && <ErrorTexto>{error}</ErrorTexto>}
 
       <View style={{ flexDirection: "row", gap: spacing(2) }}>
-        <Boton titulo="Confirmar" variante="primario" onPress={confirmar} disabled={guardando} style={{ flex: 1 }} />
-        <Boton titulo="Descartar" variante="peligro" onPress={descartar} disabled={guardando} style={{ flex: 1 }} />
+        <Boton
+          titulo="Confirmar"
+          variante="primario"
+          onPress={confirmar}
+          loading={guardando}
+          disabled={guardando}
+          style={{ flex: 1 }}
+        />
+        <Boton
+          titulo="Descartar"
+          variante="peligro"
+          onPress={descartar}
+          loading={guardando}
+          disabled={guardando}
+          style={{ flex: 1 }}
+        />
       </View>
     </Tarjeta>
   );
 }
 
-const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: color.bg },
-  encabezado: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline" },
-  tipo: { fontSize: 15, fontWeight: "700", color: color.text },
-  fecha: { fontSize: 12, color: color.textMuted },
-  asunto: { fontSize: 12.5, color: color.textMuted, fontStyle: "italic" },
-});
+const createStyles = (color: Colors) =>
+  StyleSheet.create({
+    screenTitle: {
+      fontFamily: font.display,
+      fontSize: 30,
+      lineHeight: 36,
+      color: color.text,
+    },
+    screenIntro: {
+      fontFamily: font.body,
+      fontSize: 14,
+      lineHeight: 21,
+      color: color.textMuted,
+    },
+    contenedor: { flex: 1, backgroundColor: color.bg },
+    encabezado: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: spacing(3),
+      justifyContent: "space-between",
+      alignItems: "baseline",
+    },
+    tipo: {
+      fontFamily: font.semibold,
+      fontSize: 15,
+      fontWeight: "700",
+      color: color.text,
+    },
+    fecha: { fontFamily: font.body, fontSize: 12, color: color.textMuted },
+    asunto: {
+      fontFamily: font.body,
+      fontSize: 12.5,
+      color: color.textMuted,
+      fontStyle: "italic",
+    },
+  });

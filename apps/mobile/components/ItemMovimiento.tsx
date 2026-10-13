@@ -1,10 +1,12 @@
 import { View, Text, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { MovimientoCuenta } from "core";
-import { color as tema, radius, spacing } from "../lib/theme";
+import { useTheme, font, radius, spacing, type Colors } from "../lib/theme";
 
 /** Paralelo a `ItemMovimiento.tsx` de desktop. */
 export default function ItemMovimiento({ item }: { item: MovimientoCuenta }) {
+  const { color: tema } = useTheme();
+  const styles = makeStyles(tema);
   const esIngreso = item.tipo !== "gasto";
   return (
     <View style={styles.fila}>
@@ -26,11 +28,11 @@ export default function ItemMovimiento({ item }: { item: MovimientoCuenta }) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (tema: Colors) => StyleSheet.create({
   fila: { flexDirection: "row", alignItems: "center", gap: spacing(3), paddingVertical: spacing(2.5) },
   icono: { width: 34, height: 34, borderRadius: radius.pill, alignItems: "center", justifyContent: "center" },
   info: { flex: 1, minWidth: 0 },
-  descripcion: { fontSize: 14, fontWeight: "600", color: tema.text },
-  subtitulo: { fontSize: 12, color: tema.textMuted },
-  monto: { fontSize: 14, fontWeight: "700" },
+  descripcion: { fontFamily: font.body, fontSize: 14, fontWeight: "600", color: tema.text },
+  subtitulo: { fontFamily: font.body, fontSize: 12, color: tema.textMuted },
+  monto: { fontFamily: font.mono, fontSize: 14, fontWeight: "700" },
 });

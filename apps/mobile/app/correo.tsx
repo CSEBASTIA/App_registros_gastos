@@ -1,5 +1,12 @@
 import { useCallback, useState } from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+} from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -14,7 +21,8 @@ import {
 import Tarjeta from "../components/Tarjeta";
 import Boton from "../components/Boton";
 import ErrorTexto from "../components/ErrorTexto";
-import { color, spacing } from "../lib/theme";
+import { spacing, useTheme, font, type Colors } from "../lib/theme";
+import { BlurFade } from "../components/Motion";
 import {
   ETIQUETA_PROVEEDOR,
   proveedorConfigurado,
@@ -28,17 +36,26 @@ import {
 const CLAVE_ULTIMA_SYNC = "correo_ultima_sync";
 const PROVEEDORES: ProveedorCorreo[] = ["gmail", "outlook"];
 
-function cuentaParaTransaccion(cuentas: Cuenta[], banco: Cuenta["banco"] | undefined, identificador: string | undefined) {
+function cuentaParaTransaccion(
+  cuentas: Cuenta[],
+  banco: Cuenta["banco"] | undefined,
+  identificador: string | undefined,
+) {
   if (!banco) return undefined;
   const delBanco = cuentas.filter((c) => c.banco === banco);
   if (delBanco.length === 1) return delBanco[0].id;
-  if (identificador) return delBanco.find((c) => c.identificador === identificador)?.id;
+  if (identificador)
+    return delBanco.find((c) => c.identificador === identificador)?.id;
   return undefined; // ambiguo — se elige a mano en la Bandeja.
 }
 
 export default function CorreoScreen() {
+  const { color } = useTheme();
+  const styles = createStyles(color);
   const router = useRouter();
-  const [conectado, setConectado] = useState<ProveedorCorreo | null | undefined>(undefined);
+  const [conectado, setConectado] = useState<
+    ProveedorCorreo | null | undefined
+  >(undefined);
   const [ultimaSync, setUltimaSync] = useState<string | null>(null);
   const [conectando, setConectando] = useState<ProveedorCorreo | null>(null);
   const [buscando, setBuscando] = useState(false);
@@ -76,14 +93,20 @@ export default function CorreoScreen() {
     try {
       const desdeGuardado = await AsyncStorage.getItem(CLAVE_ULTIMA_SYNC);
       // primera vez: mira los últimos 14 días, no toda la casilla.
-      const desde = desdeGuardado ? new Date(desdeGuardado) : new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+      const desde = desdeGuardado
+        ? new Date(desdeGuardado)
+        : new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
 
       const correos = await traerCorreosDelProveedorActivo(desde);
       const cuentas = await listarCuentas();
 
       const detectadas: TransaccionDetectadaInsert[] = [];
       for (const correo of correos) {
-        const parseado = parsearCorreoBancario(correo.remitente, correo.asunto, correo.cuerpoTexto);
+        const parseado = parsearCorreoBancario(
+          correo.remitente,
+          correo.asunto,
+          correo.cuerpoTexto,
+        );
         if (!parseado.tipo || !parseado.monto) continue; // sin tipo o sin monto no sirve de nada en la cola
 
         detectadas.push({
@@ -92,7 +115,11 @@ export default function CorreoScreen() {
           monto: parseado.monto,
           descripcion: parseado.descripcion,
           banco: parseado.banco,
-          cuentaId: cuentaParaTransaccion(cuentas, parseado.banco, parseado.identificadorCuenta),
+          cuentaId: cuentaParaTransaccion(
+            cuentas,
+            parseado.banco,
+            parseado.identificadorCuenta,
+          ),
           fecha: parseado.fecha ?? correo.fecha,
           correoAsunto: correo.asunto,
         });
@@ -104,7 +131,7 @@ export default function CorreoScreen() {
       setResultado(
         detectadas.length === 0
           ? "No encontré movimientos nuevos que reconocer."
-          : `Encontré ${detectadas.length} movimiento(s) nuevo(s) — revisalos en la Bandeja.`
+          : `Encontré ${detectadas.length} movimiento(s) nuevo(s) — revisalos en la Bandeja.`,
       );
     } catch (err) {
       setError(mensajeError(err));
@@ -113,93 +140,174 @@ export default function CorreoScreen() {
     }
   }
 
-  if (conectado === undefined) return null;
+  if (conectado === undefined)
+    return (
+      <View
+        style={[
+          styles.contenedor,
+          {
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing(5),
+          },
+        ]}
+      >
+        <Text style={styles.textoMuted}>Cargando conexión de correo…</Text>
+      </View>
+    );
 
   return (
-    <ScrollView style={styles.contenedor} contentContainerStyle={{ padding: spacing(4), gap: spacing(4) }}>
-      {PROVEEDORES.every((p) => !proveedorConfigurado(p)) && (
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: color.bg }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        style={styles.contenedor}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={{
+          padding: spacing(5),
+          paddingBottom: spacing(8),
+          gap: spacing(4),
+        }}
+      >
+        <BlurFade style={{ gap: spacing(2) }}>
+          <Text accessibilityRole="header" style={styles.screenTitle}>
+            Correo
+          </Text>
+          <Text style={styles.screenIntro}>
+            Detectá movimientos desde los avisos de tus bancos.
+          </Text>
+        </BlurFade>
+        {PROVEEDORES.every((p) => !proveedorConfigurado(p)) && (
+          <Tarjeta>
+            <View style={styles.filaTitulo}>
+              <Ionicons
+                name="construct-outline"
+                size={18}
+                color={color.warning}
+              />
+              <Text style={styles.tituloCard}>
+                Falta configurar la conexión
+              </Text>
+            </View>
+            <Text style={styles.texto}>
+              La conexión con Gmail y Outlook todavía no está disponible.
+            </Text>
+            <Text style={styles.textoMuted}>
+              Podés seguir registrando movimientos manualmente mientras se
+              habilita la conexión.
+            </Text>
+          </Tarjeta>
+        )}
+
         <Tarjeta>
           <View style={styles.filaTitulo}>
-            <Ionicons name="construct-outline" size={18} color={color.warning} />
-            <Text style={styles.tituloCard}>Falta configurar la conexión</Text>
+            <Ionicons
+              name={conectado ? "checkmark-circle" : "mail-outline"}
+              size={20}
+              color={conectado ? color.success : color.textMuted}
+            />
+            <Text style={styles.tituloCard}>
+              {conectado
+                ? `${ETIQUETA_PROVEEDOR[conectado]} conectado`
+                : "Correo no conectado"}
+            </Text>
           </View>
-          <Text style={styles.texto}>
-            Conectar Gmail u Outlook necesita un Client ID que todavía no está configurado.
-          </Text>
           <Text style={styles.textoMuted}>
-            <Text style={{ fontWeight: "700" }}>Gmail</Text> (variable{" "}
-            <Text style={styles.mono}>EXPO_PUBLIC_GOOGLE_CLIENT_ID</Text>):{"\n"}
-            1. console.cloud.google.com → crear proyecto → APIs & Services → Credentials → Create Credentials →
-            OAuth client ID → tipo "Web application".{"\n"}
-            2. Habilitar la Gmail API para ese proyecto.{"\n"}
-            3. Agregar <Text style={styles.mono}>gastosapp://redirect</Text> como URI de redirección autorizado.{"\n"}
-            4. Copiar el Client ID a la variable de entorno.
+            {conectado
+              ? "La app puede leer tu bandeja de entrada para detectar avisos de tus bancos."
+              : "Conectá tu correo para que la app detecte gastos e ingresos sola desde los avisos de tus bancos."}
           </Text>
-          <Text style={styles.textoMuted}>
-            <Text style={{ fontWeight: "700" }}>Outlook</Text> (variable{" "}
-            <Text style={styles.mono}>EXPO_PUBLIC_MS_CLIENT_ID</Text>):{"\n"}
-            1. portal.azure.com → Microsoft Entra ID → App registrations → New registration.{"\n"}
-            2. Tipo de cuenta: "Accounts in any organizational directory and personal Microsoft accounts".{"\n"}
-            3. En Authentication, agregar plataforma "Mobile and desktop applications" con el redirect URI{" "}
-            <Text style={styles.mono}>gastosapp://redirect</Text>.{"\n"}
-            4. Copiar el "Application (client) ID" a la variable de entorno.
-          </Text>
+          {conectado ? (
+            <Boton
+              titulo="Desconectar correo"
+              variante="peligro"
+              onPress={desconectar}
+            />
+          ) : (
+            <View style={{ gap: spacing(2) }}>
+              {PROVEEDORES.map((p) => (
+                <Boton
+                  key={p}
+                  titulo={
+                    conectando === p
+                      ? "Conectando…"
+                      : `Conectar ${ETIQUETA_PROVEEDOR[p]}`
+                  }
+                  variante="primario"
+                  onPress={() => conectar(p)}
+                  loading={conectando === p}
+                  disabled={!proveedorConfigurado(p) || conectando !== null}
+                  style={{ flex: 1 }}
+                />
+              ))}
+            </View>
+          )}
         </Tarjeta>
-      )}
 
-      <Tarjeta>
-        <View style={styles.filaTitulo}>
-          <Ionicons name={conectado ? "checkmark-circle" : "mail-outline"} size={20} color={conectado ? color.success : color.textMuted} />
-          <Text style={styles.tituloCard}>
-            {conectado ? `${ETIQUETA_PROVEEDOR[conectado]} conectado` : "Correo no conectado"}
-          </Text>
-        </View>
-        <Text style={styles.textoMuted}>
-          {conectado
-            ? "La app puede leer tu bandeja de entrada para detectar avisos de tus bancos."
-            : "Conectá tu correo para que la app detecte gastos e ingresos sola desde los avisos de tus bancos."}
-        </Text>
-        {conectado ? (
-          <Boton titulo="Desconectar correo" variante="peligro" onPress={desconectar} />
-        ) : (
-          <View style={{ flexDirection: "row", gap: spacing(2) }}>
-            {PROVEEDORES.map((p) => (
-              <Boton
-                key={p}
-                titulo={conectando === p ? "Conectando…" : `Conectar ${ETIQUETA_PROVEEDOR[p]}`}
-                variante="primario"
-                onPress={() => conectar(p)}
-                disabled={!proveedorConfigurado(p) || conectando !== null}
-                style={{ flex: 1 }}
-              />
-            ))}
-          </View>
+        {conectado && (
+          <Tarjeta>
+            <Text style={styles.tituloCard}>Buscar movimientos nuevos</Text>
+            <Text style={styles.textoMuted}>
+              {ultimaSync
+                ? `Última búsqueda: ${new Date(ultimaSync).toLocaleString("es-EC")}`
+                : "Todavía no buscaste nunca."}
+            </Text>
+            <Boton
+              titulo={buscando ? "Buscando…" : "Buscar ahora"}
+              variante="primario"
+              onPress={buscarAhora}
+              loading={buscando}
+              disabled={buscando}
+            />
+            {resultado && <Text style={styles.textoOk}>{resultado}</Text>}
+            <Boton
+              titulo="Ver bandeja de revisión"
+              onPress={() => router.push("/bandeja")}
+            />
+          </Tarjeta>
         )}
-      </Tarjeta>
 
-      {conectado && (
-        <Tarjeta>
-          <Text style={styles.tituloCard}>Buscar movimientos nuevos</Text>
-          <Text style={styles.textoMuted}>
-            {ultimaSync ? `Última búsqueda: ${new Date(ultimaSync).toLocaleString("es-EC")}` : "Todavía no buscaste nunca."}
-          </Text>
-          <Boton titulo={buscando ? "Buscando…" : "Buscar ahora"} variante="primario" onPress={buscarAhora} disabled={buscando} />
-          {resultado && <Text style={styles.textoOk}>{resultado}</Text>}
-          <Boton titulo="Ver bandeja de revisión" onPress={() => router.push("/bandeja")} />
-        </Tarjeta>
-      )}
-
-      {error && <ErrorTexto>{error}</ErrorTexto>}
-    </ScrollView>
+        {error && <ErrorTexto>{error}</ErrorTexto>}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  contenedor: { flex: 1, backgroundColor: color.bg },
-  filaTitulo: { flexDirection: "row", alignItems: "center", gap: spacing(2) },
-  tituloCard: { fontSize: 15, fontWeight: "700", color: color.text },
-  texto: { fontSize: 13.5, color: color.text, lineHeight: 20 },
-  textoMuted: { fontSize: 13, color: color.textMuted, lineHeight: 19 },
-  textoOk: { fontSize: 13, color: color.success },
-  mono: { fontFamily: "monospace", fontSize: 12.5, backgroundColor: color.bg, color: color.text },
-});
+const createStyles = (color: Colors) =>
+  StyleSheet.create({
+    screenTitle: {
+      fontFamily: font.display,
+      fontSize: 30,
+      lineHeight: 36,
+      color: color.text,
+    },
+    screenIntro: {
+      fontFamily: font.body,
+      fontSize: 14,
+      lineHeight: 21,
+      color: color.textMuted,
+    },
+    contenedor: { flex: 1, backgroundColor: color.bg },
+    filaTitulo: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: spacing(2),
+    },
+    tituloCard: { fontFamily: font.display, fontSize: 20, color: color.text },
+    texto: {
+      fontFamily: font.body,
+      fontSize: 13.5,
+      color: color.text,
+      lineHeight: 20,
+    },
+    textoMuted: {
+      fontFamily: font.body,
+      fontSize: 13,
+      color: color.textMuted,
+      lineHeight: 19,
+    },
+    textoOk: { fontFamily: font.body, fontSize: 13, color: color.success },
+  });

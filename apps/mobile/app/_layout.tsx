@@ -1,10 +1,32 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Stack, useRouter, useSegments } from "expo-router";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
-import { color } from "../lib/theme";
+import { ThemeProvider, useTheme, font } from "../lib/theme";
+import { useFonts } from "expo-font";
+import { StatusBar } from "expo-status-bar";
+import { Animated } from "react-native";
 
 export default function RootLayout() {
+  return <ThemeProvider><ThemedLayout /></ThemeProvider>;
+}
+
+function ThemedLayout() {
+  const { color, mode, ready, reduceMotion } = useTheme();
+  const opacity = useRef(new Animated.Value(1)).current;
+  useEffect(() => {
+    if (reduceMotion) { opacity.setValue(1); return; }
+    opacity.setValue(0.85);
+    const animation = Animated.timing(opacity, { toValue: 1, duration: 180, useNativeDriver: true });
+    animation.start(); return () => animation.stop();
+  }, [mode, reduceMotion, opacity]);
+  const [fontsLoaded, fontError] = useFonts({
+    Fraunces: require("../assets/fonts/Fraunces.ttf"),
+    IBMPlexSans: require("../assets/fonts/IBMPlexSans.ttf"),
+    IBMPlexSansMedium: require("../assets/fonts/IBMPlexSansMedium.ttf"),
+    IBMPlexSansSemiBold: require("../assets/fonts/IBMPlexSansSemiBold.ttf"),
+    IBMPlexMono: require("../assets/fonts/IBMPlexMono.ttf"),
+  });
   // undefined = todavía no sabemos si hay sesión; null = no hay sesión.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const router = useRouter();
@@ -41,15 +63,19 @@ export default function RootLayout() {
     }
   }, [session, segments]);
 
-  if (session === undefined) return null;
+  if (session === undefined || !ready || (!fontsLoaded && !fontError)) return null;
 
   return (
+    <Animated.View style={{ flex: 1, backgroundColor: color.bg, opacity }}>
+    <StatusBar style={mode === "dark" ? "light" : "dark"} backgroundColor={color.bg} />
     <Stack
       screenOptions={{
         headerStyle: { backgroundColor: color.surface },
         headerTintColor: color.text,
         headerShadowVisible: false,
-        headerTitleStyle: { fontWeight: "700" },
+        headerTitleStyle: { fontFamily: font.display },
+        contentStyle: { backgroundColor: color.bg },
+        animation: reduceMotion ? "none" : "default",
       }}
     >
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
@@ -65,5 +91,6 @@ export default function RootLayout() {
       <Stack.Screen name="correo" options={{ title: "Correo" }} />
       <Stack.Screen name="bandeja" options={{ title: "Bandeja de revisión" }} />
     </Stack>
+    </Animated.View>
   );
 }

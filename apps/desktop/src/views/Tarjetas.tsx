@@ -1,14 +1,41 @@
+import RippleButton from "../components/RippleButton";
 import { useEffect, useState, type FormEvent } from "react";
-import type { Banco, Categoria, Cuenta, Gasto, Ingreso, Marca, PagoTarjeta } from "core";
+import type {
+  Banco,
+  Categoria,
+  Cuenta,
+  Gasto,
+  Ingreso,
+  Marca,
+  PagoTarjeta,
+} from "core";
 import TarjetaVisual from "../components/TarjetaVisual";
 import BarraProgreso from "../components/BarraProgreso";
 import ItemMovimiento from "../components/ItemMovimiento";
-import { PagarTarjeta, RegistrarGastoInline } from "../components/AccionesCuentaRapidas";
+import {
+  PagarTarjeta,
+  RegistrarGastoInline,
+} from "../components/AccionesCuentaRapidas";
 import { agruparPorFecha, movimientosDe, type MovimientoCuenta } from "core";
-import { cssGradiente, ETIQUETA_BANCO, GRADIENTE_BANCO, OPCIONES_BANCO, OPCIONES_MARCA } from "core";
+import {
+  cssGradiente,
+  ETIQUETA_BANCO,
+  GRADIENTE_BANCO,
+  OPCIONES_BANCO,
+  OPCIONES_MARCA,
+} from "core";
 import SwatchBanco from "../components/SwatchBanco";
-import { bancoTieneCatalogo, gruposDelCatalogo, productoDe } from "../lib/catalogoTarjetas";
-import { IconoGastos, IconoMas, IconoPapelera, IconoTarjetas } from "../components/iconos";
+import {
+  bancoTieneCatalogo,
+  gruposDelCatalogo,
+  productoDe,
+} from "../lib/catalogoTarjetas";
+import {
+  IconoGastos,
+  IconoMas,
+  IconoPapelera,
+  IconoTarjetas,
+} from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
 import { mensajeError } from "core";
 import { formatMonto } from "core";
@@ -21,7 +48,11 @@ interface Props {
   categorias: Categoria[];
   onCrear: (input: Omit<Cuenta, "id" | "createdAt">) => Promise<void>;
   onEliminar: (id: string) => Promise<void>;
-  onRegistrarPago: (cuentaId: string, monto: number, cuentaOrigenId?: string) => Promise<void>;
+  onRegistrarPago: (
+    cuentaId: string,
+    monto: number,
+    cuentaOrigenId?: string,
+  ) => Promise<void>;
   onCrearGasto: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
 }
 
@@ -55,12 +86,25 @@ export default function Tarjetas({
 
   return (
     <>
+      <p
+        className="etiqueta"
+        style={{ margin: "0 0 24px", fontSize: "0.95rem", lineHeight: 1.6 }}
+      >
+        Controlá tu cupo, registrá pagos y revisá tus movimientos.
+      </p>
       {mostrarForm ? (
-        <NuevaTarjeta onCrear={crearYCerrar} onCancelar={() => setMostrarForm(false)} />
+        <NuevaTarjeta
+          onCrear={crearYCerrar}
+          onCancelar={() => setMostrarForm(false)}
+        />
       ) : (
-        <button className="btn btn-primary" style={{ marginBottom: 24 }} onClick={() => setMostrarForm(true)}>
+        <RippleButton
+          className="btn btn-primary"
+          style={{ marginBottom: 24 }}
+          onClick={() => setMostrarForm(true)}
+        >
           <IconoMas /> Agregar tarjeta
-        </button>
+        </RippleButton>
       )}
 
       {tarjetas.length === 0 ? (
@@ -120,27 +164,54 @@ function DetalleTarjeta({
   ingresos: Ingreso[];
   categorias: Categoria[];
   onEliminar: (id: string) => Promise<void>;
-  onRegistrarPago: (cuentaId: string, monto: number, cuentaOrigenId?: string) => Promise<void>;
+  onRegistrarPago: (
+    cuentaId: string,
+    monto: number,
+    cuentaOrigenId?: string,
+  ) => Promise<void>;
   onCrearGasto: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
 }) {
   const [verEstadoCuenta, setVerEstadoCuenta] = useState(false);
-  const movimientos = movimientosDe(cuenta.id, gastos, pagosTarjeta, ingresos, categorias);
+  const movimientos = movimientosDe(
+    cuenta.id,
+    gastos,
+    pagosTarjeta,
+    ingresos,
+    categorias,
+  );
   const recientes = movimientos.slice(0, 5);
   const categoriasGasto = categorias.filter((c) => c.tipo === "gasto");
-  const cuentasOrigen = cuentas.filter((c) => c.tipo === "ahorro" || c.tipo === "debito");
+  const cuentasOrigen = cuentas.filter(
+    (c) => c.tipo === "ahorro" || c.tipo === "debito",
+  );
 
   return (
     <>
       <div className="card tarjeta-detalle">
         <div>
-          <TarjetaVisual cuenta={cuenta} onClick={() => setVerEstadoCuenta(true)} />
+          <TarjetaVisual
+            cuenta={cuenta}
+            onClick={() => setVerEstadoCuenta(true)}
+          />
 
           <div className="tarjeta-visual-acciones" style={{ marginTop: 14 }}>
             <div className="tarjeta-detalle-acciones-rapidas">
-              <PagarTarjeta cuenta={cuenta} cuentasOrigen={cuentasOrigen} onRegistrarPago={onRegistrarPago} />
-              <RegistrarGastoInline cuenta={cuenta} categorias={categoriasGasto} onCrear={onCrearGasto} />
+              <PagarTarjeta
+                cuenta={cuenta}
+                cuentasOrigen={cuentasOrigen}
+                onRegistrarPago={onRegistrarPago}
+              />
+              <RegistrarGastoInline
+                cuenta={cuenta}
+                categorias={categoriasGasto}
+                onCrear={onCrearGasto}
+              />
             </div>
-            <button className="btn-icon" title="Eliminar tarjeta" onClick={() => onEliminar(cuenta.id)}>
+            <button
+              className="btn-icon"
+              title="Eliminar tarjeta"
+              onClick={() => onEliminar(cuenta.id)}
+            >
               <IconoPapelera />
             </button>
           </div>
@@ -148,9 +219,15 @@ function DetalleTarjeta({
 
         <div>
           <div className="form-gasto-header">
-            <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Movimientos de la tarjeta</h3>
+            <h3 style={{ margin: 0, fontSize: "0.95rem" }}>
+              Movimientos de la tarjeta
+            </h3>
             {movimientos.length > 0 && (
-              <button type="button" className="btn" onClick={() => setVerEstadoCuenta(true)}>
+              <button
+                type="button"
+                className="btn"
+                onClick={() => setVerEstadoCuenta(true)}
+              >
                 Ver todo
               </button>
             )}
@@ -202,12 +279,21 @@ function EstadoCuentaModal({
   movimientos: MovimientoCuenta[];
   categoriasGasto: Categoria[];
   onEliminar: (id: string) => Promise<void>;
-  onRegistrarPago: (cuentaId: string, monto: number, cuentaOrigenId?: string) => Promise<void>;
+  onRegistrarPago: (
+    cuentaId: string,
+    monto: number,
+    cuentaOrigenId?: string,
+  ) => Promise<void>;
   onCrearGasto: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
   onCerrar: () => void;
 }) {
-  const usado = cuenta.cupoTotal !== undefined ? cuenta.cupoTotal - cuenta.disponible : undefined;
-  const usoPorcentaje = cuenta.cupoTotal ? ((cuenta.cupoTotal - cuenta.disponible) / cuenta.cupoTotal) * 100 : undefined;
+  const usado =
+    cuenta.cupoTotal !== undefined
+      ? cuenta.cupoTotal - cuenta.disponible
+      : undefined;
+  const usoPorcentaje = cuenta.cupoTotal
+    ? ((cuenta.cupoTotal - cuenta.disponible) / cuenta.cupoTotal) * 100
+    : undefined;
   const grupos = agruparPorFecha(movimientos);
 
   async function eliminarYCerrar() {
@@ -220,7 +306,12 @@ function EstadoCuentaModal({
       <div className="modal modal-ancho" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <h3>{cuenta.nombre}</h3>
-          <button className="btn-icon" onClick={onCerrar} title="Cerrar" type="button">
+          <button
+            className="btn-icon"
+            onClick={onCerrar}
+            title="Cerrar"
+            type="button"
+          >
             ✕
           </button>
         </div>
@@ -243,7 +334,9 @@ function EstadoCuentaModal({
                       <span className="etiqueta">Cupo utilizado</span>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <span className="valor">{formatMonto(cuenta.cupoTotal)}</span>
+                      <span className="valor">
+                        {formatMonto(cuenta.cupoTotal)}
+                      </span>
                       <span className="etiqueta">Cupo aprobado</span>
                     </div>
                   </div>
@@ -255,12 +348,27 @@ function EstadoCuentaModal({
                 </span>
               )}
 
-              <div className="tarjeta-visual-acciones" style={{ marginTop: 16 }}>
+              <div
+                className="tarjeta-visual-acciones"
+                style={{ marginTop: 16 }}
+              >
                 <div className="tarjeta-detalle-acciones-rapidas">
-                  <PagarTarjeta cuenta={cuenta} cuentasOrigen={cuentasOrigen} onRegistrarPago={onRegistrarPago} />
-                  <RegistrarGastoInline cuenta={cuenta} categorias={categoriasGasto} onCrear={onCrearGasto} />
+                  <PagarTarjeta
+                    cuenta={cuenta}
+                    cuentasOrigen={cuentasOrigen}
+                    onRegistrarPago={onRegistrarPago}
+                  />
+                  <RegistrarGastoInline
+                    cuenta={cuenta}
+                    categorias={categoriasGasto}
+                    onCrear={onCrearGasto}
+                  />
                 </div>
-                <button className="btn-icon" title="Eliminar tarjeta" onClick={eliminarYCerrar}>
+                <button
+                  className="btn-icon"
+                  title="Eliminar tarjeta"
+                  onClick={eliminarYCerrar}
+                >
                   <IconoPapelera />
                 </button>
               </div>
@@ -277,10 +385,15 @@ function EstadoCuentaModal({
           ) : (
             grupos.map((grupo) => (
               <div key={grupo.fecha} className="estado-cuenta-grupo">
-                <span className="estado-cuenta-grupo-fecha">{grupo.etiqueta}</span>
+                <span className="estado-cuenta-grupo-fecha">
+                  {grupo.etiqueta}
+                </span>
                 <ul className="actividad-lista">
                   {grupo.items.map((item) => (
-                    <ItemMovimiento key={`${item.tipo}-${item.id}`} item={item} />
+                    <ItemMovimiento
+                      key={`${item.tipo}-${item.id}`}
+                      item={item}
+                    />
                   ))}
                 </ul>
               </div>
@@ -314,7 +427,11 @@ function NuevaTarjeta({
     if (!bancoTieneCatalogo(b)) setEstilo("");
   }
 
-  function elegirDelCatalogo(id: string, nombreProducto: string, marcaProducto: Marca) {
+  function elegirDelCatalogo(
+    id: string,
+    nombreProducto: string,
+    marcaProducto: Marca,
+  ) {
     setMarca(marcaProducto);
     setEstilo(id);
     if (!nombre.trim()) setNombre(nombreProducto);
@@ -346,7 +463,10 @@ function NuevaTarjeta({
 
   const vistaPrevia: Cuenta = {
     id: "vista-previa",
-    nombre: nombre || (hayCatalogo && estilo ? productoDe(estilo)?.nombre : undefined) || "Mi tarjeta",
+    nombre:
+      nombre ||
+      (hayCatalogo && estilo ? productoDe(estilo)?.nombre : undefined) ||
+      "Mi tarjeta",
     tipo: "credito",
     banco,
     marca,
@@ -359,7 +479,9 @@ function NuevaTarjeta({
   return (
     <form onSubmit={agregar} className="card" style={{ marginBottom: 24 }}>
       <div className="form-gasto-header">
-        <h3 style={{ margin: 0, fontSize: "0.95rem" }}>Nueva tarjeta de crédito</h3>
+        <h3 style={{ margin: 0, fontSize: "0.95rem" }}>
+          Nueva tarjeta de crédito
+        </h3>
         <button type="button" className="btn" onClick={onCancelar}>
           Cancelar
         </button>
@@ -389,9 +511,13 @@ function NuevaTarjeta({
             required
           />
         </div>
-        <button type="submit" className="btn btn-primary" disabled={guardando}>
+        <RippleButton
+          type="submit"
+          className="btn btn-primary"
+          disabled={guardando}
+        >
           {guardando ? "Guardando…" : "Agregar"}
-        </button>
+        </RippleButton>
       </div>
 
       <div className="campo" style={{ marginTop: 16 }}>
@@ -421,7 +547,13 @@ function NuevaTarjeta({
                     key={producto.id}
                     compacta
                     seleccionada={estilo === producto.id}
-                    onClick={() => elegirDelCatalogo(producto.id, producto.nombre, producto.marca)}
+                    onClick={() =>
+                      elegirDelCatalogo(
+                        producto.id,
+                        producto.nombre,
+                        producto.marca,
+                      )
+                    }
                     cuenta={{
                       id: producto.id,
                       nombre: producto.nombre,

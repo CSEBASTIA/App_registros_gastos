@@ -288,15 +288,15 @@ const IMAGENES_POR_ID: Record<string, ImageSourcePropType> = {
   "pichincha-mastercard-platinum-miles": require("../assets/Banco Pichincha Tarjetas/pichincha-mastercard-platinum-miles.png"),
   // "pichincha-mastercard-premium-microfinanzas": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-mastercard-premium-microfinanzas.jpg no existe todavía; TarjetaVisual usa el degradado del banco)
   // "pichincha-mastercard-premium-microfinanzas-miles": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-mastercard-premium-microfinanzas-miles.jpg no existe todavía; TarjetaVisual usa el degradado del banco)
-  "pichincha-mastercard-premium-miles": require("../assets/Banco Pichincha Tarjetas/pichincha-mastercard-premium-miles.jpg"),
+  // "pichincha-mastercard-premium-miles": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-mastercard-premium-miles.jpg no existe; TarjetaVisual usa el degradado del banco)
   "pichincha-visa-gold-miles": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-gold-miles.png"),
   "pichincha-visa-infinite-miles": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-infinite-miles.png"),
-  "pichincha-visa-joven": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-joven.png"),
-  "pichincha-visa-platinum-miles": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-platinum-miles.jpg"),
-  "pichincha-visa-premium-microfinanzas": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-premium-microfinanzas.jpg"),
-  "pichincha-visa-premium-microfinanzas-miles": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-premium-microfinanzas-miles.jpg"),
-  "pichincha-visa-signature-miles": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-signature-miles.jpg"),
-  "pichincha-visa-universidad-catolica": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-universidad-catolica.jpg"),
+  // "pichincha-visa-joven": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-visa-joven.png no existe; TarjetaVisual usa el degradado del banco)
+  // "pichincha-visa-platinum-miles": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-visa-platinum-miles.jpg no existe; TarjetaVisual usa el degradado del banco)
+  // "pichincha-visa-premium-microfinanzas": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-visa-premium-microfinanzas.jpg no existe; TarjetaVisual usa el degradado del banco)
+  // "pichincha-visa-premium-microfinanzas-miles": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-visa-premium-microfinanzas-miles.jpg no existe; TarjetaVisual usa el degradado del banco)
+  // "pichincha-visa-signature-miles": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-visa-signature-miles.jpg no existe; TarjetaVisual usa el degradado del banco)
+  // "pichincha-visa-universidad-catolica": imagen pendiente (assets/Banco Pichincha Tarjetas/pichincha-visa-universidad-catolica.jpg no existe; TarjetaVisual usa el degradado del banco)
   "pichincha-visa-premium-miles": require("../assets/Banco Pichincha Tarjetas/pichincha-visa-premium-miles.webp"),
   "pacifico-mastercard-clasica-internacional": require("../assets/Banco Pacifico Tarjetas/pacifico-mastercard-clasica-internacional.png"),
   "pacifico-mastercard-clasica-mi-comisariato": require("../assets/Banco Pacifico Tarjetas/pacifico-mastercard-clasica-mi-comisariato.png"),

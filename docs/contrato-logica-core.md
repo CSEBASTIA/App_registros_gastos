@@ -63,3 +63,6 @@ Cambios hechos en pantallas (dueño: Agente 3), todos con los componentes existe
 - `app/bandeja.tsx`: confirmar usa `confirmarTransaccionDetectada`; descartar muestra errores.
 - Fechas locales (`fechaLocal`/`mesLocal`) en todas las pantallas del teléfono: ya no queda ningún `toISOString().slice(...)`.
 - `lib/catalogoTarjetas.ts` (en curso por otro agente): se comentaron entradas cuyo archivo de imagen no existía, porque rompían el paquete de la app (`Unable to resolve`). Al terminar de subir las imágenes, revisar que cada `require` apunte a un archivo existente.
+
+## Revisión general (14-oct, 10:50)
+- `lib/catalogoTarjetas.ts`: el commit `834933c` dejó en `main` 7 `require` a imágenes de Pichincha que no existen (`pichincha-mastercard-premium-miles.jpg`, `pichincha-visa-joven.png`, `pichincha-visa-platinum-miles.jpg`, `pichincha-visa-premium-microfinanzas*.jpg`, `pichincha-visa-signature-miles.jpg`, `pichincha-visa-universidad-catolica.jpg`). Con eso la app móvil no arrancaba. Se comentaron (la tarjeta usa el degradado del banco). Al agregar cada imagen, descomentar su línea. Antes de cada commit, comprobar con `npx expo export -p android` desde `apps/mobile`.

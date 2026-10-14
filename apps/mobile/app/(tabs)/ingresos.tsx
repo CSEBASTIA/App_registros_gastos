@@ -1,6 +1,6 @@
 import { SafeAreaView } from "react-native-safe-area-context";
 import SelectorChips from "../../components/SelectorChips";
-import { mensajeError } from "core";
+import { mensajeError, mesLocal } from "core";
 import ErrorTexto from "../../components/ErrorTexto";
 import { useCallback, useState } from "react";
 import {
@@ -37,7 +37,7 @@ import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
 
 function mesActual() {
-  return new Date().toISOString().slice(0, 7);
+  return mesLocal(); // zona horaria del teléfono, no UTC
 }
 
 export default function IngresosScreen() {

@@ -35,6 +35,12 @@ const ITEMS: {
     icono: "alert-circle-outline",
   },
   {
+    titulo: "Presupuestos",
+    subtitulo: "Controlá cuánto llevás usado este mes",
+    ruta: "/presupuestos",
+    icono: "pie-chart-outline",
+  },
+  {
     titulo: "Recordatorios",
     subtitulo: "Pagos y cuotas próximas",
     ruta: "/recordatorios",
@@ -47,8 +53,8 @@ const ITEMS: {
     icono: "pricetag-outline",
   },
   {
-    titulo: "Correo",
-    subtitulo: "Detectar movimientos de Gmail u Outlook",
+    titulo: "Correo (beta)",
+    subtitulo: "Opcional: detectar avisos bancarios de Gmail u Outlook",
     ruta: "/correo",
     icono: "mail-outline",
   },

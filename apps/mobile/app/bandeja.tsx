@@ -14,8 +14,7 @@ import {
   listarCategorias,
   listarCuentas,
   marcarTransaccionDetectada,
-  crearGasto,
-  crearIngreso,
+  confirmarTransaccionDetectada,
   mensajeError,
   ETIQUETA_BANCO,
   type TransaccionDetectada,
@@ -161,21 +160,16 @@ function ItemBandeja({
     setError(null);
     setGuardando(true);
     try {
-      const datos = {
-        monto: Number(monto),
+      if (item.tipo === "gasto" && !categoriaId)
+        throw new Error("Elegí una categoría antes de confirmar.");
+      // Un solo paso en la base: crea el gasto/ingreso y marca el aviso
+      // juntos, así reintentar tras un error de red nunca lo duplica.
+      await confirmarTransaccionDetectada(item.id, {
+        monto: Number(monto.replace(",", ".")),
         descripcion,
         categoriaId: categoriaId || undefined,
         cuentaId: cuentaId || undefined,
-        fecha: item.fecha,
-      };
-      if (item.tipo === "gasto") {
-        if (!categoriaId)
-          throw new Error("Elegí una categoría antes de confirmar.");
-        await crearGasto({ ...datos, categoriaId });
-      } else {
-        await crearIngreso(datos);
-      }
-      await marcarTransaccionDetectada(item.id, "confirmado");
+      });
       onResuelto();
     } catch (err) {
       setError(mensajeError(err));
@@ -189,6 +183,8 @@ function ItemBandeja({
     try {
       await marcarTransaccionDetectada(item.id, "descartado");
       onResuelto();
+    } catch (err) {
+      setError(mensajeError(err));
     } finally {
       setGuardando(false);
     }

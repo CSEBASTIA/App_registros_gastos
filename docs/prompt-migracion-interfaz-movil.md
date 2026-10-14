@@ -8,9 +8,9 @@ Quiero aplicar **toda la nueva interfaz** primero en `apps/desktop` (React + Vit
 
 ## Referencia de estilo
 
-«Zallox» es el diseño actual de escritorio de **este mismo repositorio**. Usa `apps/desktop/src/index.css`, `apps/desktop/src/views/Resumen.tsx` y los componentes visuales actuales como referencia de **estilo**: colores, tipografía, jerarquía, superficies, bordes, radios, sombras y presentación de cifras. Adapta las composiciones a pantallas táctiles; no traslades literalmente la barra lateral ni las tablas de escritorio.
+La referencia principal de «Zallox» es la captura adjunta por el usuario: fondo blanco, títulos negros, texto secundario gris, tipografía sans serif, líneas de borde delgadas, tarjetas blancas con esquinas redondeadas, sombra mínima y una navegación dock flotante. Usa esa captura por encima de cualquier estilo antiguo que aparezca en el repositorio. Conserva el contenido y las acciones financieras; lleva ese lenguaje visual a todas las vistas web y móviles, con composición táctil propia en el teléfono.
 
-La paleta clara observada al preparar este prompt tiene fondo `#f1f2f7`, superficies `#ffffff` y `#e9ebf3`, borde `#d8dae3`, texto `#14151d`, texto secundario `#52566b`, azul principal `#3552d1`, peligro `#c23b34`, éxito `#157a4b` y aviso `#a5690a`. Verifica los valores actuales del escritorio antes de editar móvil, porque los archivos locales pueden haber cambiado. Usa Fraunces para títulos, IBM Plex Sans para lectura e IBM Plex Mono donde ayude a comparar importes. Conserva los colores y gradientes propios de las tarjetas bancarias.
+Base cromática: fondo/superficie `#ffffff`, superficie secundaria `#f5f5f5`, borde `#dedede`, texto `#111111`, texto secundario `#62666c` y negro como acento principal. Conserva color semántico para estados de éxito, aviso y peligro y los colores propios de bancos/categorías cuando identifican contenido. IBM Plex Sans va en títulos y lectura; IBM Plex Mono queda donde ayude a comparar importes. El tema claro debe iniciar por defecto; el oscuro queda opcional y usa neutros, sin regresar a índigo/lavanda.
 
 ## Referencias de movimiento y su lugar en la interfaz
 
@@ -41,7 +41,7 @@ Los comandos citados instalan **Svelte** y no se deben ejecutar en este proyecto
 - Sustituye la barra de pestañas estándar por el dock/isla flotante, sin perder ninguna ruta. Haz que el control de tema sea accesible desde la isla expandida.
 - Asegura que formularios, modales, cabeceras, tarjetas, gráficos, listados y estados de carga/error/vacío sigan una misma jerarquía visual.
 - Respeta la preferencia del sistema de reducir movimiento, zonas táctiles cómodas, lectores de pantalla, contraste, áreas seguras y teclado. Las animaciones deben responder rápido y mantenerse fluidas en teléfonos reales.
-- Mantén intactos los cálculos, repositorios, modelos, esquema de Supabase y operaciones financieras. Conserva el comportamiento de autenticación, correo y bandeja. Puedes guardar localmente la preferencia visual del tema.
+- Mantén intactos los cálculos, repositorios, modelos, esquema de Supabase y operaciones financieras. Conserva autenticación, correo y bandeja en producción; el acceso visual sin login solo se permite en desarrollo para revisar la interfaz. Puedes guardar localmente la preferencia visual del tema.
 - Interpreta «isla dinámica» como interfaz **dentro de la app**. La Dynamic Island del sistema iOS y un servicio real de notificaciones requieren un alcance diferente.
 
 ## Fase 3 — supervisor Luna y entrega

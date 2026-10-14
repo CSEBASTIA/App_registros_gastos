@@ -1,8 +1,10 @@
 # Auditoría de supervisión: migración de interfaz móvil
 
-**Fecha:** 2026-10-13  
-**Estado:** auditoría en curso; el veredicto final queda reservado hasta completar las dos fases.  
+**Fecha:** 2026-10-14
+**Estado:** revisión final actualizada tras cerrar los ajustes responsive y de Correo.
 **Alcance vigente (orden solicitado):** primero supervisar la adaptación web en `apps/desktop`; después revisar la migración móvil de `apps/mobile` usando el escritorio como referencia Zallox. No se modifica código de `apps/mobile`, `apps/desktop`, `packages/core` ni `supabase`.
+
+**Nota de vigencia:** este informe registra la auditoría anterior a la nueva dirección visual solicitada por el usuario. La captura de Zallox compartida después es la fuente de verdad para color, tipografía y composición; las modificaciones posteriores de web y móvil todavía requieren una revisión supervisora nueva.
 
 ## Fases y puertas de revisión
 
@@ -41,24 +43,31 @@ La migración es de composición móvil, no una copia de la navegación lateral 
 
 ## Integridad del repositorio y coordinación
 
-Al comenzar ya existían cambios locales en `apps/desktop`, `packages/core`, `README.md` y archivos no rastreados en `docs/`; son trabajo ajeno al alcance de esta auditoría y no deben revertirse ni reescribirse. Los agentes 2 y 3 son dueños de sus archivos móviles asignados. La auditoría se limita a este documento y a lectura/revisión. Revisaré en particular que el contrato UI de Agente 2 se publique antes de que Agente 3 dependa de APIs nuevas y que no haya cruces en archivos compartidos.
+Al comenzar ya existían cambios locales en `apps/desktop`, `packages/core`, `README.md` y archivos no rastreados en `docs/`; son trabajo ajeno al alcance y no se revirtieron. La migración visual quedó en el commit `f562126`; el commit separado `fbb3d13` contiene el trabajo de lógica descrito arriba. Los únicos cambios aún sin commit al cierre son la corrección de error de Correo/Resumen, el atributo `inert` de Animated List y los contratos actualizados. Esta auditoría solo modificó su propio documento.
 
-## Seguimiento provisional (sin veredicto)
+## Informe final de supervisión
 
-- Al inicio de la supervisión, el escritorio ya tenía cambios locales amplios anteriores en `apps/desktop` y `packages/core`; por eso el diff final debe distinguirlos de los cambios de migración.
-- Antes del nuevo orden, los agentes habían iniciado en paralelo con móvil. Agente 2 agregó provisionalmente `docs/contrato-ui-movil.md`, amplió `apps/mobile/lib/theme.ts` y añadió una primitiva `apps/mobile/components/Motion.tsx`; instaló `expo-font` y comenzó a incorporar fuentes. Agente 3 inició cambios en las pantallas. Estos cambios son parciales y no representan la fase móvil terminada.
-- El contrato propone `useTheme`, `BlurFade`, `AnimatedBackground`, `AnimatedList` virtualizada y reserva de espacio para el dock. La revisión posterior comprobará que las implementaciones coincidan con el contrato y que no haya pantallas que se queden con estilos claros globales en modo oscuro.
-- Se observó un intento de transformación automática de estilos en varias pantallas y una ejecución de `tsc --noEmit` que terminó con error. No se han aislado aún los diagnósticos ni se ha revisado el resultado; será prioridad de integración. Este supervisor no ejecutará pruebas ni validaciones adicionales.
-- Tras esa ejecución, el Agente 3 informó que TypeScript pasó con el estado móvil guardado. Confirmar que ese resultado cubre el conjunto de rutas y no se invalidó después por la fase web o por integraciones posteriores.
-- La supervisión observó un archivo temporal de transformación en la raíz del repo (`.mobile-ui-transform.cjs`) en el registro del agente; comprobar si se retiró al cerrar su uso y registrarlo si permanece.
-- En el cambio de fase, `apps/desktop/src/components/` ya contiene implementaciones nuevas de `AnimatedBackground`, `AnimatedList`, `BlurFade`, `Dock`, `RippleButton` y `ThemeToggler`; el contrato está en `docs/contrato-ui-web.md`. La inspección y el contraste con el shell/vistas siguen pendientes.
-- Aparecieron cambios posteriores en `packages/core/package.json` y `packages/core/test/` (pruebas para lógica de deudas/presupuestos/score). No estaban en el `git status` inicial. No atribuirlos a los agentes sin evidencia; investigar su origen al reconciliar el diff, pues quedan fuera del alcance visual y la lógica financiera debe mantenerse.
-- No se ha inspeccionado ninguna pantalla en simulador o dispositivo todavía. Los agentes continúan activos. No emitir hallazgos finales hasta el cierre WEB y MÓVIL.
+- La fase **WEB** integra seis patrones: dock, selector de tema, fondo de selección compartido, entrada Blur Fade, Ripple Button y Animated List desacoplada. `App.tsx` conecta ocho destinos sin quitar las operaciones de las vistas. La paleta clara y tipografía corresponden a los tokens Zallox de escritorio; hay variables de tema oscuro y soporte `prefers-reduced-motion`.
+- La fase **MÓVIL** cubre las 18 pantallas, los 11 componentes compartidos y las cinco rutas del dock. `ThemeProvider` ofrece claro/oscuro/sistema persistente, carga Fraunces e IBM Plex desde recursos locales, actualiza StatusBar y observa movimiento reducido. El dock usa áreas seguras, se oculta con el teclado y conserva selección por pulsación. Animated List es virtualizada y no recibe datos de avisos.
+- Se verificó estáticamente que las 22 funciones asíncronas de autenticación y operaciones financieras de las pantallas conservan sus cuerpos frente a la versión inicial. Los desarrolladores reportan que TypeScript pasó para escritorio y móvil, el build Vite pasó y Expo exportó para web, Android e iOS. El supervisor no ejecutó esas validaciones.
+- Los dos problemas P1 detectados durante la revisión se corrigieron: el fallo al cargar el proveedor ya no deja Correo en el spinner porque muestra el error y sale del estado indefinido; el fallo de consultas de Resumen ya no presenta cifras vacías como diagnóstico financiero, sino error y botón Reintentar.
+- Los archivos temporales `.mobile-ui-transform.cjs` se eliminaron. Las fuentes locales incluyen archivos OFL. No se encontraron comandos `shadcn-svelte` ejecutados ni datos/avisos ficticios integrados.
+- El commit `fbb3d13 Paso 1 (presupuestos), endurecimiento de seguridad y pruebas` incluye cambios de `packages/core`, `supabase`, correo y pruebas ajenos a esta migración visual. Es trabajo concurrente separado; no forma parte del veredicto visual ni debe revertirse como parte de esta auditoría.
 
 ## Hallazgos y prioridades
 
-Pendiente de las entregas de agentes. Al actualizar, clasificaré cada hallazgo como **P0** (bloquea uso/integración o altera operaciones), **P1** (incumple un criterio central de migración/accesibilidad) o **P2** (acabado o evidencia incompleta), con ruta concreta y recomendación breve.
+- **P0 — ninguno observado.** No vi evidencia de rutas eliminadas ni de cambios en las operaciones financieras de la migración visual.
+- **P1 — corregido, rama de carga de Correo:** [`apps/mobile/app/correo.tsx`](../apps/mobile/app/correo.tsx#L65) captura el rechazo de `proveedorConectado`, muestra `ErrorTexto` y cambia `conectado` a `null`, por lo que la pantalla deja el estado de carga (`conectado === undefined`).
+- **P1 — corregido, error de Resumen:** [`apps/mobile/app/(tabs)/resumen.tsx`](../apps/mobile/app/(tabs)/resumen.tsx#L147) termina la vista financiera en el error, ofrece reintento y no renderiza balance/recomendaciones con arreglos vacíos cuando falló la carga.
+- **Cerrado — responsive web:** [`apps/desktop/src/index.css`](../apps/desktop/src/index.css#L2350) oculta el sidebar y muestra el dock hasta 880 px; desde 881 px oculta el dock, elimina su reserva inferior y muestra el selector de tema del sidebar. [`apps/desktop/src/App.tsx`](../apps/desktop/src/App.tsx#L410) monta ese selector junto a la navegación lateral.
+- **Cerrado — desconexión de correo:** [`apps/mobile/app/correo.tsx`](../apps/mobile/app/correo.tsx#L91) ahora muestra estado ocupado, ignora intentos repetidos, captura el rechazo y conserva el proveedor conectado si la operación falla. La acción presenta el error con el componente compartido.
+- **Limitación externa pendiente:** los bundles no validan tacto, lector de pantalla, teclado, zona segura ni rendimiento en dispositivos. Además el backend de desarrollo respondió `Failed to fetch`; no se verificaron operaciones con datos reales. Mantener este límite al comunicar la entrega.
+- **Notificaciones:** `AnimatedList` web/móvil queda desacoplada y sin fuente, de acuerdo con el alcance. No se implementó servicio ni contenido inventado.
 
 ## Revisión de integración
 
-Pendiente. No se han ejecutado pruebas ni validaciones de compilación; esta supervisión prioriza la lectura solicitada y no añadirá comandos de pruebas sin instrucción.
+**Veredicto:** la migración visual queda integrada y compilable según los informes de los agentes. Los dos P1 de carga/error, el dock duplicado en pantallas anchas y el feedback de desconexión están cerrados. No detecté cambios de lógica financiera en los diffs visuales revisados. **Solo queda la validación externa en teléfonos reales y con backend disponible**; esos comportamientos no se han presentado como probados. Agentes reportan TypeScript web/móvil, build Vite y exportaciones Expo aprobados. El supervisor revisó el código y el diff, no ejecutó pruebas ni compilaciones.
+
+## Actualización de dirección visual posterior
+
+El usuario pidió reemplazar el hero negro y el saludo genérico del Resumen y extender el estilo Zallox a móvil. La nueva base usa blanco, negro y grises, tipografía sans serif y tarjetas con borde fino. Web inicia claro, el dock queda visible en todos los anchos y el Resumen no consulta Supabase sin sesión durante la vista previa. Móvil usa la misma paleta y tipografía y su Resumen omite consultas sin sesión. Estos cambios no están cubiertos por el veredicto ni por las validaciones históricas de arriba.

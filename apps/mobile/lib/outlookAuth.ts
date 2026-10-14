@@ -106,10 +106,16 @@ export async function conectarCorreo(): Promise<void> {
   await guardarTokens(tokens);
 }
 
-export async function desconectarCorreo(): Promise<void> {
+/**
+ * Borra los tokens locales. Microsoft no ofrece revocar un refresh token
+ * desde una app pública como esta: para quitar el permiso por completo, la
+ * persona debe hacerlo en su cuenta (la pantalla Correo le indica dónde).
+ */
+export async function desconectarCorreo(): Promise<{ revocado: boolean }> {
   await borrarSeguro(CLAVE_REFRESH);
   await borrarSeguro(CLAVE_ACCESS);
   await borrarSeguro(CLAVE_EXPIRA);
+  return { revocado: false };
 }
 
 /** Devuelve un access token vigente para llamar a Microsoft Graph, renovándolo solo si ya venció. */

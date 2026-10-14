@@ -4,6 +4,8 @@ node_modules/
 # variables de entorno
 .env
 .env.local
+.env.production
+.env.development
 .env.*.local
 
 # builds
@@ -39,3 +41,5 @@ test-results/
 apps/desktop/src/assets/Logotipos/
 apps/desktop/src/assets/Tarjetas dinner club/
 apps/desktop/src/assets/tarjetas produbanco/
+# configuración local de Claude Code (launch.json, permisos)
+.claude/

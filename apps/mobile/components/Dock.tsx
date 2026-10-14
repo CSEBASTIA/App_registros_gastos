@@ -1,5 +1,15 @@
-import { useEffect, useState } from "react";
-import { Keyboard, Modal, Pressable, StyleSheet, Text, View, type LayoutRectangle } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import {
+  Animated,
+  Easing,
+  Keyboard,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  type LayoutRectangle,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { BottomTabBarProps } from "@react-navigation/bottom-tabs";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -8,21 +18,68 @@ import { AnimatedBackground, BlurFade } from "./Motion";
 const ICONOS: Record<string, keyof typeof Ionicons.glyphMap> = { resumen: "home-outline", ingresos: "trending-up-outline", gastos: "document-text-outline", tarjetas: "card-outline", mas: "menu-outline" };
 const MODES: { value: ThemePreference; label: string; icon: keyof typeof Ionicons.glyphMap }[] = [{ value: "light", label: "Claro", icon: "sunny-outline" }, { value: "dark", label: "Oscuro", icon: "moon-outline" }, { value: "system", label: "Sistema", icon: "phone-portrait-outline" }];
 export default function Dock({ state, descriptors, navigation }: BottomTabBarProps) {
-  const { color, preference, setPreference } = useTheme();
+  const { color, mode, preference, setPreference, reduceMotion } = useTheme();
   const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState(false);
   const [keyboard, setKeyboard] = useState(false);
   const [layouts, setLayouts] = useState<Record<string, LayoutRectangle>>({});
   const [themeLayouts, setThemeLayouts] = useState<Record<string, LayoutRectangle>>({});
+  const themeIconMotion = useRef(new Animated.Value(1)).current;
+  const previousMode = useRef(mode);
   useEffect(() => {
     const show = Keyboard.addListener("keyboardDidShow", () => { setKeyboard(true); setExpanded(false); });
     const hide = Keyboard.addListener("keyboardDidHide", () => setKeyboard(false));
     return () => { show.remove(); hide.remove(); };
   }, []);
+  useEffect(() => {
+    if (previousMode.current === mode) return;
+    previousMode.current = mode;
+    if (reduceMotion) { themeIconMotion.setValue(1); return; }
+    themeIconMotion.setValue(0);
+    const animation = Animated.timing(themeIconMotion, {
+      toValue: 1,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
+  }, [mode, reduceMotion, themeIconMotion]);
   if (keyboard) return null;
   return <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 12), backgroundColor: color.bg }}>
     <View style={[styles.island, { backgroundColor: color.surface, borderColor: color.border }]}>
-      <Pressable accessibilityRole="button" accessibilityLabel="Abrir selector de tema" accessibilityState={{ expanded }} onPress={() => setExpanded(true)} style={styles.handle}><View style={{ width: 30, height: 3, borderRadius: 2, backgroundColor: color.textFaint }} /></Pressable>
+      <View style={styles.header}>
+        <Pressable accessibilityRole="button" accessibilityLabel="Abrir selector de tema" accessibilityState={{ expanded }} onPress={() => setExpanded(true)} style={styles.handle}><View style={{ width: 30, height: 3, borderRadius: 2, backgroundColor: color.textFaint }} /></Pressable>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={mode === "dark" ? "Cambiar al tema claro" : "Cambiar al tema oscuro"}
+          accessibilityHint="Alterna entre los temas claro y oscuro"
+          onPress={() => setPreference(mode === "dark" ? "light" : "dark")}
+          style={({ pressed }) => [styles.themeToggle, { opacity: pressed ? 0.65 : 1 }]}
+        >
+          <Animated.View
+            style={{
+              opacity: themeIconMotion,
+              transform: [
+                {
+                  rotate: themeIconMotion.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ["-90deg", "0deg"],
+                  }),
+                },
+                {
+                  scale: themeIconMotion.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0.72, 1],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Ionicons name={mode === "dark" ? "moon" : "sunny"} size={19} color={color.text} />
+          </Animated.View>
+        </Pressable>
+      </View>
       <View style={styles.routes}>
         <AnimatedBackground layout={layouts[state.routes[state.index].key]} color={color.primaryBg} radius={14} />
         {state.routes.map((route, index) => {
@@ -59,5 +116,62 @@ export default function Dock({ state, descriptors, navigation }: BottomTabBarPro
     </Modal>
   </View>;
 }
-const styles = StyleSheet.create({ island: { borderWidth: 1, borderRadius: 26, paddingHorizontal: 6, paddingBottom: 6, shadowColor: "#000", shadowOpacity: 0.12, shadowRadius: 12, shadowOffset: { width: 0, height: 4 }, elevation: 5 }, handle: { height: 44, alignItems: "center", justifyContent: "center" }, routes: { flexDirection: "row", gap: 4 }, route: { flex: 1, minHeight: 54, alignItems: "center", justifyContent: "center", gap: 4, borderRadius: 14 }, badge: { position: "absolute", top: 0, right: 8, fontSize: 10, borderRadius: 10, paddingHorizontal: 4 }, overlay: { flex: 1, justifyContent: "flex-end", paddingHorizontal: 12, backgroundColor: "rgba(0,0,0,0.2)" }, panel: { padding: 16, borderWidth: 1, borderRadius: 24, gap: 12 }, close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" }, themeRow: { flexDirection: "row", gap: 8 }, themeChoice: { flex: 1, minHeight: 72, gap: 6, alignItems: "center", justifyContent: "center" } });
+const styles = StyleSheet.create({
+  island: {
+    borderWidth: 1,
+    borderRadius: 26,
+    paddingHorizontal: 6,
+    paddingBottom: 6,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  header: { height: 44, justifyContent: "center" },
+  handle: { height: 44, alignItems: "center", justifyContent: "center" },
+  themeToggle: {
+    position: "absolute",
+    right: 0,
+    top: 0,
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 1,
+  },
+  routes: { flexDirection: "row", gap: 4 },
+  route: {
+    flex: 1,
+    minHeight: 54,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    borderRadius: 14,
+  },
+  badge: {
+    position: "absolute",
+    top: 0,
+    right: 8,
+    fontSize: 10,
+    borderRadius: 10,
+    paddingHorizontal: 4,
+  },
+  overlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(0,0,0,0.2)",
+  },
+  panel: { padding: 16, borderWidth: 1, borderRadius: 24, gap: 12 },
+  close: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  themeRow: { flexDirection: "row", gap: 8 },
+  themeChoice: {
+    flex: 1,
+    minHeight: 72,
+    gap: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+});
 

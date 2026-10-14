@@ -10,5 +10,5 @@ export default function AnimatedList<T>({ items, getKey, renderItem, className =
     const timer = window.setTimeout(() => setEntries(next), window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180);
     return () => window.clearTimeout(timer);
   }, [items, getKey]);
-  return <ul className={`ui-animated-list ${className}`}>{entries.map((entry, index) => <li key={entry.key} aria-hidden={entry.leaving || undefined} className={entry.leaving ? "ui-list-leaving" : "ui-blur-fade"} style={{ "--ui-delay": `${Math.min(index * 35, 210)}ms` } as CSSProperties}>{renderItem(entry.item, index)}</li>)}</ul>;
+  return <ul className={`ui-animated-list ${className}`}>{entries.map((entry, index) => <li key={entry.key} aria-hidden={entry.leaving || undefined} {...(entry.leaving ? { inert: "" } : {})} className={entry.leaving ? "ui-list-leaving" : "ui-blur-fade"} style={{ "--ui-delay": `${Math.min(index * 35, 210)}ms` } as CSSProperties}>{renderItem(entry.item, index)}</li>)}</ul>;
 }

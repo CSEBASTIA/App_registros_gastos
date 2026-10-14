@@ -7,6 +7,7 @@ import {
   View,
   Text,
   ScrollView,
+  Pressable,
   StyleSheet,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -32,6 +33,11 @@ import SelectorChips from "../../components/SelectorChips";
 import EstadoVacio from "../../components/EstadoVacio";
 import { spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
+import {
+  gruposDelCatalogo,
+  productoDe,
+  type ProductoTarjeta,
+} from "../../lib/catalogoTarjetas";
 
 export default function TarjetasScreen() {
   const [error, setError] = useState<string | null>(null);
@@ -162,13 +168,39 @@ function NuevaTarjeta({
 }) {
   const { color } = useTheme();
   const styles = createStyles(color);
-  const [nombre, setNombre] = useState("");
+  const [nombre, setNombre] = useState("American Express® Clásica Crédito");
   const [banco, setBanco] = useState<Banco>("banco_guayaquil");
-  const [marca, setMarca] = useState<Marca>("visa");
+  const [marca, setMarca] = useState<Marca>("amex");
+  const [estilo, setEstilo] = useState<string | undefined>("amex-clasica-credito");
+  const [usarCatalogo, setUsarCatalogo] = useState(true);
   const [cupoTotal, setCupoTotal] = useState("");
   const [identificador, setIdentificador] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const grupos = gruposDelCatalogo(banco);
+  const tarjetaElegida = productoDe(estilo);
+
+  function seleccionarProducto(producto: ProductoTarjeta) {
+    setBanco(producto.banco);
+    setMarca(producto.marca);
+    setEstilo(producto.id);
+    setNombre(producto.nombre);
+    setUsarCatalogo(true);
+  }
+
+  function seleccionarBanco(valor: string) {
+    const bancoNuevo = valor as Banco;
+    setBanco(bancoNuevo);
+    const primerProducto = gruposDelCatalogo(bancoNuevo)[0]?.items[0];
+    if (primerProducto) {
+      seleccionarProducto(primerProducto);
+    } else {
+      setEstilo(undefined);
+      setNombre("");
+      setMarca("visa");
+      setUsarCatalogo(false);
+    }
+  }
 
   async function agregar() {
     if (!nombre.trim()) {
@@ -187,11 +219,14 @@ function NuevaTarjeta({
         tipo: "credito",
         banco,
         marca,
+        estilo,
         cupoTotal: Number(cupoTotal),
         disponible: Number(cupoTotal),
         identificador: identificador.trim() || undefined,
       });
       setNombre("");
+      setEstilo(undefined);
+      setUsarCatalogo(true);
       setCupoTotal("");
       setIdentificador("");
     } catch (err) {
@@ -207,45 +242,92 @@ function NuevaTarjeta({
         <Text style={styles.tituloCard}>Nueva tarjeta de crédito</Text>
         <Boton titulo="Cancelar" onPress={onCancelar} />
       </View>
-      <Campo
-        etiqueta="Nombre"
-        placeholder="Visa Clásica"
-        value={nombre}
-        onChangeText={setNombre}
-      />
-      <Campo
-        etiqueta="Cupo total"
-        keyboardType="decimal-pad"
-        value={cupoTotal}
-        onChangeText={setCupoTotal}
-      />
-      <Campo
-        etiqueta="Últimos dígitos (opcional)"
-        placeholder="1234"
-        keyboardType="number-pad"
-        maxLength={4}
-        value={identificador}
-        onChangeText={setIdentificador}
-      />
+      <Campo etiqueta="Nombre" placeholder="Visa Clásica" value={nombre} onChangeText={setNombre} />
+      <Campo etiqueta="Cupo total" keyboardType="decimal-pad" value={cupoTotal} onChangeText={setCupoTotal} />
+      <Campo etiqueta="Últimos dígitos (opcional)" placeholder="1234" keyboardType="number-pad" maxLength={4} value={identificador} onChangeText={setIdentificador} />
       <SelectorChips
         titulo="Banco"
         valor={banco}
-        onCambiar={(v) => setBanco(v as Banco)}
+        onCambiar={seleccionarBanco}
         opciones={OPCIONES_BANCO.map((b) => ({
           valor: b,
           etiqueta: ETIQUETA_BANCO[b],
           color: GRADIENTE_BANCO[b][0],
         }))}
       />
-      <SelectorChips
-        titulo="Marca"
-        valor={marca}
-        onCambiar={(v) => setMarca(v as Marca)}
-        opciones={OPCIONES_MARCA.map((m) => ({
-          valor: m,
-          etiqueta: ETIQUETA_MARCA[m] || "Otra",
-        }))}
-      />
+      {grupos.length > 0 && usarCatalogo ? (
+        <View style={{ gap: spacing(3) }}>
+          <Text style={styles.etiquetaCatalogo}>Tarjetas de {ETIQUETA_BANCO[banco]}</Text>
+          {grupos.map((grupo) => (
+            <View key={grupo.familia} style={{ gap: spacing(2) }}>
+              <Text style={styles.nombreFamilia}>{grupo.familia}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filaProductos}>
+                {grupo.items.map((producto) => {
+                  const cuentaProducto: Cuenta = {
+                    id: producto.id,
+                    nombre: producto.nombre,
+                    tipo: "credito",
+                    banco: producto.banco,
+                    marca: producto.marca,
+                    estilo: producto.id,
+                    disponible: 0,
+                    createdAt: "",
+                  };
+                  const seleccionada = producto.id === estilo;
+                  return (
+                    <Pressable
+                      key={producto.id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: seleccionada }}
+                      accessibilityLabel={`Seleccionar ${producto.nombre}`}
+                      onPress={() => seleccionarProducto(producto)}
+                      style={({ pressed }) => [styles.opcionProducto, seleccionada && { borderColor: color.primary }, pressed && { opacity: 0.8 }]}
+                    >
+                      <TarjetaVisual cuenta={cuentaProducto} compacta seleccionada={seleccionada} />
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          ))}
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setUsarCatalogo(false);
+              setEstilo(undefined);
+              setNombre("");
+            }}
+            style={styles.otraTarjeta}
+          >
+            <Text style={styles.otraTarjetaTexto}>Mi tarjeta no aparece</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <SelectorChips
+          titulo="Marca"
+          valor={marca}
+          onCambiar={(v) => setMarca(v as Marca)}
+          opciones={OPCIONES_MARCA.map((m) => ({ valor: m, etiqueta: ETIQUETA_MARCA[m] || "Otra" }))}
+        />
+      )}
+      {usarCatalogo && tarjetaElegida && (
+        <View style={{ gap: spacing(2) }}>
+          <Text style={styles.nombreFamilia}>Vista previa · {tarjetaElegida.nombre}</Text>
+          <TarjetaVisual
+            cuenta={{
+              id: "vista-previa",
+              nombre: nombre || tarjetaElegida.nombre,
+              tipo: "credito",
+              banco,
+              marca,
+              estilo,
+              cupoTotal: Number(cupoTotal) > 0 ? Number(cupoTotal) : 1,
+              disponible: Number(cupoTotal) > 0 ? Number(cupoTotal) : 1,
+              createdAt: "",
+            }}
+          />
+        </View>
+      )}
       {error && <ErrorTexto>{error}</ErrorTexto>}
       <Boton
         titulo={guardando ? "Guardando…" : "Agregar"}
@@ -281,4 +363,10 @@ const createStyles = (color: Colors) =>
       alignItems: "center",
     },
     tituloCard: { fontFamily: font.display, fontSize: 20, color: color.text },
+    etiquetaCatalogo: { fontFamily: font.semibold, fontSize: 14, color: color.text },
+    nombreFamilia: { fontFamily: font.medium, fontSize: 12, color: color.textMuted },
+    filaProductos: { gap: spacing(3), paddingVertical: spacing(1), paddingHorizontal: spacing(1) },
+    opcionProducto: { width: 184, borderWidth: 1, borderColor: color.border, borderRadius: 18 },
+    otraTarjeta: { alignSelf: "flex-start", minHeight: 40, justifyContent: "center", paddingHorizontal: spacing(3), borderWidth: 1, borderColor: color.border, borderRadius: 999 },
+    otraTarjetaTexto: { fontFamily: font.medium, fontSize: 12, color: color.textMuted },
   });

@@ -26,6 +26,7 @@ import {
   type Ingreso,
   type PagoTarjeta,
   type Categoria,
+  fechaLocal,
 } from "core";
 import Tarjeta from "../../components/Tarjeta";
 import TarjetaVisual from "../../components/TarjetaVisual";
@@ -39,7 +40,7 @@ import { spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
 
 function hoy() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocal(); // zona horaria del teléfono, no UTC
 }
 
 export default function DetalleTarjeta() {

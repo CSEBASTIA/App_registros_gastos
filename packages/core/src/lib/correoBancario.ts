@@ -40,10 +40,34 @@ export interface CorreoParseado {
   categoriaSugerida: string | undefined;
 }
 
-function bancoDeRemitente(remitente: string): Banco | undefined {
-  const direccion = remitente.toLowerCase();
-  for (const [banco, direcciones] of Object.entries(REMITENTES_BANCO) as [Banco, string[]][]) {
-    if (direcciones.some((d) => direccion.includes(d.toLowerCase()))) return banco;
+/** "Banco X <avisos@banco.com>" → "avisos@banco.com". Se usa la dirección real, nunca el nombre visible. */
+function direccionDe(remitente: string): string {
+  const entreAngulos = remitente.match(/<([^>]+)>/);
+  return (entreAngulos ? entreAngulos[1] : remitente).trim().toLowerCase();
+}
+
+/**
+ * Coincidencia estricta para que un remitente falso no pase por banco:
+ * con "@" se exige la dirección exacta; sin "@" se exige el dominio exacto
+ * o un subdominio suyo. Antes se usaba `includes`, que aceptaba por ejemplo
+ * "avisos@bancoguayaquil.com.estafa.net".
+ * (No reemplaza una verificación DKIM/SPF: un From falsificado con el
+ * dominio real seguiría pasando; por eso todo va a revisión humana.)
+ */
+function remitenteCoincide(direccion: string, patron: string): boolean {
+  const p = patron.trim().toLowerCase();
+  if (p.includes("@")) return direccion === p;
+  const dominio = direccion.split("@")[1] ?? "";
+  return dominio === p || dominio.endsWith(`.${p}`);
+}
+
+export function bancoDeRemitente(
+  remitente: string,
+  remitentes: Partial<Record<Banco, string[]>> = REMITENTES_BANCO
+): Banco | undefined {
+  const direccion = direccionDe(remitente);
+  for (const [banco, patrones] of Object.entries(remitentes) as [Banco, string[]][]) {
+    if (patrones.some((p) => remitenteCoincide(direccion, p))) return banco;
   }
   return undefined;
 }

@@ -14,6 +14,8 @@ export const GRADIENTE_BANCO: Record<Banco, [string, string]> = {
   pichincha: ["#7a5c00", "#d4a72c"],
   produbanco: ["#1e3a5f", "#3b6ff2"],
   diners_club: ["#0a2f5c", "#0074c2"],
+  banco_pacifico: ["#003b5c", "#008fa8"],
+  banco_austro: ["#12264c", "#bb8b2c"],
   otro: ["#52525b", "#27272a"],
 };
 
@@ -32,6 +34,8 @@ export const COLOR_CUENTA_BANCO: Record<Banco, string> = {
   pichincha: "#ffd400",
   produbanco: "#0a4f8c",
   diners_club: "#0057a8",
+  banco_pacifico: "#006b8f",
+  banco_austro: "#17345e",
   otro: "#52525b",
 };
 
@@ -41,6 +45,8 @@ export const TEXTO_CUENTA_BANCO: Record<Banco, string> = {
   pichincha: "#0a2540",
   produbanco: "#ffffff",
   diners_club: "#ffffff",
+  banco_pacifico: "#ffffff",
+  banco_austro: "#ffffff",
   otro: "#ffffff",
 };
 
@@ -49,6 +55,8 @@ export const ETIQUETA_BANCO: Record<Banco, string> = {
   pichincha: "Banco Pichincha",
   produbanco: "Produbanco",
   diners_club: "Diners Club",
+  banco_pacifico: "Banco del Pacífico",
+  banco_austro: "Banco del Austro",
   otro: "Otro banco",
 };
 
@@ -60,5 +68,5 @@ export const ETIQUETA_MARCA: Record<Marca, string> = {
   otro: "",
 };
 
-export const OPCIONES_BANCO: Banco[] = ["banco_guayaquil", "pichincha", "produbanco", "diners_club", "otro"];
+export const OPCIONES_BANCO: Banco[] = ["banco_guayaquil", "pichincha", "produbanco", "diners_club", "banco_pacifico", "banco_austro", "otro"];
 export const OPCIONES_MARCA: Marca[] = ["amex", "visa", "mastercard", "diners", "otro"];

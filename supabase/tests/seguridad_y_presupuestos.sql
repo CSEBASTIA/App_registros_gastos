@@ -96,7 +96,8 @@ end $$;
 do $$ declare n int; begin
   select count(*) into n from cuentas where usuario_id = 'b0000000-0000-4000-8000-000000000002';
   insert into resultados values ('S8 A no ve cuentas de B', n = 0, n || ' filas visibles');
-  select count(*) into n from deudas;
+  -- Solo las de B: A puede tener deudas propias (las crea abono_deuda.sql).
+  select count(*) into n from deudas where usuario_id = 'b0000000-0000-4000-8000-000000000002';
   insert into resultados values ('S8b A no ve deudas de B', n = 0, n || ' filas visibles');
 end $$;
 

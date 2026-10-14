@@ -1,4 +1,4 @@
-import { htmlATexto, crearFetchConTimeout } from "core";
+import { htmlATexto, crearFetchConTimeout, fechaLocal } from "core";
 import { obtenerAccessToken } from "./gmailAuth";
 import type { CorreoRecibido } from "./graphMail";
 
@@ -109,7 +109,7 @@ export async function traerCorreosNuevos(desde: Date, limite = 40): Promise<Corr
 
   return mensajes.map((m) => {
     const headers = m.payload.headers ?? [];
-    const fecha = new Date(Number(m.internalDate)).toISOString().slice(0, 10);
+    const fecha = fechaLocal(new Date(Number(m.internalDate)));
     return {
       mensajeId: m.id,
       remitente: extraerDireccion(cabecera(headers, "From")),

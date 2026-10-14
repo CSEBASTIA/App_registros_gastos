@@ -11,3 +11,23 @@ export const ingresoSchema = z.object({
 });
 
 export type IngresoInput = z.infer<typeof ingresoSchema>;
+
+/**
+ * Cambios al editar un ingreso: solo los campos enviados se actualizan.
+ * `null` en categoría, detalle o cuenta significa "quitarlo". El reajuste
+ * del saldo lo hace la base (trigger ajustar_ingreso_actualizado).
+ */
+export const cambiosIngresoSchema = z
+  .object({
+    monto: montoPositivo().optional(),
+    descripcion: textoRequerido(LIMITES.descripcion).optional(),
+    categoriaId: z.string().uuid().nullable().optional(),
+    categoriaDetalle: textoRequerido(LIMITES.detalle).nullable().optional(),
+    cuentaId: z.string().uuid().nullable().optional(),
+    fecha: fechaIso().optional(),
+  })
+  .refine((c) => Object.values(c).some((v) => v !== undefined), {
+    message: "No hay cambios para guardar",
+  });
+
+export type CambiosIngreso = z.infer<typeof cambiosIngresoSchema>;

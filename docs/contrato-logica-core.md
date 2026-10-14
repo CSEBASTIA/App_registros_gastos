@@ -30,3 +30,36 @@
 - `apps/desktop/src/lib/supabase.ts` y `apps/mobile/lib/supabase.ts`: cliente con `global.fetch = crearFetchConTimeout()`.
 - `apps/desktop/src/lib/estadoCuenta.ts`: descripción importada recortada a 200 caracteres.
 - `apps/mobile/lib/gmailApi.ts` y `graphMail.ts`: timeout de 20 s.
+- `apps/mobile/app/_layout.tsx` (dueño: Agente 3), 14-oct: el efecto de redirección ahora espera a sesión, tema y fuentes antes de llamar a `router.replace`. Antes navegaba mientras el layout devolvía `null` y expo-router lanzaba "Attempted to navigate before mounting the Root Layout component", que tumbaba la app al abrir. **Pendiente para el Agente 3:** con el login desactivado, la ruta raíz `/` sigue mostrando "Unmatched Route" en vez de redirigir a `/resumen` (en `/resumen` la app funciona).
+
+## Nuevo 14-oct
+- `registrarAbonoDeuda(id, monto, { cuentaId?, fecha? })`: misma firma de antes más opciones. Ahora es atómico (función `registrar_abono_deuda` en la base), descuenta de la cuenta de origen y libera cupo en diferidos. `listarAbonosDeuda(deudaId?)` da el historial. Requiere la migración `20261014120000`.
+- `mensajeError` traduce los fallos de red a "No se pudo conectar con el servidor. Revisa tu conexión a internet e inténtalo de nuevo."
+
+## Estabilización de la app móvil (14-oct, pedido del usuario)
+- Dependencias alineadas al SDK 51: `expo-linking ~6.3.1` y `expo-constants ~16.0.2` ahora son dependencias directas de `apps/mobile` (antes pnpm resolvía los peers `*` de expo-router a la versión 57 y la app se caía en Expo Go con "Cannot find native module 'ExpoLinking'"). `react-native 0.74.5` y `async-storage 1.23.1`, las que espera Expo 51. Queda una sola copia de expo-router y de react-navigation (dos copias causaban "Cannot read properties of undefined (reading 'isReady')"). Tras cambiar dependencias, arrancar Metro con `--clear`.
+- `apps/mobile/app/index.tsx` (nuevo): redirige `/` a `/resumen`; elimina el "Unmatched Route".
+- `apps/mobile/app/(auth)/_layout.tsx` (nuevo): el grupo (auth) existe como ruta; quita el aviso de expo-router.
+- `apps/mobile/app/_layout.tsx` (dueño: Agente 3): el login va activo también en desarrollo (sin sesión, RLS bloquea leer y guardar). Para revisar solo la interfaz sin sesión: `EXPO_PUBLIC_SIN_LOGIN=1` en `apps/mobile/.env`. Se registraron `index` y `presupuestos` (título "Presupuestos") en el Stack.
+
+## Plan recomendado: saldos, correo y activación (14-oct)
+
+Funciones nuevas en `core`:
+- `actualizarIngreso(id, cambios)`: edita un ingreso; `null` en categoría/detalle/cuenta lo quita. La base reajusta el saldo. Falta la pantalla de edición.
+- `confirmarTransaccionDetectada(id, { monto, descripcion, categoriaId?, cuentaId? })`: confirma un aviso de la bandeja en un solo paso; si ya estaba confirmado devuelve `{ yaConfirmado: true }` sin duplicar.
+- `eliminarTransaccionesDetectadas()`: borra todos los avisos del correo del usuario (no toca gastos confirmados).
+- `bancoDeRemitente(remitente)`: ahora exige dirección o dominio exactos.
+
+Reglas nuevas de la base que la interfaz debe respetar:
+- **Un pago de tarjeta no se puede borrar** (no mostrar "eliminar pago").
+- **Un gasto diferido no se edita en monto, cuenta, método ni plazo** (la base responde "Un gasto diferido no se puede editar…"). En la web, la edición en línea debería deshabilitar esos campos para diferidos.
+
+Cambios hechos en pantallas (dueño: Agente 3), todos con los componentes existentes:
+- `app/deudas.tsx`: el abono pide **"Pagar desde"** (cuentas que no son de crédito, con su saldo; preselecciona la cuenta de la deuda o la primera), muestra errores y el botón "Guardando…". Eliminar una deuda muestra el error si falla.
+- `app/(auth)/registro.tsx`: tras crear la cuenta va directo a `/resumen` (ya no a conectar correo). Si el proyecto pide confirmar el correo, muestra el aviso. `conectar-correo.tsx` queda sin uso desde el registro.
+- `app/(tabs)/resumen.tsx`: tarjeta **"Empezá con tu primer gasto"** solo cuando no hay gastos ni ingresos; "Salud financiera" ya no dice "tus ingresos cubren tus gastos" si no hay ingresos del mes.
+- `app/(tabs)/mas.tsx`: "Correo (beta)" con subtítulo de opcional.
+- `app/correo.tsx`: tarjeta "Qué lee y qué guarda"; desconectar revoca (Google), borra tokens y avisos, y muestra el resultado.
+- `app/bandeja.tsx`: confirmar usa `confirmarTransaccionDetectada`; descartar muestra errores.
+- Fechas locales (`fechaLocal`/`mesLocal`) en todas las pantallas del teléfono: ya no queda ningún `toISOString().slice(...)`.
+- `lib/catalogoTarjetas.ts` (en curso por otro agente): se comentaron entradas cuyo archivo de imagen no existía, porque rompían el paquete de la app (`Unable to resolve`). Al terminar de subir las imágenes, revisar que cada `require` apunte a un archivo existente.

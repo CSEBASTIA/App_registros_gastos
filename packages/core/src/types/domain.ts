@@ -36,7 +36,7 @@ export interface Presupuesto {
 }
 
 export type TipoCuenta = "debito" | "credito" | "efectivo" | "ahorro";
-export type Banco = "banco_guayaquil" | "pichincha" | "produbanco" | "diners_club" | "otro";
+export type Banco = "banco_guayaquil" | "pichincha" | "produbanco" | "diners_club" | "banco_pacifico" | "banco_austro" | "otro";
 export type Marca = "amex" | "visa" | "mastercard" | "diners" | "otro";
 
 export interface Cuenta {
@@ -131,5 +131,15 @@ export interface Recordatorio {
   frecuencia?: Frecuencia;
   completado: boolean;
   deudaId?: string;
+  createdAt: string;
+}
+
+/** Un abono ya registrado a una deuda (historial; solo se crea vía registrarAbonoDeuda). */
+export interface AbonoDeuda {
+  id: string;
+  deudaId: string;
+  cuentaId?: string;
+  monto: number;
+  fecha: string;
   createdAt: string;
 }

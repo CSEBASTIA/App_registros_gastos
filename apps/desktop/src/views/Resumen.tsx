@@ -8,11 +8,9 @@ import type {
   Recomendacion,
 } from "core";
 import BarraProgreso from "../components/BarraProgreso";
-import GradienteAnimado from "../components/GradienteAnimado";
 import EstadoVacio from "../components/EstadoVacio";
 import {
   IconoAlerta,
-  IconoCampana,
   IconoCheck,
   IconoFlechaAbajo,
   IconoFlechaArriba,
@@ -28,7 +26,6 @@ interface Props {
   gastos: Gasto[];
   ingresos: Ingreso[];
   categorias: Categoria[];
-  correoUsuario: string;
 }
 
 const DIAS_SEMANA = ["D", "L", "M", "M", "J", "V", "S"];
@@ -40,10 +37,7 @@ export default function Resumen({
   gastos,
   ingresos,
   categorias,
-  correoUsuario,
 }: Props) {
-  const esPositivo = balance.balance >= 0;
-  const nombre = nombreDesdeCorreo(correoUsuario);
   const semana = construirSemana(gastos);
   const actividad = construirActividad(gastos, ingresos, categorias).slice(
     0,
@@ -52,35 +46,17 @@ export default function Resumen({
 
   return (
     <>
-      <BlurFade className="saludo">
-        <div className="saludo-usuario">
-          <div className="saludo-avatar">
-            {nombre.slice(0, 1).toUpperCase()}
-          </div>
-          <div>
-            <span className="saludo-hola">Hola de nuevo,</span>
-            <strong className="saludo-nombre">{nombre}</strong>
-          </div>
-        </div>
-        <span className="saludo-campana" aria-hidden="true">
-          <IconoCampana />
-        </span>
+      <BlurFade className="resumen-intro">
+        <p>Ingresos y gastos de este mes, en un solo lugar.</p>
       </BlurFade>
 
       <div className="saldo-hero">
-        {/* el balance del mes es la cifra protagonista de la app: en vez de
-            un degradado fijo, el fondo se mueve muy lento (30 s por vuelta)
-            para que el panel se sienta vivo sin competir con el número */}
-        <GradienteAnimado
-          colores={["#3552d1", "#2941ac", "#5f7ae8"]}
-          velocidad={30}
-          desenfoque="fuerte"
-        />
-        <div className="saldo-hero-header">
-          <span>Balance del mes</span>
-        </div>
-        <div className="saldo-hero-valor">
-          {esPositivo ? "+" : "-"}${Math.abs(balance.balance).toFixed(2)}
+        <div className="saldo-hero-principal">
+          <div className="saldo-hero-header">Balance del mes</div>
+          <div className="saldo-hero-valor">
+            {balance.balance > 0 ? "+" : balance.balance < 0 ? "−" : ""}$
+            {Math.abs(balance.balance).toFixed(2)}
+          </div>
         </div>
         <div className="saldo-hero-stats">
           <div className="saldo-hero-stat">
@@ -310,11 +286,6 @@ function VeredictoFinanciero({
   );
 }
 
-function nombreDesdeCorreo(correo: string) {
-  const local = correo.split("@")[0] || "Usuario";
-  return local.charAt(0).toUpperCase() + local.slice(1);
-}
-
 function construirSemana(gastos: Gasto[]) {
   const hoy = new Date();
   const dias: {
@@ -379,7 +350,7 @@ function construirActividad(
         createdAt: g.createdAt,
         // hex literal (no var()): más abajo se concatena un sufijo de alpha
         // ("...1f") para el fondo del ícono, y eso no funciona con var().
-        color: categoria?.color ?? "#8a8ea3",
+        color: categoria?.color ?? "#85898f",
       };
     }),
     ...ingresos.map((i) => ({

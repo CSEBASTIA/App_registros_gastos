@@ -13,6 +13,7 @@ import {
 import { logoDeBanco } from "../lib/logosBanco";
 import BarraProgreso from "./BarraProgreso";
 import { useTheme, font, radius, spacing } from "../lib/theme";
+import { imagenDe, productoDe } from "../lib/catalogoTarjetas";
 
 const ICONO_TIPO: Record<Cuenta["tipo"], keyof typeof Ionicons.glyphMap> = {
   credito: "card-outline",
@@ -28,11 +29,7 @@ const ETIQUETA_TIPO: Record<Cuenta["tipo"], string> = {
   efectivo: "Efectivo",
 };
 
-/**
- * Versión mobile de `TarjetaVisual.tsx`/`CuentaVisual` de desktop: no hay
- * catálogo de fotos reales (a pedido, ver plan) — todas las cuentas usan
- * degradado/color de banco + logo si existe.
- */
+/** Tarjeta móvil con arte local del catálogo y respaldo de marca cuando aún no existe una imagen frontal. */
 export default function TarjetaVisual({
   cuenta,
   compacta,
@@ -47,9 +44,37 @@ export default function TarjetaVisual({
   const { color } = useTheme();
   const logo = logoDeBanco(cuenta.banco);
   const esCredito = cuenta.tipo === "credito";
+  const imagen = imagenDe(cuenta.estilo);
+  const producto = productoDe(cuenta.estilo);
   const usoPorcentaje = cuenta.cupoTotal ? ((cuenta.cupoTotal - cuenta.disponible) / cuenta.cupoTotal) * 100 : undefined;
 
-  const contenido = esCredito ? (
+  const contenido = esCredito && imagen ? (
+    <View style={[styles.imagenBase, compacta && styles.imagenBaseCompacta, { backgroundColor: color.surface, borderColor: color.border }]}>
+      <View style={[styles.imagenMarco, compacta && styles.imagenMarcoCompacta]}>
+        <Image source={imagen} style={[styles.imagenArte, compacta && styles.imagenArteCompacta]} resizeMode={producto?.ajusteImagen ?? "contain"} accessibilityLabel={producto?.nombre ?? cuenta.nombre} />
+        <Text numberOfLines={1} style={styles.marcaAgua}>{ETIQUETA_BANCO[cuenta.banco]}</Text>
+      </View>
+      <View style={styles.imagenInfo}>
+        <Text style={[styles.nombreImagen, { color: color.text }]} numberOfLines={1}>{cuenta.nombre}</Text>
+        {!compacta && (
+          <>
+            <Text style={[styles.tipoImagen, { color: color.textMuted }]} numberOfLines={1}>{producto?.nombre ?? ETIQUETA_TIPO[cuenta.tipo]}</Text>
+            {cuenta.cupoTotal ? (
+              <View style={{ gap: spacing(1.5) }}>
+                <View style={styles.cupoLinea}>
+                  <Text style={[styles.cupoTextoImagen, { color: color.textMuted }]}>Disponible</Text>
+                  <Text style={[styles.cupoTextoImagen, { color: color.textMuted }]}>{formatMonto(cuenta.disponible)} / {formatMonto(cuenta.cupoTotal)}</Text>
+                </View>
+                <BarraProgreso porcentaje={usoPorcentaje ?? 0} />
+              </View>
+            ) : (
+              <Text style={[styles.tipoImagen, { color: color.textMuted }]}>{formatMonto(cuenta.disponible)}</Text>
+            )}
+          </>
+        )}
+      </View>
+    </View>
+  ) : esCredito ? (
     <LinearGradient
       colors={GRADIENTE_BANCO[cuenta.banco]}
       start={{ x: 0, y: 0 }}
@@ -140,6 +165,17 @@ const styles = StyleSheet.create({
     gap: spacing(2),
   },
   baseCompacta: { minHeight: 100, width: 190, padding: spacing(3.5) },
+  imagenBase: { borderRadius: radius.lg, borderWidth: 1, overflow: "hidden", minHeight: 0 },
+  imagenBaseCompacta: { width: 182, borderRadius: radius.md },
+  imagenMarco: { height: 158, justifyContent: "center", alignItems: "center", position: "relative" },
+  imagenMarcoCompacta: { height: 98 },
+  imagenArte: { height: 158, width: "100%" },
+  imagenArteCompacta: { height: 94 },
+  marcaAgua: { position: "absolute", top: spacing(2), right: spacing(3), maxWidth: "55%", fontFamily: font.semibold, fontSize: 10, letterSpacing: 0.7, color: "#181818", opacity: 0.22, textTransform: "uppercase" },
+  imagenInfo: { paddingHorizontal: spacing(4), paddingTop: spacing(2), paddingBottom: spacing(4), gap: spacing(1) },
+  nombreImagen: { fontFamily: font.semibold, fontSize: 15 },
+  tipoImagen: { fontFamily: font.body, fontSize: 12 },
+  cupoTextoImagen: { fontFamily: font.mono, fontSize: 11 },
   cuentaBase: { minHeight: 110, justifyContent: "flex-start", gap: spacing(3) },
   seleccionada: { borderWidth: 2.5, borderRadius: radius.lg + 3 },
   encabezado: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },

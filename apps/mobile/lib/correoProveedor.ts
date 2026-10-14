@@ -68,10 +68,15 @@ export async function conectarProveedor(proveedor: ProveedorCorreo): Promise<voi
   await guardarSeguro(CLAVE_PROVEEDOR_ACTIVO, proveedor);
 }
 
-export async function desconectarProveedorActivo(): Promise<void> {
+/** Desconecta el proveedor activo. `revocado` indica si el permiso se quitó también en el servidor del proveedor. */
+export async function desconectarProveedorActivo(): Promise<{
+  proveedor: ProveedorCorreo | null;
+  revocado: boolean;
+}> {
   const actual = await proveedorConectado();
-  if (actual) await moduloDe(actual).desconectarCorreo();
+  const { revocado } = actual ? await moduloDe(actual).desconectarCorreo() : { revocado: false };
   await borrarSeguro(CLAVE_PROVEEDOR_ACTIVO);
+  return { proveedor: actual, revocado };
 }
 
 /** Trae correos nuevos del proveedor conectado, sea cual sea. */

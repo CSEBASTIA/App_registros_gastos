@@ -5,7 +5,7 @@ export const cuentaSchema = z
   .object({
     nombre: textoRequerido(LIMITES.nombre),
     tipo: z.enum(["debito", "credito", "efectivo", "ahorro"]),
-    banco: z.enum(["banco_guayaquil", "pichincha", "produbanco", "diners_club", "otro"]).default("otro"),
+    banco: z.enum(["banco_guayaquil", "pichincha", "produbanco", "diners_club", "banco_pacifico", "banco_austro", "otro"]).default("otro"),
     marca: z.enum(["amex", "visa", "mastercard", "diners", "otro"]).optional(),
     estilo: z
       .string()

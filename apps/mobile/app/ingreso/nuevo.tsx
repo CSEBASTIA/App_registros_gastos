@@ -14,6 +14,7 @@ import {
   listarCuentas,
   crearIngreso,
   mensajeError,
+  fechaLocal,
   type Categoria,
   type Cuenta,
 } from "core";
@@ -24,9 +25,8 @@ import SelectorChips from "../../components/SelectorChips";
 import { spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
 
-function hoy() {
-  return new Date().toISOString().slice(0, 10);
-}
+// Fecha en la zona horaria del teléfono (toISOString es UTC).
+const hoy = () => fechaLocal();
 
 export default function NuevoIngreso() {
   const [cargando, setCargando] = useState(true);

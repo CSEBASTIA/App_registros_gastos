@@ -37,12 +37,14 @@ export {
 } from "./repositories/gastos.repo";
 export { listarPresupuestos, eliminarPresupuesto } from "./repositories/presupuestos.repo";
 export { listarCuentas, eliminarCuenta } from "./repositories/cuentas.repo";
-export { listarIngresos, eliminarIngreso } from "./repositories/ingresos.repo";
+export { listarIngresos, actualizarIngreso, eliminarIngreso } from "./repositories/ingresos.repo";
 export { listarPagosTarjeta } from "./repositories/pagosTarjeta.repo";
 export {
   listarDeudas,
   eliminarDeuda,
   registrarAbonoDeuda,
+  listarAbonosDeuda,
+  type OpcionesAbono,
 } from "./repositories/deudas.repo";
 export {
   listarRecordatorios,
@@ -53,7 +55,10 @@ export {
   listarTransaccionesPendientes,
   insertarTransaccionesDetectadas,
   marcarTransaccionDetectada,
+  confirmarTransaccionDetectada,
+  eliminarTransaccionesDetectadas,
   type TransaccionDetectadaInsert,
+  type DatosConfirmacion,
 } from "./repositories/transaccionesDetectadas.repo";
 
 export * from "./usecases/crearCategoria";

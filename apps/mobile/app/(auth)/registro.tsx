@@ -25,18 +25,29 @@ export default function Registro() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [aviso, setAviso] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
 
   async function crearCuenta() {
     setError(null);
+    setAviso(null);
     setCargando(true);
-    const { error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({ email, password });
     setCargando(false);
     if (error) {
       setError(mensajeError(error));
       return;
     }
-    router.replace("/conectar-correo");
+    // Activación: tras crear la cuenta se va directo a la app (el Resumen
+    // invita a registrar el primer gasto). Conectar el correo ya no es un
+    // paso del registro: es opcional y vive en Más → Correo.
+    if (data.session) {
+      router.replace("/resumen");
+      return;
+    }
+    // Con confirmación de correo activada (proyecto en la nube), signUp no
+    // deja sesión hasta que la persona confirma.
+    setAviso("Te enviamos un correo para confirmar tu cuenta. Después iniciá sesión aquí abajo.");
   }
 
   return (
@@ -83,6 +94,11 @@ export default function Registro() {
               onChangeText={setPassword}
             />
             {error && <ErrorTexto>{error}</ErrorTexto>}
+            {aviso && (
+              <Text accessibilityLiveRegion="polite" style={styles.subtitulo}>
+                {aviso}
+              </Text>
+            )}
             <Boton
               titulo={cargando ? "Creando…" : "Crear cuenta"}
               variante="primario"

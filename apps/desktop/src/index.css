@@ -1,26 +1,26 @@
 :root {
-  --color-bg: #f1f2f7;
+  --color-bg: #ffffff;
   --color-surface: #ffffff;
-  --color-surface-2: #e9ebf3;
-  --color-border: #d8dae3;
-  --color-text: #14151d;
-  --color-brand-base: #14151d;
-  --color-text-muted: #52566b;
-  --color-text-faint: #8a8ea3;
-  --color-primary: #3552d1;
-  --color-primary-hover: #2941ac;
-  --color-primary-bg: #e7ebfb;
+  --color-surface-2: #f5f5f5;
+  --color-border: #dedede;
+  --color-text: #111111;
+  --color-brand-base: #111111;
+  --color-text-muted: #62666c;
+  --color-text-faint: #85898f;
+  --color-primary: #111111;
+  --color-primary-hover: #303030;
+  --color-primary-bg: #f1f1f1;
   --color-danger: #c23b34;
   --color-danger-bg: #fbeae9;
   --color-success: #157a4b;
   --color-success-bg: #e5f4ec;
   --color-warning: #a5690a;
   --color-warning-bg: #f8ecda;
-  --radius: 14px;
-  --shadow: 0 1px 2px rgba(20, 21, 29, 0.05), 0 10px 30px -12px rgba(20, 21, 29, 0.14);
-  --shadow-lg: 0 4px 10px rgba(20, 21, 29, 0.08), 0 24px 48px -16px rgba(20, 21, 29, 0.22);
+  --radius: 16px;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.035);
+  --shadow-lg: 0 10px 32px -20px rgba(0, 0, 0, 0.22);
 
-  --font-display: "Fraunces", ui-serif, Georgia, serif;
+  --font-display: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -198,7 +198,7 @@ select {
 }
 
 .contenedor {
-  max-width: 1080px;
+  max-width: 1280px;
   width: 100%;
   margin: 0 auto;
   padding: 28px 32px 64px;
@@ -211,7 +211,7 @@ select {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: none;
   padding: 20px;
   transition: box-shadow 0.15s ease;
 }
@@ -521,156 +521,102 @@ select.input:focus {
   color: var(--color-danger);
 }
 
-/* ---- inicio: saludo, saldo hero, semana, actividad ---- */
+/* ---- resumen: cabecera breve y balance editorial de Zallox ---- */
 
-.saludo {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-}
-
-.saludo-usuario {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.saludo-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 50%;
-  background: var(--color-primary);
-  color: var(--color-on-primary);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 1.05rem;
-  flex-shrink: 0;
-}
-
-.saludo-hola {
-  display: block;
+.resumen-intro {
+  margin: 0 0 16px;
   color: var(--color-text-muted);
-  font-size: 0.85rem;
+  font-size: 0.95rem;
 }
 
-.saludo-nombre {
-  display: block;
-  font-size: 1.05rem;
-}
-
-.saludo-campana {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
+.resumen-intro p { margin: 0; }
 
 .saldo-hero {
-  background: radial-gradient(130% 160% at 100% 0%, color-mix(in srgb, var(--color-primary) 60%, transparent), transparent 60%),
-    var(--color-brand-base);
-  color: #fff;
-  border-radius: 18px;
-  padding: 30px 32px 30px 36px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 0.9fr);
+  align-items: center;
+  gap: 24px;
+  padding: 26px 30px;
   margin-bottom: 24px;
-  box-shadow: var(--shadow-lg);
-  position: relative;
-  overflow: hidden;
-}
-
-/* "lomo" de acento sólido a la izquierda: la misma idea que el lomo de un
-   libro/cuaderno — una firma gráfica que se repite en el resto del Resumen
-   (ver .resumen-grid .card más abajo), no un detalle suelto. Va como
-   pseudo-elemento y ya no como inset box-shadow: el gradiente animado se
-   pinta sobre el fondo de la caja y taparía una sombra interior. */
-.saldo-hero::before {
-  content: "";
-  position: absolute;
-  inset: 0 auto 0 0;
-  width: 6px;
-  background: var(--color-primary);
-  z-index: 2;
-}
-
-/* el contenido va sobre el gradiente animado, que se queda en z-index 0 */
-.saldo-hero > *:not(.gradiente-animado) {
-  position: relative;
-  z-index: 1;
-}
-
-/* se atenúa la capa para que el blanco del saldo mantenga contraste contra
-   el fondo oscuro pase por donde pase un blob */
-.saldo-hero .gradiente-animado-capa {
-  opacity: 0.55;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
 }
 
 .saldo-hero-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+  margin-bottom: 10px;
+  color: var(--color-text-muted);
   font-size: 0.85rem;
-  opacity: 0.85;
 }
 
 .saldo-hero-valor {
-  font-family: var(--font-display);
-  font-size: clamp(2.8rem, 5vw, 4.6rem);
+  font-family: var(--font-body);
+  font-size: clamp(2.25rem, 4vw, 3.25rem);
   font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1;
-  margin: 10px 0 26px;
+  letter-spacing: -0.055em;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
 }
 
 .saldo-hero-stats {
-  display: flex;
-  gap: 32px;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-left: 1px solid var(--color-border);
 }
 
 .saldo-hero-stat {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 11px;
+  min-width: 0;
+  padding: 8px 16px;
 }
 
+.saldo-hero-stat + .saldo-hero-stat { border-left: 1px solid var(--color-border); }
+
 .saldo-hero-stat-icono {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--color-surface-2);
 }
 
 .saldo-hero-stat-icono-positiva,
-.saldo-hero-stat-icono-positivo {
-  color: #6ee7a8;
-}
+.saldo-hero-stat-icono-positivo { color: var(--color-success); }
 
 .saldo-hero-stat-icono-negativa,
-.saldo-hero-stat-icono-negativo {
-  color: #ffb4b0;
-}
+.saldo-hero-stat-icono-negativo { color: var(--color-danger); }
 
 .saldo-hero-stat-etiqueta {
   display: block;
-  font-size: 0.78rem;
-  opacity: 0.8;
+  color: var(--color-text-muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
 }
 
 .saldo-hero-stat-valor {
   display: block;
-  font-size: 1.05rem;
+  margin-top: 3px;
+  font-size: 1rem;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 700px) {
+  .saldo-hero { grid-template-columns: minmax(0, 1fr); gap: 18px; padding: 22px; }
+  .saldo-hero-stats { border-left: 0; border-top: 1px solid var(--color-border); padding-top: 12px; }
+  .saldo-hero-stat:first-child { padding-left: 0; }
+}
+
+@media (max-width: 400px) {
+  .saldo-hero-stats { grid-template-columns: 1fr; }
+  .saldo-hero-stat + .saldo-hero-stat { border-left: 0; border-top: 1px solid var(--color-border); padding-left: 0; }
 }
 
 .resumen-grid {
@@ -722,19 +668,6 @@ select.input:focus {
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-size: 0.68rem;
-}
-
-.saludo-nombre {
-  font-family: var(--font-display);
-  font-size: 1.2rem;
-  font-weight: 600;
-}
-
-.saludo-avatar {
-  width: 48px;
-  height: 48px;
-  font-family: var(--font-display);
-  font-size: 1.2rem;
 }
 
 .grafico-semanal {
@@ -1901,6 +1834,10 @@ td.tabla-monto {
   gap: 4px;
   border-bottom: 1px solid var(--color-border);
   margin-bottom: 20px;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
 }
 
 /* ---- toggle de período (semana/mes) ---- */
@@ -1937,6 +1874,7 @@ td.tabla-monto {
 }
 
 .semanas-tab {
+  flex: 0 0 auto;
   border: none;
   background: transparent;
   padding: 10px 16px;
@@ -2151,8 +2089,8 @@ td.tabla-monto {
 /* ---- cifras de libro contable: todo importe en tabular-nums para que las
    columnas de montos queden alineadas dígito a dígito, y los importes de
    listas/tablas en mono. El número grande del hero y los .valor de las
-   tarjetas de estadística se quedan en la display (Fraunces): son la cifra
-   protagonista, no una columna que haya que comparar. ---- */
+   tarjetas de estadística usan la misma familia sans serif de la interfaz,
+   con cifras tabulares para facilitar la comparación. ---- */
 .valor,
 .saldo-hero-valor,
 .saldo-hero-stat-valor,
@@ -2324,17 +2262,17 @@ td.tabla-monto {
 :root[data-theme="light"] { color-scheme: light; }
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-bg: #11131d;
-  --color-surface: #1c1f2d;
-  --color-surface-2: #272b3d;
-  --color-border: #393e54;
-  --color-text: #f2f3fa;
-  --color-text-muted: #b4bad0;
-  --color-text-faint: #949cb8;
-  --color-primary: #9aafff;
-  --color-primary-hover: #b7c5ff;
-  --color-primary-bg: #2b365d;
-  --color-on-primary: #11131d;
+  --color-bg: #171717;
+  --color-surface: #202020;
+  --color-surface-2: #2a2a2a;
+  --color-border: #3b3b3b;
+  --color-text: #f5f5f5;
+  --color-text-muted: #c1c1c1;
+  --color-text-faint: #989898;
+  --color-primary: #f2f2f2;
+  --color-primary-hover: #ffffff;
+  --color-primary-bg: #353535;
+  --color-on-primary: #111111;
   --color-danger: #ffaaa4;
   --color-danger-bg: #452827;
   --color-success: #7fd6a6;
@@ -2348,6 +2286,40 @@ td.tabla-monto {
 .ui-selection { position: relative; isolation: isolate; }
 .ui-selection-background { position: absolute; left: 0; top: 0; z-index: -1; border-radius: 12px; background: var(--color-primary-bg); pointer-events: none; transition: transform 180ms var(--ease-out), width 180ms var(--ease-out), height 180ms var(--ease-out); }
 .ui-with-dock { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
+.ui-with-dock .sidebar,
+.ui-wide-theme { display: none; }
+.ui-dock-island { display: block; }
+.topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  min-height: 72px;
+  padding: 12px 32px;
+  background: var(--color-surface);
+}
+.topbar-contexto { color: var(--color-text-muted); font-size: 13px; }
+.topbar-brand { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 17px; font-weight: 650; letter-spacing: -0.04em; }
+.topbar-acciones { justify-self: end; }
+.contenido-heading { margin: 2px 0 24px; }
+.contenido-heading h1 { margin: 0; font: 600 clamp(1.55rem, 2.5vw, 2rem)/1.2 var(--font-body); letter-spacing: -0.035em; }
+.card { border-radius: 16px; box-shadow: none; }
+.btn { border-radius: 10px; }
+.btn-primary { background: var(--color-primary); color: var(--color-on-primary); }
+.btn-primary:hover { background: var(--color-primary-hover); }
+.nav-item-activo,
+.nav-item-activo:hover { color: var(--color-text); }
+.ui-dock-island { box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12); }
+.ui-dock-item[aria-current="page"] { background: var(--color-primary-bg); color: var(--color-text); }
+.ui-dock-item[aria-current="page"] .ui-dock-icon { transform: translateY(-1px); }
+@media (min-width: 881px) {
+  .ui-with-dock { padding-bottom: calc(124px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 600px) {
+  .topbar { grid-template-columns: 1fr auto; padding: 12px 18px; }
+  .topbar-contexto { display: none; }
+  .topbar-brand { justify-content: start; }
+  .topbar-acciones { grid-column: 2; grid-row: 1; }
+  .contenido-heading { margin-bottom: 18px; }
+}
 .ui-dock-island { position: fixed; z-index: 40; bottom: max(16px, env(safe-area-inset-bottom, 0px)); left: 50%; transform: translateX(-50%); width: min(460px, calc(100% - 24px)); border: 1px solid var(--color-border); border-radius: 26px; background: var(--color-surface); box-shadow: var(--shadow-lg); padding: 0 8px 8px; }
 .ui-dock-handle { width: 100%; height: 24px; display: flex; align-items: center; justify-content: center; border: 0; background: transparent; cursor: pointer; border-radius: 24px 24px 0 0; }
 .ui-dock-handle span { width: 30px; height: 3px; border-radius: 999px; background: var(--color-text-faint); }
@@ -2376,6 +2348,25 @@ td.tabla-monto {
 ::view-transition-new(root) { z-index: 1; }
 @media (hover: hover) and (pointer: fine) { .ui-dock-item:hover .ui-dock-icon { transform: translateY(-2px) scale(1.08); } .ui-dock-more button:hover { border-color: var(--color-primary); } }
 @media (max-width: 380px) { .ui-dock-more { grid-template-columns: 1fr; } .ui-dock-item { font-size: 10px; } }
+@media (max-width: 380px) {
+  .topbar { padding: 12px 16px; gap: 8px; }
+  .topbar-acciones { min-width: 0; }
+  .topbar-acciones input[type="month"] { width: 170px; max-width: 100%; min-width: 0; }
+}
+@media (max-width: 600px) {
+  .form-gasto-header { flex-wrap: wrap; align-items: flex-start; gap: 12px; }
+  .form-gasto-header > h3 { flex: 1 1 100%; }
+  .form-gasto-header > div { width: 100%; }
+  .form-gasto-header > div > .btn { flex: 1 1 120px; min-width: 0; justify-content: center; text-align: center; }
+}
+@media (max-width: 480px) {
+  .cuenta-visual { padding: 16px; }
+  .cuenta-visual-cuerpo { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 10px; }
+  .cuenta-visual-icono { width: 40px; height: 40px; }
+  .cuenta-visual-saldo { grid-column: 1 / -1; margin-left: 0; text-align: left; }
+  .cuenta-visual-saldo-linea { justify-content: flex-start; }
+  .cuenta-visual-ojo { width: 40px; height: 40px; }
+}
 @media (prefers-reduced-motion: reduce) {
   .ui-selection-background, .ui-dock-icon { transition: none; }
   .ui-blur-fade, .ui-list-leaving { animation: none; filter: none; transform: none; opacity: 1; }

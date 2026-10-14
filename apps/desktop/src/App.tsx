@@ -45,6 +45,7 @@ import { useInterfazMotion } from "./lib/interfazMotion";
 import TituloAnimado from "./components/TituloAnimado";
 import PanelCargando from "./components/PanelCargando";
 import Dock from "./components/Dock";
+import ThemeToggler from "./components/ThemeToggler";
 import AnimatedBackground from "./components/AnimatedBackground";
 import BlurFade from "./components/BlurFade";
 import RippleButton from "./components/RippleButton";
@@ -68,15 +69,8 @@ import {
   IconoCategorias,
 } from "./components/iconos";
 
-// LOGIN DESACTIVADO DE MOMENTO: no hay pantalla de login, la app entra
-// directo al dashboard. Las tablas exigen un usuario autenticado (RLS +
-// usuario_id = auth.uid()), así que para ver/guardar datos hace falta una
-// sesión real: si no hay una guardada, se inicia sola con VITE_DEV_EMAIL y
-// VITE_DEV_PASSWORD del .env. Sin sesión el dashboard se ve, pero vacío.
-//
-// Solo en `vite dev`: toda variable VITE_* se incrusta como texto en el
-// JavaScript que se publica. Con el guard de DEV, en `vite build` la
-// condición es `false` y el minificador elimina las credenciales del bundle.
+// El login se omite en desarrollo para revisar la interfaz directamente.
+// En producción se conserva el flujo de sesión existente.
 const DEV_EMAIL = import.meta.env.DEV ? import.meta.env.VITE_DEV_EMAIL : undefined;
 const DEV_PASSWORD = import.meta.env.DEV ? import.meta.env.VITE_DEV_PASSWORD : undefined;
 
@@ -96,6 +90,13 @@ export default function App() {
       const { data } = await supabase.auth.getSession();
       if (data.session) {
         if (activo) setSession(data.session);
+        return;
+      }
+      if (import.meta.env.DEV) {
+        if (activo) {
+          setAvisoSesion(null);
+          setSession(null);
+        }
         return;
       }
       if (!DEV_EMAIL || !DEV_PASSWORD) {
@@ -222,8 +223,12 @@ function Dashboard({
   }
 
   useEffect(() => {
+    if (!session) {
+      setCargando(false);
+      return;
+    }
     recargar();
-  }, []);
+  }, [session]);
 
   const gastosDelMes = useMemo(
     () => gastos.filter((g) => g.fecha.startsWith(mes)),
@@ -406,6 +411,9 @@ function Dashboard({
             })}
           </AnimatedBackground>
         </nav>
+        <div className="ui-wide-theme">
+          <ThemeToggler />
+        </div>
         <RippleButton
           className="btn nav-salir"
           style={{
@@ -423,9 +431,11 @@ function Dashboard({
 
       <main className="main">
         <header className="topbar">
-          <TituloAnimado
-            texto={TABS.find((t) => t.id === tab)?.etiqueta ?? ""}
-          />
+          <span className="topbar-contexto">Finanzas personales</span>
+          <div className="topbar-brand" aria-label="Gastos App">
+            <Logo size={26} />
+            <span>Gastos App</span>
+          </div>
           {(tab === "resumen" || tab === "gastos" || tab === "ingresos") && (
             <div className="topbar-acciones">
               <input
@@ -440,6 +450,11 @@ function Dashboard({
         </header>
 
         <div className="contenedor" id="contenido-principal">
+          <div className="contenido-heading">
+            <TituloAnimado
+              texto={TABS.find((t) => t.id === tab)?.etiqueta ?? ""}
+            />
+          </div>
           {avisoSesion && (
             <p role="alert" className="error" style={{ marginBottom: 16 }}>
               {avisoSesion}
@@ -463,7 +478,6 @@ function Dashboard({
                   gastos={gastos}
                   ingresos={ingresos}
                   categorias={categorias}
-                  correoUsuario={session?.user.email ?? ""}
                 />
               )}
               {tab === "ingresos" && (

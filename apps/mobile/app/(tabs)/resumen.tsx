@@ -1,6 +1,6 @@
 import { BlurFade } from "../../components/Motion";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { mensajeError } from "core";
+import { mensajeError, mesLocal, fechaLocal } from "core";
 import ErrorTexto from "../../components/ErrorTexto";
 import { useCallback, useState } from "react";
 import {
@@ -12,7 +12,7 @@ import {
   ScrollView,
   StyleSheet,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
   listarGastos,
@@ -33,14 +33,15 @@ import {
 } from "core";
 import { supabase } from "../../lib/supabase";
 import Tarjeta from "../../components/Tarjeta";
+import Boton from "../../components/Boton";
 import BarraProgreso from "../../components/BarraProgreso";
 import EstadoVacio from "../../components/EstadoVacio";
 import ItemMovimiento from "../../components/ItemMovimiento";
 import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
 
-function mesActual() {
-  return new Date().toISOString().slice(0, 7);
-}
+// Mes en la zona horaria del teléfono (toISOString es UTC: el último día del
+// mes, después de las 19:00 en Ecuador, ya mostraba el mes siguiente).
+const mesActual = () => mesLocal();
 
 const DIAS_SEMANA = ["D", "L", "M", "M", "J", "V", "S"];
 
@@ -51,6 +52,7 @@ export default function ResumenScreen() {
   const [error, setError] = useState<string | null>(null);
   const { color } = useTheme();
   const styles = createStyles(color);
+  const router = useRouter();
   const COLOR_NIVEL = {
     bajo: color.success,
     moderado: color.warning,
@@ -62,33 +64,47 @@ export default function ResumenScreen() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
-  const [correo, setCorreo] = useState("");
 
-  useFocusEffect(
-    useCallback(() => {
+  const cargar = useCallback(() => {
+    let activo = true;
+    async function cargarDatos() {
       setCargando(true);
       setError(null);
-      Promise.all([
-        listarGastos(),
-        listarIngresos(),
-        listarCategorias(),
-        listarCuentas(),
-        listarDeudas(),
-      ])
-        .then(([g, i, c, cu, d]) => {
-          setGastos(g);
-          setIngresos(i);
-          setCategorias(c);
-          setCuentas(cu);
-          setDeudas(d);
-        })
-        .catch((err) => setError(mensajeError(err)))
-        .finally(() => setCargando(false));
-      supabase.auth
-        .getSession()
-        .then(({ data }) => setCorreo(data.session?.user.email ?? ""));
-    }, []),
-  );
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (!activo) return;
+        if (!data.session) {
+          setGastos([]);
+          setIngresos([]);
+          setCategorias([]);
+          setCuentas([]);
+          setDeudas([]);
+          setCargando(false);
+          return;
+        }
+        const [g, i, c, cu, d] = await Promise.all([
+          listarGastos(),
+          listarIngresos(),
+          listarCategorias(),
+          listarCuentas(),
+          listarDeudas(),
+        ]);
+        if (!activo) return;
+        setGastos(g);
+        setIngresos(i);
+        setCategorias(c);
+        setCuentas(cu);
+        setDeudas(d);
+      } catch (err) {
+        if (activo) setError(mensajeError(err));
+      } finally {
+        if (activo) setCargando(false);
+      }
+    }
+    void cargarDatos();
+    return () => { activo = false; };
+  }, []);
+  useFocusEffect(cargar);
 
   const gastosDelMes = gastos.filter((g) => g.fecha.startsWith(mes));
   const ingresosDelMes = ingresos.filter((i) => i.fecha.startsWith(mes));
@@ -103,7 +119,6 @@ export default function ResumenScreen() {
     endeudamiento,
   });
 
-  const nombre = nombreDesdeCorreo(correo);
   const semana = construirSemana(gastos);
   const actividad = construirActividad(
     gastos,
@@ -112,7 +127,6 @@ export default function ResumenScreen() {
     color,
   ).slice(0, 8);
   const veredicto = veredictoFinanciero(balance, endeudamiento);
-  const esPositivo = balance.balance >= 0;
 
   if (cargando)
     return (
@@ -144,6 +158,21 @@ export default function ResumenScreen() {
       </View>
     );
 
+  if (error)
+    return (
+      <SafeAreaView style={styles.contenedor} edges={["top"]}>
+        <ScrollView
+          contentContainerStyle={{ padding: spacing(5), gap: spacing(4) }}
+        >
+          <Text accessibilityRole="header" style={styles.tituloCard}>
+            Resumen
+          </Text>
+          <ErrorTexto>{error}</ErrorTexto>
+          <Boton titulo="Reintentar" onPress={cargar} />
+        </ScrollView>
+      </SafeAreaView>
+    );
+
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: color.bg }}
@@ -163,20 +192,35 @@ export default function ResumenScreen() {
             gap: spacing(4),
           }}
         >
-          {error && <ErrorTexto>{error}</ErrorTexto>}
-          <BlurFade style={styles.saludo}>
-            <View style={styles.avatar}>
-              <Text style={styles.avatarTexto}>
-                {nombre.slice(0, 1).toUpperCase()}
-              </Text>
-            </View>
-            <View>
-              <Text style={styles.saludoHola}>Hola de nuevo,</Text>
-              <Text accessibilityRole="header" style={styles.saludoNombre}>
-                {nombre}
-              </Text>
-            </View>
+          <BlurFade style={styles.intro}>
+            <Text style={styles.introTexto}>
+              Ingresos y gastos de este mes, en un solo lugar.
+            </Text>
           </BlurFade>
+
+          {/* Primer uso: sin ningún movimiento todavía, lo único que muestra
+              valor es anotar el primero. Cuentas y tarjetas pueden esperar. */}
+          {gastos.length === 0 && ingresos.length === 0 && (
+            <Tarjeta>
+              <View style={styles.filaTitulo}>
+                <Text style={styles.tituloCard}>Empezá con tu primer gasto</Text>
+                <Ionicons name="sparkles-outline" size={18} color={color.primary} />
+              </View>
+              <Text style={styles.introTexto}>
+                Anotá algo que hayas pagado hoy y ya vas a ver tu balance del
+                mes. Tus cuentas y tarjetas las podés agregar después.
+              </Text>
+              <Boton
+                titulo="Registrar mi primer gasto"
+                variante="primario"
+                onPress={() => router.push("/gasto/nuevo")}
+              />
+              <Boton
+                titulo="Prefiero anotar un ingreso"
+                onPress={() => router.push("/ingreso/nuevo")}
+              />
+            </Tarjeta>
+          )}
 
           <View style={styles.hero}>
             <Text style={styles.heroEtiqueta}>Balance del mes</Text>
@@ -186,7 +230,8 @@ export default function ResumenScreen() {
               minimumFontScale={0.65}
               style={styles.heroValor}
             >
-              {esPositivo ? "+" : "-"}${Math.abs(balance.balance).toFixed(2)}
+              {balance.balance > 0 ? "+" : balance.balance < 0 ? "−" : ""}$
+              {Math.abs(balance.balance).toFixed(2)}
             </Text>
             <View style={styles.heroStats}>
               <View style={styles.heroStat}>
@@ -379,11 +424,6 @@ export default function ResumenScreen() {
   );
 }
 
-function nombreDesdeCorreo(correo: string) {
-  const local = correo.split("@")[0] || "Usuario";
-  return local.charAt(0).toUpperCase() + local.slice(1);
-}
-
 function construirSemana(gastos: Gasto[]) {
   const hoy = new Date();
   const dias: {
@@ -395,7 +435,7 @@ function construirSemana(gastos: Gasto[]) {
   for (let i = 6; i >= 0; i--) {
     const fecha = new Date(hoy);
     fecha.setDate(hoy.getDate() - i);
-    const clave = fecha.toISOString().slice(0, 10);
+    const clave = fechaLocal(fecha); // día local, no UTC
     const total = gastos
       .filter((g) => g.fecha === clave)
       .reduce((acc, g) => acc + g.monto, 0);
@@ -486,6 +526,15 @@ function veredictoFinanciero(
       detalle: `El ${endeudamiento.porcentaje.toFixed(0)}% de tu ingreso se va en cuotas. Vale la pena vigilarlo.`,
     };
   }
+  // Sin ingresos del mes no hay con qué comparar: decir "estás en buena forma"
+  // sería engañoso (y el endeudamiento sale 0 % por falta de ingreso).
+  if (balance.totalIngresos === 0) {
+    return {
+      estado: "atencion",
+      titulo: "Faltan tus ingresos del mes",
+      detalle: "Anotá tu sueldo u otros ingresos para saber si te alcanza y cuánto pesan tus cuotas.",
+    };
+  }
   return {
     estado: "bien",
     titulo: "Estás en buena forma",
@@ -496,26 +545,13 @@ function veredictoFinanciero(
 const createStyles = (color: Colors) =>
   StyleSheet.create({
     contenedor: { flex: 1, backgroundColor: color.bg },
-    saludo: { flexDirection: "row", alignItems: "center", gap: spacing(3) },
-    avatar: {
-      width: 42,
-      height: 42,
-      borderRadius: radius.pill,
-      backgroundColor: color.primaryBg,
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    avatarTexto: {
-      fontFamily: font.semibold,
-      color: color.primary,
-      fontWeight: "700",
-      fontSize: 16,
-    },
-    saludoHola: { fontFamily: font.body, fontSize: 12, color: color.textMuted },
-    saludoNombre: { fontFamily: font.display, fontSize: 26, color: color.text },
+    intro: { marginBottom: spacing(1) },
+    introTexto: { fontFamily: font.body, fontSize: 14, color: color.textMuted },
     hero: {
-      backgroundColor: color.primaryBg,
-      borderRadius: radius.lg,
+      backgroundColor: color.surface,
+      borderWidth: 1,
+      borderColor: color.border,
+      borderRadius: radius.md,
       padding: spacing(5),
       gap: spacing(2),
     },
@@ -525,7 +561,7 @@ const createStyles = (color: Colors) =>
       fontSize: 12,
       fontWeight: "600",
     },
-    heroValor: { fontFamily: font.mono, color: color.text, fontSize: 30 },
+    heroValor: { fontFamily: font.semibold, color: color.text, fontSize: 34, letterSpacing: -1.5 },
     heroStats: {
       flexDirection: "row",
       flexWrap: "wrap",

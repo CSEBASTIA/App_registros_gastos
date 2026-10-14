@@ -15,6 +15,7 @@ import {
   crearGasto,
   mensajeError,
   sumarMeses,
+  fechaLocal,
   ETIQUETA_METODO_PAGO,
   OPCIONES_METODO_PAGO,
   OPCIONES_MESES_DIFERIDO,
@@ -29,9 +30,9 @@ import SelectorChips from "../../components/SelectorChips";
 import { spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
 
-function hoy() {
-  return new Date().toISOString().slice(0, 10);
-}
+// Fecha en la zona horaria del teléfono (toISOString es UTC: de noche en
+// Ecuador ya daba el día siguiente).
+const hoy = () => fechaLocal();
 
 export default function NuevoGasto() {
   const [cargando, setCargando] = useState(true);

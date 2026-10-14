@@ -1,7 +1,8 @@
 import { getSupabaseClient } from "../client";
 import type { TransaccionDetectada } from "../types/domain";
 import type { Database } from "../types/database";
-import { LIMITES } from "../schemas/limites";
+import { z } from "zod";
+import { LIMITES, montoPositivo, textoRequerido } from "../schemas/limites";
 
 type Row = Database["public"]["Tables"]["transacciones_detectadas"]["Row"];
 
@@ -67,6 +68,55 @@ export async function marcarTransaccionDetectada(
   id: string,
   estado: TransaccionDetectada["estado"]
 ): Promise<void> {
-  const { error } = await getSupabaseClient().from("transacciones_detectadas").update({ estado }).eq("id", id);
+  // Minimización: resuelto el aviso, su asunto original ya no hace falta.
+  const cambios = estado === "pendiente" ? { estado } : { estado, correo_asunto: null };
+  const { error } = await getSupabaseClient().from("transacciones_detectadas").update(cambios).eq("id", id);
   if (error) throw error;
+}
+
+const confirmacionSchema = z.object({
+  monto: montoPositivo(),
+  descripcion: textoRequerido(LIMITES.descripcion),
+  categoriaId: z.string().uuid().optional(),
+  cuentaId: z.string().uuid().optional(),
+});
+
+export type DatosConfirmacion = z.infer<typeof confirmacionSchema>;
+
+/**
+ * Convierte un aviso detectado en gasto o ingreso real en UN solo paso de la
+ * base (función `confirmar_transaccion_detectada`): crea el movimiento y
+ * marca el aviso juntos, así un reintento nunca duplica el gasto. Si el aviso
+ * ya estaba confirmado devuelve `{ yaConfirmado: true }` sin crear nada.
+ */
+export async function confirmarTransaccionDetectada(
+  id: string,
+  datos: DatosConfirmacion
+): Promise<{ movimientoId: string | null; yaConfirmado: boolean }> {
+  const d = confirmacionSchema.parse(datos);
+  const { data, error } = await getSupabaseClient().rpc("confirmar_transaccion_detectada", {
+    p_id: id,
+    p_monto: d.monto,
+    p_descripcion: d.descripcion,
+    p_categoria_id: d.categoriaId ?? null,
+    p_cuenta_id: d.cuentaId ?? null,
+  });
+  if (error) throw error;
+  const movimientoId = (data as string | null) ?? null;
+  return { movimientoId, yaConfirmado: movimientoId === null };
+}
+
+/**
+ * Privacidad: borra todo lo que la app guardó a partir de correos de este
+ * usuario (avisos pendientes, confirmados y descartados). Los gastos e
+ * ingresos que ya se confirmaron NO se tocan: son datos propios del usuario.
+ * RLS limita el borrado a las filas propias. Devuelve cuántas se borraron.
+ */
+export async function eliminarTransaccionesDetectadas(): Promise<number> {
+  const { error, count } = await getSupabaseClient()
+    .from("transacciones_detectadas")
+    .delete({ count: "exact" })
+    .not("id", "is", null);
+  if (error) throw error;
+  return count ?? 0;
 }

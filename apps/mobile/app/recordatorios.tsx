@@ -23,6 +23,7 @@ import {
   type Deuda,
   type TipoRecordatorio,
   type Frecuencia,
+  fechaLocal,
 } from "core";
 import Tarjeta from "../components/Tarjeta";
 import Campo from "../components/Campo";
@@ -34,7 +35,7 @@ import { spacing, useTheme, font, type Colors } from "../lib/theme";
 import { BlurFade } from "../components/Motion";
 
 function hoy() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocal(); // zona horaria del teléfono, no UTC
 }
 
 const ETIQUETA_TIPO: Record<TipoRecordatorio, string> = {

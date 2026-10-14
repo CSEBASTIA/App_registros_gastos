@@ -19,6 +19,8 @@ import {
   eliminarDeuda,
   calcularEndeudamiento,
   mensajeError,
+  fechaLocal,
+  mesLocal,
   type Deuda,
   type Cuenta,
   type TipoDeuda,
@@ -33,12 +35,10 @@ import EstadoVacio from "../components/EstadoVacio";
 import { radius, spacing, useTheme, font, type Colors } from "../lib/theme";
 import { BlurFade } from "../components/Motion";
 
-function mesActual() {
-  return new Date().toISOString().slice(0, 7);
-}
-function hoy() {
-  return new Date().toISOString().slice(0, 10);
-}
+// Fechas en la zona horaria del teléfono (toISOString es UTC: en Ecuador,
+// después de las 19:00 ya daba el día siguiente).
+const mesActual = () => mesLocal();
+const hoy = () => fechaLocal();
 
 const ETIQUETA_TIPO: Record<TipoDeuda, string> = {
   prestamo: "Préstamo",
@@ -89,7 +89,10 @@ export default function DeudasScreen() {
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: () => eliminarDeuda(deuda.id).then(cargar),
+        onPress: () =>
+          eliminarDeuda(deuda.id)
+            .then(cargar)
+            .catch((err) => setError(mensajeError(err))),
       },
     ]);
   }
@@ -205,6 +208,7 @@ export default function DeudasScreen() {
               <FilaDeuda
                 key={d.id}
                 deuda={d}
+                cuentas={cuentas}
                 onCambio={cargar}
                 onEliminar={() => confirmarEliminar(d)}
               />
@@ -218,24 +222,53 @@ export default function DeudasScreen() {
 
 function FilaDeuda({
   deuda,
+  cuentas,
   onCambio,
   onEliminar,
 }: {
   deuda: Deuda;
+  cuentas: Cuenta[];
   onCambio: () => void;
   onEliminar: () => void;
 }) {
   const { color } = useTheme();
   const styles = createStyles(color);
+  // Un abono sale de dinero real: ahorro, débito o efectivo (no de otra tarjeta).
+  const cuentasOrigen = cuentas.filter((c) => c.tipo !== "credito");
+  const cuentaSugerida =
+    cuentasOrigen.find((c) => c.id === deuda.cuentaId)?.id ?? cuentasOrigen[0]?.id ?? "";
   const [abonando, setAbonando] = useState(false);
   const [monto, setMonto] = useState("");
+  const [cuentaId, setCuentaId] = useState(cuentaSugerida);
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  function abrir() {
+    setCuentaId(cuentaSugerida);
+    setError(null);
+    setAbonando(true);
+  }
 
   async function confirmar() {
-    if (!monto) return;
-    await registrarAbonoDeuda(deuda.id, Number(monto));
-    setMonto("");
-    setAbonando(false);
-    onCambio();
+    const valor = Number(monto.replace(",", "."));
+    if (!monto || !(valor > 0)) {
+      setError("Ingresá un monto mayor que 0.");
+      return;
+    }
+    setError(null);
+    setGuardando(true);
+    try {
+      // Atómico en la base: baja el saldo, descuenta de la cuenta elegida y
+      // mueve el próximo pago. Si el monto supera el saldo, se cobra solo lo pendiente.
+      await registrarAbonoDeuda(deuda.id, valor, { cuentaId: cuentaId || undefined });
+      setMonto("");
+      setAbonando(false);
+      onCambio();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setGuardando(false);
+    }
   }
 
   return (
@@ -276,21 +309,40 @@ function FilaDeuda({
       {abonando ? (
         <View style={{ gap: spacing(3) }}>
           <Campo
-            etiqueta=""
-            placeholder="Monto"
+            etiqueta="Monto del abono"
+            placeholder={`Hasta $${deuda.saldoPendiente.toFixed(2)}`}
             keyboardType="decimal-pad"
             value={monto}
             onChangeText={setMonto}
           />
-          <Boton titulo="Abonar" variante="primario" onPress={confirmar} />
-          <Boton titulo="Cancelar" onPress={() => setAbonando(false)} />
+          <SelectorChips
+            titulo="Pagar desde"
+            valor={cuentaId}
+            onCambiar={setCuentaId}
+            opciones={[
+              ...cuentasOrigen.map((c) => ({
+                valor: c.id,
+                etiqueta: `${c.nombre} · $${c.disponible.toFixed(2)}`,
+              })),
+              { valor: "", etiqueta: "No descontar de una cuenta" },
+            ]}
+          />
+          {error && <ErrorTexto>{error}</ErrorTexto>}
+          <Boton
+            titulo={guardando ? "Guardando…" : "Abonar"}
+            variante="primario"
+            onPress={confirmar}
+            loading={guardando}
+            disabled={guardando}
+          />
+          <Boton titulo="Cancelar" onPress={() => setAbonando(false)} disabled={guardando} />
         </View>
       ) : (
         <View style={{ flexDirection: "row", gap: spacing(2) }}>
           <Boton
             titulo="Registrar abono"
             style={{ flex: 1 }}
-            onPress={() => setAbonando(true)}
+            onPress={abrir}
             disabled={deuda.saldoPendiente <= 0}
           />
           <Boton titulo="Eliminar" variante="peligro" onPress={onEliminar} />

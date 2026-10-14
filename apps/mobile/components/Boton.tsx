@@ -20,7 +20,7 @@ export default function Boton({ titulo, onPress, variante = "secundario", disabl
   const diameter = Math.hypot(size.width, size.height) * 2;
   const fondo =
     variante === "primario" ? color.primary : variante === "peligro" ? color.dangerBg : color.surface;
-  const texto = variante === "primario" ? (mode === "dark" ? "#11131d" : "#fff") : variante === "peligro" ? color.danger : color.text;
+  const texto = variante === "primario" ? (mode === "dark" ? "#111111" : "#fff") : variante === "peligro" ? color.danger : color.text;
   const borde = variante === "primario" ? color.primary : color.border;
 
   return (

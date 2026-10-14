@@ -14,3 +14,13 @@ export const deudaSchema = z.object({
 });
 
 export type DeudaInput = z.infer<typeof deudaSchema>;
+
+export const abonoDeudaSchema = z.object({
+  deudaId: z.string().uuid(),
+  monto: montoPositivo(),
+  /** Cuenta de ahorro/débito/efectivo de la que sale el dinero (opcional). */
+  cuentaId: z.string().uuid().optional(),
+  fecha: fechaIso(),
+});
+
+export type AbonoDeudaInput = z.infer<typeof abonoDeudaSchema>;

@@ -1,11 +1,11 @@
 import { useEffect, useState, type MouseEvent } from "react";
 
 type Mode = "light" | "dark";
-const KEY = "gastos-app:visual-theme";
+const KEY = "gastos-app:zallox-theme-v1";
 export function initializeTheme(): Mode {
   let saved: string | null = null;
   try { saved = localStorage.getItem(KEY); } catch { /* Visual preferences work without storage. */ }
-  const mode = saved === "light" || saved === "dark" ? saved : window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  const mode = saved === "light" || saved === "dark" ? saved : "light";
   document.documentElement.dataset.theme = mode;
   return mode;
 }
@@ -35,7 +35,7 @@ export default function ThemeToggler() {
     const transition = doc.startViewTransition(apply);
     transition.ready.then(() => document.documentElement.animate({ clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${radius}px at ${x}px ${y}px)`] }, { duration: 300, easing: "ease-out", pseudoElement: "::view-transition-new(root)" })).catch(() => {});
   }
-  return <button type="button" className="ui-theme-toggle" onClick={toggle} aria-label={`Activar tema ${mode === "dark" ? "claro" : "oscuro"}`} aria-pressed={mode === "dark"}>
-    <span aria-hidden="true">{mode === "dark" ? "☾" : "☀"}</span><span>Tema {mode === "dark" ? "oscuro" : "claro"}</span>
+  return <button type="button" className="ui-theme-toggle" onClick={toggle} aria-label={`Cambiar a tema ${mode === "dark" ? "claro" : "oscuro"}`} aria-pressed={mode === "dark"}>
+    <span aria-hidden="true">{mode === "dark" ? "☾" : "☀"}</span><span>Tema {mode === "dark" ? "claro" : "oscuro"}</span>
   </button>;
 }

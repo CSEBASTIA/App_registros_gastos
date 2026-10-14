@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +14,7 @@ import {
   listarCuentas,
   parsearCorreoBancario,
   insertarTransaccionesDetectadas,
+  eliminarTransaccionesDetectadas,
   mensajeError,
   type Cuenta,
   type TransaccionDetectadaInsert,
@@ -58,13 +59,23 @@ export default function CorreoScreen() {
   >(undefined);
   const [ultimaSync, setUltimaSync] = useState<string | null>(null);
   const [conectando, setConectando] = useState<ProveedorCorreo | null>(null);
+  const [desconectando, setDesconectando] = useState(false);
+  const desconexionEnCurso = useRef(false);
   const [buscando, setBuscando] = useState(false);
   const [resultado, setResultado] = useState<string | null>(null);
+  const [avisoDesconexion, setAvisoDesconexion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
-    proveedorConectado().then(setConectado);
-    AsyncStorage.getItem(CLAVE_ULTIMA_SYNC).then(setUltimaSync);
+    proveedorConectado()
+      .then(setConectado)
+      .catch((err) => {
+        setError(mensajeError(err));
+        setConectado(null);
+      });
+    AsyncStorage.getItem(CLAVE_ULTIMA_SYNC)
+      .then(setUltimaSync)
+      .catch((err) => setError(mensajeError(err)));
   }, []);
   useFocusEffect(cargar);
 
@@ -82,11 +93,38 @@ export default function CorreoScreen() {
   }
 
   async function desconectar() {
-    await desconectarProveedorActivo();
-    setConectado(null);
+    if (desconexionEnCurso.current || buscando) return;
+    desconexionEnCurso.current = true;
+    setDesconectando(true);
+    setError(null);
+    setAvisoDesconexion(null);
+    try {
+      // 1) Quita el permiso (en Google también en sus servidores) y borra los tokens.
+      const { proveedor, revocado } = await desconectarProveedorActivo();
+      setConectado(null);
+      // 2) Borra lo que la app guardó de los correos. Los gastos ya confirmados se quedan.
+      const borrados = await eliminarTransaccionesDetectadas();
+      await AsyncStorage.removeItem(CLAVE_ULTIMA_SYNC);
+      setUltimaSync(null);
+      setResultado(null);
+      const permiso = revocado
+        ? "Se quitó el permiso de la app en tu cuenta."
+        : proveedor === "outlook"
+          ? "Para quitar el permiso por completo, entrá a account.live.com/consent/Manage y eliminá esta app."
+          : "No se pudo confirmar la revocación con el proveedor: revisá myaccount.google.com/permissions.";
+      setAvisoDesconexion(
+        `Correo desconectado. ${permiso} Se borraron ${borrados} registro(s) leídos de tus correos.`,
+      );
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      desconexionEnCurso.current = false;
+      setDesconectando(false);
+    }
   }
 
   async function buscarAhora() {
+    if (desconexionEnCurso.current) return;
     setError(null);
     setResultado(null);
     setBuscando(true);
@@ -176,9 +214,37 @@ export default function CorreoScreen() {
             Correo
           </Text>
           <Text style={styles.screenIntro}>
-            Detectá movimientos desde los avisos de tus bancos.
+            Opcional y en prueba (beta): detectá movimientos desde los avisos
+            de tus bancos. Podés usar la app sin conectar tu correo.
           </Text>
         </BlurFade>
+        <Tarjeta>
+          <View style={styles.filaTitulo}>
+            <Ionicons
+              name="shield-checkmark-outline"
+              size={18}
+              color={color.textMuted}
+            />
+            <Text style={styles.tituloCard}>Qué lee y qué guarda</Text>
+          </View>
+          <Text style={styles.textoMuted}>
+            • Solo busca cuando tocás «Buscar ahora», y solo correos recientes
+            (desde la última búsqueda; la primera vez, 14 días). El permiso de
+            Google o Microsoft técnicamente permite leer tu bandeja.
+          </Text>
+          <Text style={styles.textoMuted}>
+            • El texto del correo se analiza en tu teléfono. De cada aviso
+            reconocido se guarda monto, fecha, banco y asunto; el asunto se
+            borra al confirmarlo o descartarlo.
+          </Text>
+          <Text style={styles.textoMuted}>
+            • Nada se convierte en gasto sin que lo confirmes en la Bandeja.
+          </Text>
+          <Text style={styles.textoMuted}>
+            • Al desconectar se quita el permiso y se borran estos datos. Los
+            gastos que ya confirmaste se quedan.
+          </Text>
+        </Tarjeta>
         {PROVEEDORES.every((p) => !proveedorConfigurado(p)) && (
           <Tarjeta>
             <View style={styles.filaTitulo}>
@@ -221,9 +287,11 @@ export default function CorreoScreen() {
           </Text>
           {conectado ? (
             <Boton
-              titulo="Desconectar correo"
+              titulo={desconectando ? "Desconectando…" : "Desconectar correo"}
               variante="peligro"
               onPress={desconectar}
+              loading={desconectando}
+              disabled={desconectando || buscando}
             />
           ) : (
             <View style={{ gap: spacing(2) }}>
@@ -244,6 +312,11 @@ export default function CorreoScreen() {
               ))}
             </View>
           )}
+          {avisoDesconexion && (
+            <Text accessibilityLiveRegion="polite" style={styles.textoOk}>
+              {avisoDesconexion}
+            </Text>
+          )}
         </Tarjeta>
 
         {conectado && (
@@ -259,7 +332,7 @@ export default function CorreoScreen() {
               variante="primario"
               onPress={buscarAhora}
               loading={buscando}
-              disabled={buscando}
+              disabled={buscando || desconectando}
             />
             {resultado && <Text style={styles.textoOk}>{resultado}</Text>}
             <Boton

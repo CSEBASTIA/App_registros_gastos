@@ -7,6 +7,12 @@ import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
 import { Animated } from "react-native";
 
+// Sin sesión, RLS bloquea toda lectura y escritura: la app se ve vacía y
+// guardar un gasto falla. Por eso el login va activo también en desarrollo.
+// Para revisar solo la interfaz sin iniciar sesión, poner
+// EXPO_PUBLIC_SIN_LOGIN=1 en apps/mobile/.env (nunca aplica en producción).
+const LOGIN_DESACTIVADO = __DEV__ && process.env.EXPO_PUBLIC_SIN_LOGIN === "1";
+
 export default function RootLayout() {
   return <ThemeProvider><ThemedLayout /></ThemeProvider>;
 }
@@ -21,7 +27,6 @@ function ThemedLayout() {
     animation.start(); return () => animation.stop();
   }, [mode, reduceMotion, opacity]);
   const [fontsLoaded, fontError] = useFonts({
-    Fraunces: require("../assets/fonts/Fraunces.ttf"),
     IBMPlexSans: require("../assets/fonts/IBMPlexSans.ttf"),
     IBMPlexSansMedium: require("../assets/fonts/IBMPlexSansMedium.ttf"),
     IBMPlexSansSemiBold: require("../assets/fonts/IBMPlexSansSemiBold.ttf"),
@@ -41,8 +46,6 @@ function ThemedLayout() {
   }, []);
 
   useEffect(() => {
-    if (session === undefined) return; // todavía cargando
-
     const enGrupoAuth = segments[0] === "(auth)";
     // segments vacío = ruta raíz "/" sin match (no hay index propio, el
     // tab por defecto es "resumen") — pasa también en el arranque en frío
@@ -54,6 +57,16 @@ function ThemedLayout() {
     // misma cuando termina).
     const enConectarCorreo = segments[1] === "conectar-correo";
 
+    // No navegar mientras el componente devuelve null (abajo): el Stack
+    // todavía no existe y expo-router lanza "Attempted to navigate before
+    // mounting the Root Layout component", que tumba la app al arrancar.
+    if (session === undefined || !ready || (!fontsLoaded && !fontError)) return;
+
+    if (LOGIN_DESACTIVADO) {
+      if (enGrupoAuth || enRaiz) router.replace("/resumen");
+      return;
+    }
+
     if (!session && !enGrupoAuth) {
       router.replace("/login");
     } else if (session && enRaiz) {
@@ -61,7 +74,7 @@ function ThemedLayout() {
     } else if (session && enGrupoAuth && !enConectarCorreo) {
       router.replace("/resumen");
     }
-  }, [session, segments]);
+  }, [session, segments, router, ready, fontsLoaded, fontError]);
 
   if (session === undefined || !ready || (!fontsLoaded && !fontError)) return null;
 
@@ -78,6 +91,7 @@ function ThemedLayout() {
         animation: reduceMotion ? "none" : "default",
       }}
     >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="cuentas" options={{ title: "Cuentas" }} />
@@ -90,6 +104,7 @@ function ThemedLayout() {
       <Stack.Screen name="ingreso/nuevo" options={{ title: "Nuevo ingreso", presentation: "modal" }} />
       <Stack.Screen name="correo" options={{ title: "Correo" }} />
       <Stack.Screen name="bandeja" options={{ title: "Bandeja de revisión" }} />
+      <Stack.Screen name="presupuestos" options={{ title: "Presupuestos" }} />
     </Stack>
     </Animated.View>
   );

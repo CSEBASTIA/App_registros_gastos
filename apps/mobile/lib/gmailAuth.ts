@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
+import { crearFetchConTimeout } from "core";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -104,10 +105,35 @@ export async function conectarCorreo(): Promise<void> {
   await guardarTokens(tokens);
 }
 
-export async function desconectarCorreo(): Promise<void> {
+// La revocación es una llamada corta: si la red falla, igual se borran los tokens.
+const fetchRevocar = crearFetchConTimeout({ ms: 10_000 });
+
+/**
+ * Revoca el acceso ante Google (el refresh token deja de servir en sus
+ * servidores, no solo en este teléfono) y borra los tokens locales. Es de
+ * "mejor esfuerzo": sin internet se borran los tokens igual y la persona puede
+ * quitar el permiso en myaccount.google.com/permissions.
+ */
+export async function desconectarCorreo(): Promise<{ revocado: boolean }> {
+  const token = (await obtenerSeguro(CLAVE_REFRESH)) ?? (await obtenerSeguro(CLAVE_ACCESS));
+  let revocado = false;
+  if (token) {
+    try {
+      const res = await fetchRevocar("https://oauth2.googleapis.com/revoke", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `token=${encodeURIComponent(token)}`,
+      });
+      // 400 = el token ya no era válido: el acceso ya estaba revocado.
+      revocado = res.ok || res.status === 400;
+    } catch {
+      revocado = false;
+    }
+  }
   await borrarSeguro(CLAVE_REFRESH);
   await borrarSeguro(CLAVE_ACCESS);
   await borrarSeguro(CLAVE_EXPIRA);
+  return { revocado };
 }
 
 /** Devuelve un access token vigente para llamar a la API de Gmail, renovándolo solo si ya venció. */

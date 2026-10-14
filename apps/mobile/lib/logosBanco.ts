@@ -6,6 +6,8 @@ const LOGO_BANCO: Partial<Record<Banco, ReturnType<typeof require>>> = {
   pichincha: require("../assets/logos/pichincha.webp"),
   diners_club: require("../assets/logos/diners_club.webp"),
   produbanco: require("../assets/logos/produbanco.webp"),
+  banco_pacifico: require("../assets/logos/banco_pacifico.png"),
+  banco_austro: require("../assets/logos/banco_austro.png"),
 };
 
 export function logoDeBanco(banco: Banco) {

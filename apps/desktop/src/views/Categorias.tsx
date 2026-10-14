@@ -205,7 +205,7 @@ function NuevaCategoria({
   }) => Promise<void>;
 }) {
   const [nombre, setNombre] = useState("");
-  const [color, setColor] = useState("#3552d1");
+  const [color, setColor] = useState("#111111");
   const [tipo, setTipo] = useState<TipoCategoria>("gasto");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -217,7 +217,7 @@ function NuevaCategoria({
     try {
       await onCrear({ nombre, color, tipo });
       setNombre("");
-      setColor("#3552d1");
+      setColor("#111111");
     } catch (err) {
       setError(mensajeError(err));
     } finally {

@@ -18,7 +18,8 @@
     "updates": {
       "enabled": true,
       "checkAutomatically": "ON_LOAD",
-      "fallbackToCacheTimeout": 0
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/a2907344-dbc9-4f5a-9e59-aa50b8393e14"
     },
     "android": {
       "package": "com.csebastia.gastosapp",
@@ -33,6 +34,15 @@
     "plugins": [
       "expo-router",
       "expo-secure-store"
-    ]
+    ],
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": "a2907344-dbc9-4f5a-9e59-aa50b8393e14"
+      }
+    },
+    "owner": "lans112"
   }
 }

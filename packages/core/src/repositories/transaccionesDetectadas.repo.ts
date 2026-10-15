@@ -2,7 +2,7 @@ import { getSupabaseClient } from "../client";
 import type { TransaccionDetectada } from "../types/domain";
 import type { Database } from "../types/database";
 import { z } from "zod";
-import { LIMITES, montoPositivo, textoRequerido } from "../schemas/limites";
+import { LIMITES, fechaIso, montoPositivo, textoRequerido } from "../schemas/limites";
 
 type Row = Database["public"]["Tables"]["transacciones_detectadas"]["Row"];
 
@@ -36,19 +36,37 @@ export async function listarTransaccionesPendientes(): Promise<TransaccionDetect
 
 export type TransaccionDetectadaInsert = Omit<TransaccionDetectada, "id" | "createdAt" | "estado">;
 
+/** ¿Se puede guardar este aviso? Monto y fecha reales y un id de mensaje. */
+export function avisoGuardable(t: TransaccionDetectadaInsert): boolean {
+  return (
+    !!t.mensajeId &&
+    t.mensajeId.length <= 500 &&
+    Number.isFinite(t.monto) &&
+    t.monto >= 0.01 &&
+    t.monto <= LIMITES.monto &&
+    fechaIso().safeParse(t.fecha).success
+  );
+}
+
 /**
  * Inserta las transacciones detectadas en un correo nuevo. `mensajeId` es
  * único por usuario — sincronizar el mismo correo dos veces no duplica
- * nada (se ignoran los que ya existen).
+ * nada (se ignoran los que ya existen). Los avisos con datos imposibles se
+ * descartan uno por uno: antes uno solo hacía fallar todo el lote y la
+ * sincronización quedaba bloqueada. Devuelve cuántos se enviaron y descartaron.
  */
-export async function insertarTransaccionesDetectadas(items: TransaccionDetectadaInsert[]): Promise<void> {
-  if (items.length === 0) return;
+export async function insertarTransaccionesDetectadas(
+  items: TransaccionDetectadaInsert[]
+): Promise<{ enviados: number; descartados: number }> {
+  const validos = items.filter(avisoGuardable);
+  const descartados = items.length - validos.length;
+  if (validos.length === 0) return { enviados: 0, descartados };
   const { error } = await getSupabaseClient()
     .from("transacciones_detectadas")
     .upsert(
       // El texto viene de correos de terceros: se recorta a los límites que
       // impone la base, para que un asunto larguísimo no tumbe el lote entero.
-      items.map((t) => ({
+      validos.map((t) => ({
         mensaje_id: t.mensajeId,
         tipo: t.tipo,
         monto: t.monto,
@@ -62,15 +80,21 @@ export async function insertarTransaccionesDetectadas(items: TransaccionDetectad
       { onConflict: "usuario_id,mensaje_id", ignoreDuplicates: true }
     );
   if (error) throw error;
+  return { enviados: validos.length, descartados };
 }
 
-export async function marcarTransaccionDetectada(
-  id: string,
-  estado: TransaccionDetectada["estado"]
-): Promise<void> {
+/**
+ * Descarta un aviso de la bandeja. Solo existe esta transición desde la app:
+ * confirmar va por `confirmarTransaccionDetectada` (atómica) y la base impide
+ * que un aviso resuelto vuelva a "pendiente" (confirmarlo dos veces duplicaba el gasto).
+ */
+export async function marcarTransaccionDetectada(id: string, estado: "descartado"): Promise<void> {
+  if (estado !== "descartado") throw new Error("Solo se puede descartar un aviso desde aquí.");
   // Minimización: resuelto el aviso, su asunto original ya no hace falta.
-  const cambios = estado === "pendiente" ? { estado } : { estado, correo_asunto: null };
-  const { error } = await getSupabaseClient().from("transacciones_detectadas").update(cambios).eq("id", id);
+  const { error } = await getSupabaseClient()
+    .from("transacciones_detectadas")
+    .update({ estado, correo_asunto: null })
+    .eq("id", id);
   if (error) throw error;
 }
 

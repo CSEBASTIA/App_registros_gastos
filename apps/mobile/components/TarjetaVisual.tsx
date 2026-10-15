@@ -149,8 +149,17 @@ export default function TarjetaVisual({
 
   if (!onPress) return contenido;
 
+  const accessibleLabel = [
+    cuenta.nombre,
+    ETIQUETA_BANCO[cuenta.banco],
+    ETIQUETA_TIPO[cuenta.tipo],
+    cuenta.cupoTotal
+      ? `Disponible ${formatMonto(cuenta.disponible)} de ${formatMonto(cuenta.cupoTotal)}`
+      : `Saldo ${formatMonto(cuenta.disponible)}`,
+  ].join(", ");
+
   return (
-    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!seleccionada }} accessibilityLabel={cuenta.nombre} style={({ pressed }) => [seleccionada && styles.seleccionada, { borderColor: color.primary, opacity: pressed ? 0.86 : 1 }]}>
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: !!seleccionada }} accessibilityLabel={accessibleLabel} style={({ pressed }) => [seleccionada && styles.seleccionada, { borderColor: color.primary, opacity: pressed ? 0.86 : 1 }]}>
       {contenido}
     </Pressable>
   );

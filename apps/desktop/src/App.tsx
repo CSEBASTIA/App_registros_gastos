@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { mensajeError } from "core";
 import {
@@ -49,14 +49,6 @@ import ThemeToggler from "./components/ThemeToggler";
 import AnimatedBackground from "./components/AnimatedBackground";
 import BlurFade from "./components/BlurFade";
 import RippleButton from "./components/RippleButton";
-import Resumen from "./views/Resumen";
-import Gastos from "./views/Gastos";
-import Ingresos from "./views/Ingresos";
-import Tarjetas from "./views/Tarjetas";
-import Cuentas from "./views/Cuentas";
-import Deudas from "./views/Deudas";
-import Recordatorios from "./views/Recordatorios";
-import Categorias from "./views/Categorias";
 import Logo from "./components/Logo";
 import {
   IconoResumen,
@@ -68,6 +60,15 @@ import {
   IconoRecordatorios,
   IconoCategorias,
 } from "./components/iconos";
+
+const Resumen = lazy(() => import("./views/Resumen"));
+const Gastos = lazy(() => import("./views/Gastos"));
+const Ingresos = lazy(() => import("./views/Ingresos"));
+const Tarjetas = lazy(() => import("./views/Tarjetas"));
+const Cuentas = lazy(() => import("./views/Cuentas"));
+const Deudas = lazy(() => import("./views/Deudas"));
+const Recordatorios = lazy(() => import("./views/Recordatorios"));
+const Categorias = lazy(() => import("./views/Categorias"));
 
 // El login se omite en desarrollo para revisar la interfaz directamente.
 // En producción se conserva el flujo de sesión existente.
@@ -388,7 +389,7 @@ function Dashboard({
       <aside className="sidebar">
         <div className="brand">
           <Logo size={28} />
-          <span>Gastos App</span>
+          <span>fintrack</span>
         </div>
         <nav aria-label="Navegación principal">
           <AnimatedBackground value={tab} className="nav">
@@ -432,9 +433,9 @@ function Dashboard({
       <main className="main">
         <header className="topbar">
           <span className="topbar-contexto">Finanzas personales</span>
-          <div className="topbar-brand" aria-label="Gastos App">
+          <div className="topbar-brand" aria-label="fintrack">
             <Logo size={26} />
-            <span>Gastos App</span>
+            <span>fintrack</span>
           </div>
           {(tab === "resumen" || tab === "gastos" || tab === "ingresos") && (
             <div className="topbar-acciones">
@@ -469,92 +470,94 @@ function Dashboard({
           {cargando ? (
             <PanelCargando />
           ) : (
-            <BlurFade key={tab}>
-              {tab === "resumen" && (
-                <Resumen
-                  balance={balance}
-                  endeudamiento={endeudamiento}
-                  recomendaciones={recomendaciones}
-                  gastos={gastos}
-                  ingresos={ingresos}
-                  categorias={categorias}
-                />
-              )}
-              {tab === "ingresos" && (
-                <Ingresos
-                  mes={mes}
-                  ingresos={ingresos}
-                  cuentas={cuentas}
-                  categorias={categorias}
-                  onCrear={handleCrearIngreso}
-                  onEliminar={handleEliminarIngreso}
-                />
-              )}
-              {tab === "gastos" && (
-                <Gastos
-                  mes={mes}
-                  gastos={gastos}
-                  categorias={categorias}
-                  cuentas={cuentas}
-                  onCrear={handleCrearGasto}
-                  onActualizar={handleActualizarGasto}
-                  onEliminar={handleEliminarGasto}
-                  onImportarVarios={handleImportarGastos}
-                />
-              )}
-              {tab === "tarjetas" && (
-                <Tarjetas
-                  cuentas={cuentas}
-                  gastos={gastos}
-                  pagosTarjeta={pagosTarjeta}
-                  ingresos={ingresos}
-                  categorias={categorias}
-                  onCrear={handleCrearCuenta}
-                  onEliminar={handleEliminarCuenta}
-                  onRegistrarPago={handleRegistrarPago}
-                  onCrearGasto={handleCrearGasto}
-                />
-              )}
-              {tab === "cuentas" && (
-                <Cuentas
-                  cuentas={cuentas}
-                  gastos={gastos}
-                  ingresos={ingresos}
-                  categorias={categorias}
-                  onCrear={handleCrearCuenta}
-                  onEliminar={handleEliminarCuenta}
-                  onCrearGasto={handleCrearGasto}
-                  onCrearIngreso={handleCrearIngreso}
-                />
-              )}
-              {tab === "deudas" && (
-                <Deudas
-                  deudas={deudas}
-                  cuentas={cuentas}
-                  endeudamiento={endeudamiento}
-                  onCrear={handleCrearDeuda}
-                  onAbonar={handleAbonarDeuda}
-                  onEliminar={handleEliminarDeuda}
-                />
-              )}
-              {tab === "recordatorios" && (
-                <Recordatorios
-                  recordatorios={recordatorios}
-                  deudas={deudas}
-                  onCrear={handleCrearRecordatorio}
-                  onToggle={handleToggleRecordatorio}
-                  onEliminar={handleEliminarRecordatorio}
-                />
-              )}
-              {tab === "categorias" && (
-                <Categorias
-                  categorias={categorias}
-                  onCrear={handleCrearCategoria}
-                  onActualizar={handleActualizarCategoria}
-                  onEliminar={handleEliminarCategoria}
-                />
-              )}
-            </BlurFade>
+            <Suspense fallback={<PanelCargando />}>
+              <BlurFade key={tab}>
+                {tab === "resumen" && (
+                  <Resumen
+                    balance={balance}
+                    endeudamiento={endeudamiento}
+                    recomendaciones={recomendaciones}
+                    gastos={gastos}
+                    ingresos={ingresos}
+                    categorias={categorias}
+                  />
+                )}
+                {tab === "ingresos" && (
+                  <Ingresos
+                    mes={mes}
+                    ingresos={ingresos}
+                    cuentas={cuentas}
+                    categorias={categorias}
+                    onCrear={handleCrearIngreso}
+                    onEliminar={handleEliminarIngreso}
+                  />
+                )}
+                {tab === "gastos" && (
+                  <Gastos
+                    mes={mes}
+                    gastos={gastos}
+                    categorias={categorias}
+                    cuentas={cuentas}
+                    onCrear={handleCrearGasto}
+                    onActualizar={handleActualizarGasto}
+                    onEliminar={handleEliminarGasto}
+                    onImportarVarios={handleImportarGastos}
+                  />
+                )}
+                {tab === "tarjetas" && (
+                  <Tarjetas
+                    cuentas={cuentas}
+                    gastos={gastos}
+                    pagosTarjeta={pagosTarjeta}
+                    ingresos={ingresos}
+                    categorias={categorias}
+                    onCrear={handleCrearCuenta}
+                    onEliminar={handleEliminarCuenta}
+                    onRegistrarPago={handleRegistrarPago}
+                    onCrearGasto={handleCrearGasto}
+                  />
+                )}
+                {tab === "cuentas" && (
+                  <Cuentas
+                    cuentas={cuentas}
+                    gastos={gastos}
+                    ingresos={ingresos}
+                    categorias={categorias}
+                    onCrear={handleCrearCuenta}
+                    onEliminar={handleEliminarCuenta}
+                    onCrearGasto={handleCrearGasto}
+                    onCrearIngreso={handleCrearIngreso}
+                  />
+                )}
+                {tab === "deudas" && (
+                  <Deudas
+                    deudas={deudas}
+                    cuentas={cuentas}
+                    endeudamiento={endeudamiento}
+                    onCrear={handleCrearDeuda}
+                    onAbonar={handleAbonarDeuda}
+                    onEliminar={handleEliminarDeuda}
+                  />
+                )}
+                {tab === "recordatorios" && (
+                  <Recordatorios
+                    recordatorios={recordatorios}
+                    deudas={deudas}
+                    onCrear={handleCrearRecordatorio}
+                    onToggle={handleToggleRecordatorio}
+                    onEliminar={handleEliminarRecordatorio}
+                  />
+                )}
+                {tab === "categorias" && (
+                  <Categorias
+                    categorias={categorias}
+                    onCrear={handleCrearCategoria}
+                    onActualizar={handleActualizarCategoria}
+                    onEliminar={handleEliminarCategoria}
+                  />
+                )}
+              </BlurFade>
+            </Suspense>
           )}
         </div>
       </main>

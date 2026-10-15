@@ -15,6 +15,7 @@ function filaADeuda(row: DeudaRow): Deuda {
     saldoPendiente: Number(row.saldo_pendiente),
     cuotaMensual: Number(row.cuota_mensual),
     tasaInteres: row.tasa_interes !== null ? Number(row.tasa_interes) : undefined,
+    interesCuotaPendiente: Number(row.interes_cuota_pendiente ?? 0),
     fechaInicio: row.fecha_inicio,
     proximoPago: row.proximo_pago ?? undefined,
     cuentaId: row.cuenta_id ?? undefined,
@@ -55,7 +56,11 @@ export async function crearDeuda(deuda: Omit<Deuda, "id" | "createdAt">): Promis
 }
 
 export interface OpcionesAbono {
-  /** Cuenta de ahorro/débito/efectivo de la que sale el dinero. Sin ella, solo baja el saldo de la deuda. */
+  /**
+   * Cuenta de ahorro/débito/efectivo de la que sale el dinero. Sin ella baja el
+   * saldo de la deuda y, si es un diferido, igual se libera el cupo de la
+   * tarjeta: se asume que se pagó con dinero que no está registrado en la app.
+   */
   cuentaId?: string;
   /** "YYYY-MM-DD"; por defecto, hoy en la zona horaria del dispositivo. */
   fecha?: string;

@@ -17,8 +17,10 @@ import {
   listarDeudas,
   crearRecordatorio,
   marcarCompletado,
+  completarRecordatorio,
   eliminarRecordatorio,
   mensajeError,
+  parsearMonto,
   type Recordatorio,
   type Deuda,
   type TipoRecordatorio,
@@ -172,7 +174,13 @@ export default function RecordatoriosScreen() {
                 accessibilityState={{ checked: r.completado }}
                 android_ripple={{ color: color.primaryBg }}
                 onPress={() =>
-                  marcarCompletado(r.id, !r.completado).then(cargar)
+                  // Un recurrente no queda tachado: pasa a su siguiente fecha.
+                  (r.completado
+                    ? marcarCompletado(r.id, false)
+                    : completarRecordatorio(r)
+                  )
+                    .then(cargar)
+                    .catch((err) => setError(mensajeError(err)))
                 }
                 onLongPress={() => confirmarEliminar(r)}
                 style={({ pressed }) => [
@@ -242,7 +250,7 @@ function NuevoRecordatorio({
       await onCrear({
         titulo,
         tipo,
-        monto: monto ? Number(monto) : undefined,
+        monto: monto ? parsearMonto(monto) : undefined,
         fecha,
         recurrente,
         frecuencia: recurrente ? frecuencia : undefined,

@@ -15,6 +15,7 @@ import {
   listarCuentas,
   crearCuenta,
   mensajeError,
+  parsearMonto,
   OPCIONES_BANCO,
   OPCIONES_MARCA,
   ETIQUETA_BANCO,
@@ -207,7 +208,7 @@ function NuevaTarjeta({
       setError("Ponele un nombre a la tarjeta.");
       return;
     }
-    if (!cupoTotal || Number(cupoTotal) <= 0) {
+    if (!(parsearMonto(cupoTotal) > 0)) {
       setError("Una tarjeta de crédito necesita un cupo total.");
       return;
     }
@@ -220,8 +221,8 @@ function NuevaTarjeta({
         banco,
         marca,
         estilo,
-        cupoTotal: Number(cupoTotal),
-        disponible: Number(cupoTotal),
+        cupoTotal: parsearMonto(cupoTotal),
+        disponible: parsearMonto(cupoTotal),
         identificador: identificador.trim() || undefined,
       });
       setNombre("");
@@ -321,8 +322,8 @@ function NuevaTarjeta({
               banco,
               marca,
               estilo,
-              cupoTotal: Number(cupoTotal) > 0 ? Number(cupoTotal) : 1,
-              disponible: Number(cupoTotal) > 0 ? Number(cupoTotal) : 1,
+              cupoTotal: parsearMonto(cupoTotal) > 0 ? parsearMonto(cupoTotal) : 1,
+              disponible: parsearMonto(cupoTotal) > 0 ? parsearMonto(cupoTotal) : 1,
               createdAt: "",
             }}
           />

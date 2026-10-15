@@ -14,6 +14,8 @@ import {
   listarCuentas,
   crearGasto,
   mensajeError,
+  parsearMonto,
+  calcularDiferido,
   sumarMeses,
   fechaLocal,
   ETIQUETA_METODO_PAGO,
@@ -52,6 +54,7 @@ export default function NuevoGasto() {
   const [cuentaId, setCuentaId] = useState("");
   const [metodoPago, setMetodoPago] = useState<MetodoPago | "">("");
   const [mesesDiferido, setMesesDiferido] = useState(3);
+  const [tasaInteres, setTasaInteres] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
@@ -74,10 +77,18 @@ export default function NuevoGasto() {
   const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId);
   const esOtros = categoriaSeleccionada?.nombre === "Otros";
   const esDiferido = metodoPago === "diferido";
+  const cuentaSeleccionada = cuentas.find((c) => c.id === cuentaId);
+  const montoNumerico = parsearMonto(monto);
+  const tasaNumerica = tasaInteres.trim() ? parsearMonto(tasaInteres) : 0;
+  const cupoInsuficiente = cuentaSeleccionada?.tipo === "credito" &&
+    Number.isFinite(montoNumerico) && montoNumerico > cuentaSeleccionada.disponible;
+  const plan = esDiferido && montoNumerico > 0 &&
+    Number.isFinite(tasaNumerica) && tasaNumerica >= 0 && tasaNumerica <= 999.99
+    ? calcularDiferido(montoNumerico, mesesDiferido, tasaNumerica) : null;
 
   async function agregar() {
     setError(null);
-    if (!monto || Number(monto) <= 0) {
+    if (!(montoNumerico > 0)) {
       setError("El monto no puede ser un valor negativo.");
       return;
     }
@@ -89,16 +100,29 @@ export default function NuevoGasto() {
       setError("Contanos qué fue (categoría Otros).");
       return;
     }
+    if (esDiferido && cuentaSeleccionada?.tipo !== "credito") {
+      setError("Elegí una tarjeta de crédito para el diferido.");
+      return;
+    }
+    if (esDiferido && (!Number.isFinite(tasaNumerica) || tasaNumerica < 0 || tasaNumerica > 999.99)) {
+      setError("Escribí una tasa anual válida entre 0 y 999,99 %.");
+      return;
+    }
+    if (cupoInsuficiente) {
+      setError(`El monto supera el cupo disponible de la tarjeta ($${cuentaSeleccionada!.disponible.toFixed(2)}).`);
+      return;
+    }
     setGuardando(true);
     try {
       await crearGasto({
-        monto: Number(monto),
+        monto: montoNumerico,
         descripcion: descripcion || categoriaSeleccionada?.nombre || "Gasto",
         categoriaId,
         categoriaDetalle: esOtros ? categoriaDetalle : undefined,
         cuentaId: cuentaId || undefined,
         metodoPago: metodoPago || undefined,
         mesesDiferido: esDiferido ? mesesDiferido : undefined,
+        tasaInteres: esDiferido && tasaInteres.trim() ? tasaNumerica : undefined,
         fecha,
       });
       router.back();
@@ -202,7 +226,8 @@ export default function NuevoGasto() {
           onCambiar={setCuentaId}
           opciones={[
             { valor: "", etiqueta: "Sin asignar" },
-            ...cuentas.map((c) => ({ valor: c.id, etiqueta: c.nombre })),
+            ...cuentas.filter((c) => !esDiferido || c.tipo === "credito")
+              .map((c) => ({ valor: c.id, etiqueta: c.nombre })),
           ]}
         />
 
@@ -230,14 +255,32 @@ export default function NuevoGasto() {
                 etiqueta: `${m} meses`,
               }))}
             />
-            {monto && Number(monto) > 0 && (
+            <Campo
+              etiqueta="Tasa de interés anual (%)"
+              keyboardType="decimal-pad"
+              value={tasaInteres}
+              onChangeText={setTasaInteres}
+              placeholder="0 si no hay interés"
+            />
+            {cuentaSeleccionada?.tipo === "credito" && (
+              <Text style={styles.ayudaTexto}>
+                Cupo disponible: ${cuentaSeleccionada.disponible.toFixed(2)}. La compra ocupa el monto completo.
+              </Text>
+            )}
+            {plan && (
               <View style={styles.ayuda}>
                 <Text style={styles.ayudaTexto}>
-                  ${(Number(monto) / mesesDiferido).toFixed(2)}/mes · termina el{" "}
-                  {sumarMeses(fecha, mesesDiferido)} · esto crea una deuda
-                  automáticamente.
+                  Cuota estimada: ${plan.cuotaMensual.toFixed(2)} al mes.
+                  {"\n"}Primera cuota pendiente el {fecha}: ${plan.primeraCuota.total.toFixed(2)}
+                  {" "}(capital ${plan.primeraCuota.capital.toFixed(2)} + interés ${plan.primeraCuota.interes.toFixed(2)}).
+                  {"\n"}Interés total estimado: ${plan.interesTotal.toFixed(2)} · total a pagar: ${plan.totalEstimado.toFixed(2)}.
+                  {"\n"}Última cuota: {sumarMeses(fecha, mesesDiferido - 1)}.
+                  {!tasaInteres.trim() && " Tasa no indicada: esta estimación no incluye intereses."}
                 </Text>
               </View>
+            )}
+            {cupoInsuficiente && (
+              <ErrorTexto>El monto supera el cupo disponible de esta tarjeta.</ErrorTexto>
             )}
           </>
         )}

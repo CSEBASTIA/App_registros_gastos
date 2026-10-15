@@ -1,6 +1,7 @@
 import type { Categoria, Cuenta, Gasto, Ingreso, Presupuesto } from "../types/domain";
 import type { Endeudamiento } from "./calcularEndeudamiento";
 import { estadoPresupuestos } from "./estadoPresupuestos";
+import { sumarMontos } from "../lib/montos";
 
 export type SeveridadRecomendacion = "info" | "alerta";
 
@@ -46,8 +47,8 @@ export function generarRecomendaciones(params: ParametrosRecomendaciones): Recom
 
   const gastosDelMes = gastos.filter((g) => g.fecha.startsWith(mes));
   const ingresosDelMes = ingresos.filter((i) => i.fecha.startsWith(mes));
-  const totalGastosMes = gastosDelMes.reduce((acc, g) => acc + g.monto, 0);
-  const totalIngresosMes = ingresosDelMes.reduce((acc, i) => acc + i.monto, 0);
+  const totalGastosMes = sumarMontos(gastosDelMes.map((g) => g.monto));
+  const totalIngresosMes = sumarMontos(ingresosDelMes.map((i) => i.monto));
 
   if (totalIngresosMes > 0 && totalGastosMes > totalIngresosMes) {
     recomendaciones.push({
@@ -59,20 +60,22 @@ export function generarRecomendaciones(params: ParametrosRecomendaciones): Recom
   // Gasto por categoría vs. promedio de los últimos 3 meses.
   const mesesPrevios = mesesAnteriores(mes, 3);
   for (const categoria of categorias) {
-    const gastoMesCategoria = gastosDelMes
-      .filter((g) => g.categoriaId === categoria.id)
-      .reduce((acc, g) => acc + g.monto, 0);
+    const gastoMesCategoria = sumarMontos(
+      gastosDelMes.filter((g) => g.categoriaId === categoria.id).map((g) => g.monto)
+    );
     if (gastoMesCategoria === 0) continue;
 
-    const totalPrevio = mesesPrevios.reduce((acc, m) => {
-      return (
-        acc +
-        gastos
-          .filter((g) => g.categoriaId === categoria.id && g.fecha.startsWith(m))
-          .reduce((sum, g) => sum + g.monto, 0)
-      );
-    }, 0);
-    const promedioPrevio = totalPrevio / mesesPrevios.length;
+    // Promedio solo de los meses que tienen datos (como sugerirLimite): con
+    // poco historial, dividir siempre entre 3 inventaba aumentos que no existían.
+    const totalesPrevios = mesesPrevios
+      .map((m) =>
+        sumarMontos(
+          gastos.filter((g) => g.categoriaId === categoria.id && g.fecha.startsWith(m)).map((g) => g.monto)
+        )
+      )
+      .filter((total) => total > 0);
+    if (totalesPrevios.length === 0) continue;
+    const promedioPrevio = sumarMontos(totalesPrevios) / totalesPrevios.length;
 
     if (promedioPrevio > 0 && gastoMesCategoria > promedioPrevio * 1.3) {
       const incremento = ((gastoMesCategoria - promedioPrevio) / promedioPrevio) * 100;

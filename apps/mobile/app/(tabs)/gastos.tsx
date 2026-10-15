@@ -15,6 +15,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import {
   listarGastos,
   listarCategorias,
@@ -269,29 +270,51 @@ export default function GastosScreen() {
                 {gastosSemana.map((g) => {
                   const cat = categoriaDe(g.categoriaId);
                   return (
-                    <Pressable
-                      key={g.id}
-                      onLongPress={() => confirmarEliminar(g)}
-                      style={styles.filaGasto}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.gastoDescripcion} numberOfLines={1}>
-                          {g.descripcion}
+                    <View key={g.id} style={styles.filaGastoContenedor}>
+                      <Pressable
+                        accessible={false}
+                        onLongPress={() => confirmarEliminar(g)}
+                        style={({ pressed }) => [
+                          styles.filaGasto,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <View style={styles.gastoInfo}>
+                          <Text style={styles.gastoDescripcion} numberOfLines={2}>
+                            {g.descripcion}
+                          </Text>
+                          <Text style={styles.gastoMeta}>
+                            {cat?.nombre ?? "Sin categoría"}
+                            {cat?.nombre === "Otros" && g.categoriaDetalle
+                              ? ` · ${g.categoriaDetalle}`
+                              : ""}
+                            {" · "}
+                            {cuentaDe(g.cuentaId)?.nombre ?? "Sin cuenta"} ·{" "}
+                            {g.fecha}
+                          </Text>
+                        </View>
+                        <Text style={styles.gastoMonto}>
+                          ${g.monto.toFixed(2)}
                         </Text>
-                        <Text style={styles.gastoMeta} numberOfLines={1}>
-                          {cat?.nombre ?? "Sin categoría"}
-                          {cat?.nombre === "Otros" && g.categoriaDetalle
-                            ? ` · ${g.categoriaDetalle}`
-                            : ""}
-                          {" · "}
-                          {cuentaDe(g.cuentaId)?.nombre ?? "Sin cuenta"} ·{" "}
-                          {g.fecha}
-                        </Text>
-                      </View>
-                      <Text style={styles.gastoMonto}>
-                        ${g.monto.toFixed(2)}
-                      </Text>
-                    </Pressable>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Eliminar gasto ${g.descripcion}`}
+                        accessibilityHint="Solicita confirmación antes de eliminarlo."
+                        hitSlop={4}
+                        onPress={() => confirmarEliminar(g)}
+                        style={({ pressed }) => [
+                          styles.botonEliminar,
+                          pressed && { backgroundColor: color.dangerBg },
+                        ]}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={18}
+                          color={color.danger}
+                        />
+                      </Pressable>
+                    </View>
                   );
                 })}
               </View>
@@ -368,13 +391,27 @@ const createStyles = (color: Colors) =>
       width: 70,
       textAlign: "right",
     },
+    filaGastoContenedor: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderTopColor: color.border,
+    },
     filaGasto: {
+      flex: 1,
       flexDirection: "row",
       alignItems: "center",
       gap: spacing(2),
       paddingVertical: spacing(3),
-      borderTopWidth: 1,
-      borderTopColor: color.border,
+      minWidth: 0,
+    },
+    gastoInfo: { flex: 1, minWidth: 0 },
+    botonEliminar: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radius.pill,
     },
     gastoDescripcion: {
       fontFamily: font.semibold,

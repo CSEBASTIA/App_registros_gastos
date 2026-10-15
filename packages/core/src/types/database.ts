@@ -49,6 +49,7 @@ export type Database = {
           metodo_pago: string | null;
           factura_path: string | null;
           meses_diferido: number | null;
+          tasa_interes: number | null;
           fecha: string;
           created_at: string;
           usuario_id: string;
@@ -63,6 +64,7 @@ export type Database = {
           metodo_pago?: string | null;
           factura_path?: string | null;
           meses_diferido?: number | null;
+          tasa_interes?: number | null;
           fecha?: string;
           created_at?: string;
           usuario_id?: string;
@@ -77,6 +79,7 @@ export type Database = {
           metodo_pago?: string | null;
           factura_path?: string | null;
           meses_diferido?: number | null;
+          tasa_interes?: number | null;
           fecha?: string;
           created_at?: string;
           usuario_id?: string;
@@ -272,6 +275,8 @@ export type Database = {
           saldo_pendiente: number;
           cuota_mensual: number;
           tasa_interes: number | null;
+          interes_cuota_pendiente: number;
+          capital_cuota_pendiente: number;
           fecha_inicio: string;
           proximo_pago: string | null;
           cuenta_id: string | null;
@@ -287,6 +292,8 @@ export type Database = {
           saldo_pendiente: number;
           cuota_mensual: number;
           tasa_interes?: number | null;
+          interes_cuota_pendiente?: number;
+          capital_cuota_pendiente?: number;
           fecha_inicio?: string;
           proximo_pago?: string | null;
           cuenta_id?: string | null;
@@ -302,6 +309,8 @@ export type Database = {
           saldo_pendiente?: number;
           cuota_mensual?: number;
           tasa_interes?: number | null;
+          interes_cuota_pendiente?: number;
+          capital_cuota_pendiente?: number;
           fecha_inicio?: string;
           proximo_pago?: string | null;
           cuenta_id?: string | null;

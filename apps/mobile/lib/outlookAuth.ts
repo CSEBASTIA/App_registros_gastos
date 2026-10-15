@@ -2,6 +2,7 @@ import { Platform } from "react-native";
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
+import { esPermisoRetirado, MENSAJE_PERMISO_CORREO_VENCIDO } from "core";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -130,7 +131,17 @@ export async function obtenerAccessToken(): Promise<string> {
   const refreshToken = await obtenerSeguro(CLAVE_REFRESH);
   if (!refreshToken) throw new Error("El correo no está conectado.");
 
-  const renovado = await AuthSession.refreshAsync({ clientId: CLIENT_ID, refreshToken }, DISCOVERY);
+  let renovado: AuthSession.TokenResponse;
+  try {
+    renovado = await AuthSession.refreshAsync({ clientId: CLIENT_ID, refreshToken }, DISCOVERY);
+  } catch (err) {
+    // Permiso retirado o token caducado: se borran los tokens y se pide reconectar.
+    if (esPermisoRetirado(err)) {
+      await desconectarCorreo();
+      throw new Error(MENSAJE_PERMISO_CORREO_VENCIDO);
+    }
+    throw err;
+  }
   await guardarTokens(renovado);
   return renovado.accessToken;
 }

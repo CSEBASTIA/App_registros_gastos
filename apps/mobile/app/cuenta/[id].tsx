@@ -15,6 +15,8 @@ import {
   listarGastos,
   listarIngresos,
   listarCategorias,
+  listarPagosTarjeta,
+  listarAbonosDeuda,
   eliminarCuenta,
   movimientosDe,
   mensajeError,
@@ -22,6 +24,8 @@ import {
   type Gasto,
   type Ingreso,
   type Categoria,
+  type PagoTarjeta,
+  type AbonoDeuda,
 } from "core";
 import Tarjeta from "../../components/Tarjeta";
 import TarjetaVisual from "../../components/TarjetaVisual";
@@ -42,6 +46,10 @@ export default function DetalleCuenta() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  // Pagos a tarjetas y abonos a deudas hechos DESDE esta cuenta: sin ellos el
+  // saldo bajaba sin ningún movimiento que lo explicara.
+  const [pagos, setPagos] = useState<PagoTarjeta[]>([]);
+  const [abonos, setAbonos] = useState<AbonoDeuda[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
@@ -52,12 +60,16 @@ export default function DetalleCuenta() {
       listarGastos(),
       listarIngresos(),
       listarCategorias(),
+      listarPagosTarjeta(),
+      listarAbonosDeuda(),
     ])
-      .then(([cuentas, g, i, c]) => {
+      .then(([cuentas, g, i, c, p, a]) => {
         setCuenta(cuentas.find((c) => c.id === id) ?? null);
         setGastos(g);
         setIngresos(i);
         setCategorias(c);
+        setPagos(p);
+        setAbonos(a);
       })
       .catch((err) => setError(mensajeError(err)))
       .finally(() => setCargando(false));
@@ -113,9 +125,10 @@ export default function DetalleCuenta() {
   const movimientos = movimientosDe(
     cuenta.id,
     gastos,
-    [],
+    pagos,
     ingresos,
     categorias,
+    abonos,
   ).slice(0, 30);
 
   function confirmarEliminar() {

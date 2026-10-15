@@ -15,6 +15,7 @@ apps/desktop/src-tauri/target/
 
 # expo
 .expo/
+apps/mobile/.expo-check/
 *.jsbundle
 # exports web de verificación visual (expo export), se regeneran
 apps/mobile/dist-*/
@@ -43,3 +44,11 @@ apps/desktop/src/assets/Tarjetas dinner club/
 apps/desktop/src/assets/tarjetas produbanco/
 # configuración local de Claude Code (launch.json, permisos)
 .claude/
+
+# credenciales de firma de Android/iOS si se gestionan en local (EAS las guarda en su servidor por defecto)
+credentials.json
+*.jks
+*.keystore
+*.p8
+*.p12
+*.mobileprovision

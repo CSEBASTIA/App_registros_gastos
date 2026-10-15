@@ -1,13 +1,14 @@
 import { getSupabaseClient } from "../client";
 import type { Cuenta } from "../types/domain";
 import type { Database } from "../types/database";
+import { repararTexto } from "../lib/repararTexto";
 
 type CuentaRow = Database["public"]["Tables"]["cuentas"]["Row"];
 
 function filaACuenta(row: CuentaRow): Cuenta {
   return {
     id: row.id,
-    nombre: row.nombre,
+    nombre: repararTexto(row.nombre),
     tipo: row.tipo as Cuenta["tipo"],
     banco: row.banco as Cuenta["banco"],
     marca: (row.marca as Cuenta["marca"]) ?? undefined,

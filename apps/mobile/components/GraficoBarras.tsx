@@ -66,9 +66,9 @@ const makeStyles = (color: Colors) => StyleSheet.create({
   vacioTexto: { color: color.textMuted, fontFamily: font.body, fontSize: 13 },
   lienzo: { flexDirection: "row", alignItems: "flex-end", gap: spacing(2) },
   columna: { flex: 1, alignItems: "center", height: "100%", justifyContent: "flex-end", gap: spacing(1) },
-  valor: { fontFamily: font.mono, fontSize: 10, fontWeight: "700", color: color.textMuted },
+  valor: { fontFamily: font.mono, fontSize: 11, fontWeight: "700", color: color.textMuted },
   pista: { flex: 1, width: "100%", justifyContent: "flex-end" },
   barra: { width: "100%", borderRadius: 4, minHeight: 3 },
   etiquetas: { flexDirection: "row", gap: spacing(2), marginTop: spacing(1.5) },
-  etiqueta: { flex: 1, fontFamily: font.body, fontSize: 10, color: color.textMuted, textAlign: "center" },
+  etiqueta: { flex: 1, fontFamily: font.body, fontSize: 11, color: color.textMuted, textAlign: "center" },
 });

@@ -4,7 +4,7 @@ App de finanzas personales para Ecuador (Banco Guayaquil, Pichincha, Produbanco 
 
 **El producto principal es la app de teléfono** (`apps/mobile`). La versión web (`apps/desktop`) hoy es la más completa y sirve de referencia para la migración. Las dos comparten la misma lógica (`packages/core`) y el mismo backend (Supabase).
 
-> **Estado (14-oct-2026):** saldos confiables, correo opcional con revocación y borrado, y primer uso directo hacia el primer gasto, aplicados y verificados: **35/35 pruebas de lógica, 73/73 de base de datos** (incluye dos abonos simultáneos) y prueba de punta a punta en la app. El plan de 10 pasos y el informe del Paso 1 están en [`docs/plan-10-pasos-y-paso-1.docx`](docs/plan-10-pasos-y-paso-1.docx); el piloto, en [`docs/piloto.md`](docs/piloto.md). Qué migración está desplegada en cada entorno: ver [Estado de despliegue](#estado-de-despliegue).
+> **Estado (15-oct-2026):** saldos confiables (con saldo a favor), montos con coma decimal, correo opcional que se olvida al cerrar sesión, y primer uso directo hacia el primer gasto, aplicados y verificados: **71/71 pruebas de lógica, 89/89 de base de datos** (incluye dos abonos simultáneos), tipos sin errores en core, web y teléfono, y la app de Android compila. El plan de 10 pasos y el informe del Paso 1 están en [`docs/plan-10-pasos-y-paso-1.docx`](docs/plan-10-pasos-y-paso-1.docx); el piloto, en [`docs/piloto.md`](docs/piloto.md). Qué migración está desplegada en cada entorno: ver [Estado de despliegue](#estado-de-despliegue).
 
 ## Contenido
 
@@ -24,6 +24,7 @@ App de finanzas personales para Ecuador (Banco Guayaquil, Pichincha, Produbanco 
 14. [Errores corregidos](#errores-corregidos)
 15. [Pendientes y riesgos conocidos](#pendientes-y-riesgos-conocidos)
 16. [Reglas para contribuir](#reglas-para-contribuir)
+17. [App instalable y actualizaciones](#app-instalable-y-actualizaciones)
 
 ## Arquitectura
 
@@ -128,12 +129,20 @@ cp apps/desktop/.env.example apps/desktop/.env
 | `EXPO_PUBLIC_MS_CLIENT_ID` | teléfono | Opcional: conectar Outlook. |
 | `EXPO_PUBLIC_GOOGLE_CLIENT_ID` | teléfono | Opcional: conectar Gmail (ver [correo](#detección-de-movimientos-por-correo)). |
 
-**Aplica las migraciones** antes de usar la app. La más reciente (`20261013120000_seguridad_y_presupuestos.sql`) trae las correcciones de seguridad:
+**Aplica las migraciones** antes de usar la app:
 
 ```bash
 supabase migration up        # base local
 supabase db push             # proyecto remoto
 ```
+
+**Proyecto de Supabase nuevo, sin la CLI:** [`supabase/base-completa.sql`](supabase/base-completa.sql) tiene la base entera en un solo archivo: las 19 migraciones en orden y las categorías globales. En Supabase, abre *SQL Editor → New query*, pega el archivo completo y pulsa *Run*. Debe terminar mostrando `migraciones_registradas = 19`.
+
+- Es para un proyecto **vacío**. Corre en una sola transacción: si algo falla, no cambia nada.
+- Marca las migraciones como aplicadas, así que después `supabase db push` solo aplicará las nuevas.
+- No trae datos de ninguna persona.
+- Al agregar una migración, regenéralo con `bash supabase/generar-base-completa.sh`.
+- Verificado en una base desechable: queda idéntico a aplicar las migraciones una por una, y pasan las 88 pruebas de base de datos.
 
 Ejecutar:
 
@@ -264,6 +273,9 @@ Todas las tablas tienen Row Level Security con `auth.uid() = usuario_id`. Única
 | `20261014120000_abono_deuda_atomico` | Tabla `abonos_deuda` y función `registrar_abono_deuda` |
 | `20261014130000_saldos_confiables` | Edición de ingresos con reajuste, pagos de tarjeta sin borrado, cuenta de origen con SET NULL, diferidos protegidos |
 | `20261014140000_correo_confirmacion_y_privacidad` | Confirmación atómica e idempotente de la bandeja; el asunto se borra al resolver el aviso |
+| `20261014150000_agregar_bancos_pacifico_y_austro` | Banco del Pacífico y Banco del Austro como bancos |
+| `20261015120000_integridad_saldos` | Saldo a favor en tarjetas, edición de gastos pagados por diferencia, diferidos solo en tarjeta y con plazo, deudas protegidas al borrar, avisos resueltos inmutables, categorías borradas pasan a "Otros", abono con mínimo de $0,01 |
+| `20261015150000_categoria_salud` | Categoría global "Salud" |
 
 ### Estado de despliegue
 
@@ -271,7 +283,7 @@ Actualizar esta tabla cada vez que se aplique una migración en un entorno.
 
 | Entorno | Migraciones aplicadas | Última | Fecha |
 |---|---|---|---|
-| Supabase local (Docker, `127.0.0.1:54321`) | 16 de 16 | `20261014140000_correo_confirmacion_y_privacidad` | 14-oct-2026 |
+| Supabase local (Docker, `127.0.0.1:54321`) | 18 de 19 (falta `20261015150000_categoria_salud`) | `20261015120000_integridad_saldos` | 15-oct-2026 |
 | Supabase remoto | — | — | El proyecto anterior (`yzuwuvjywxiujtvxpdkx`) ya no existe; falta crear uno nuevo |
 
 Para comprobarlo en cualquier base: `select version, name from supabase_migrations.schema_migrations order by version;`
@@ -335,16 +347,17 @@ Los textos que vienen de correos de terceros se recortan antes de guardarse.
 ## Pruebas y verificación
 
 ```bash
-pnpm --filter core test          # 35 pruebas de lógica
-bash supabase/tests/correr.sh    # 73 pruebas de base de datos (requiere Docker)
+pnpm --filter core test          # 71 pruebas de lógica
+bash supabase/tests/correr.sh    # 89 pruebas de base de datos (requiere Docker)
 ```
 
 - **Lógica:** cálculos comparados contra resultados hechos a mano: presupuestos, plan de deudas, score, timeouts, fechas locales, mensajes de error y validación.
-- **Base de datos:** el script levanta un Postgres desechable con la misma imagen de Supabase, aplica las 16 migraciones desde cero, simula dos usuarios con su JWT (igual que PostgREST) y borra el contenedor al terminar. **Nunca toca tu base local ni la de producción.** Archivos:
+- **Base de datos:** el script levanta un Postgres desechable con la misma imagen de Supabase, aplica todas las migraciones desde cero, simula dos usuarios con su JWT (igual que PostgREST) y borra el contenedor al terminar. **Nunca toca tu base local ni la de producción.** Archivos:
   - `seguridad_y_presupuestos.sql` (36): ataques entre usuarios, flujo de saldos, presupuestos, límites y configuración.
   - `abono_deuda.sql` (13): abono atómico, recorte al saldo, cuenta de origen, cupo del diferido, permisos.
   - `saldos_confiables.sql` (13): edición de ingresos, pagos de tarjeta, borrado de cuentas y diferidos.
   - `correo_bandeja.sql` (10): confirmación atómica e idempotente, aislamiento entre usuarios y borrado de los datos del correo.
+  - `integridad_saldos.sql` (16): saldo a favor, edición de gastos pagados, diferidos, borrado de deudas y categorías, avisos resueltos y borrado de un usuario con abonos.
   - Concurrencia (1): dos abonos simultáneos de 70 sobre una deuda de 100 dejan la cuenta en −100, no en −140.
 - **Compilación:**
 
@@ -371,7 +384,9 @@ Aún sin verificar: el timeout en un teléfono físico y el upsert de presupuest
 - **Outlook:** Azure → App registrations → plataforma "Mobile and desktop applications" con redirect `gastosapp://redirect`.
 - **Gmail:** Google Cloud → habilitar Gmail API → OAuth client ID. **Por confirmar en el Paso 4:** el cliente de tipo "Web application" exige un secreto y no acepta redirects `gastosapp://`; lo habitual en móvil es un cliente Android/iOS. Además, `gmail.readonly` es un permiso restringido: para publicar hace falta la verificación de Google, y en modo de prueba el token caduca a los 7 días.
 
-**Limitaciones actuales (Paso 4):** la lista de remitentes de bancos (`REMITENTES_BANCO`) está vacía hasta tener muestras reales, así que el banco queda sin asignar en la bandeja; no se verifica DKIM/SPF (un remitente falsificado con el dominio real pasaría, por eso todo va a revisión humana); no hay paginación ni sincronización en segundo plano. La revocación ante Google no se ha probado con un Client ID real.
+**Limitaciones actuales (Paso 4):** la lista de remitentes de bancos (`REMITENTES_BANCO`) está vacía hasta tener muestras reales, así que el banco queda sin asignar en la bandeja; no se verifica DKIM/SPF (un remitente falsificado con el dominio real pasaría, por eso todo va a revisión humana); no hay sincronización en segundo plano. Cada búsqueda pagina hasta 500 correos y avisa si hubo más.
+
+**Privacidad al cerrar sesión (15-oct):** el permiso de correo es del teléfono, no de la cuenta. Al cerrar sesión se borran los tokens (y se revoca el de Google), y la conexión queda ligada a quien la hizo: si entra otra persona en el mismo teléfono, se olvida. Si el permiso fue retirado (`invalid_grant`), la app borra los tokens y pide reconectar. La revocación ante Google no se ha probado con un Client ID real.
 
 ## Modelo de negocio
 
@@ -395,6 +410,7 @@ Propuesta del Paso 5, como hipótesis a validar con usuarios:
 - `planDeudas` sin deudas devolvía "no viable" (error del código nuevo, encontrado por las pruebas).
 - Saldos (14-oct): el abono desde el teléfono no descontaba de ninguna cuenta; editar un ingreso descuadraba la cuenta; borrar un pago de tarjeta dejaba el cupo inflado; no se podía borrar una cuenta usada para pagar una tarjeta; editar un diferido dejaba la deuda desactualizada.
 - App de teléfono (14-oct): se caía en Expo Go por `expo-linking`/`expo-constants` de otra versión de Expo y por dos copias de `expo-router`; la raíz `/` no tenía pantalla.
+- Integridad (15-oct, revisión con dos agentes de búsqueda de errores): un monto con coma ("12,50") se guardaba como NaN; pagar de más una tarjeta perdía el dinero; editar un gasto ya pagado perdía cupo; un diferido en cuenta de ahorro cobraba dos veces; borrar un diferido con abonos inflaba el cupo; 100,30 − 50,10 − 50,20 mostraba "−$0.00"; el detalle de una cuenta no mostraba los pagos ni los abonos que salían de ella; los errores de validación salían como JSON en inglés; quien iniciaba sesión después en el mismo teléfono seguía leyendo el correo de la persona anterior; la búsqueda de correo leía solo 40 y saltaba los que llegaban mientras buscaba; un recordatorio mensual se quedaba tachado para siempre.
 - Activación y correo (14-oct): conectar el correo era un paso obligado del registro; desconectar no revocaba el permiso ni borraba los datos; confirmar en la bandeja podía duplicar el gasto; el remitente se aceptaba si solo "contenía" el dominio del banco; "Salud financiera" decía "tus ingresos cubren tus gastos" sin ningún ingreso registrado; quedaban fechas en UTC en el teléfono.
 
 **Antes:** el CHECK de `metodo_pago` no aceptaba `diferido`; errores mostrados como `[object Object]`; montos como `$-921.70`; pagar una tarjeta no descontaba de ninguna cuenta; deudas por diferido indistinguibles de préstamos; `.env` móvil con prefijo `VITE_`; `metro.config.js` rompía la resolución en el monorepo; ruta raíz sin pantalla; `expo-secure-store` dejaba en blanco "Correo" en web; la bandeja escondía errores de red.
@@ -403,7 +419,8 @@ Propuesta del Paso 5, como hipótesis a validar con usuarios:
 
 | Pendiente | Gravedad | Paso |
 |---|---|---|
-| Crear un Supabase remoto y aplicarle las 16 migraciones (local ya está al día) | Alta | Piloto |
+| Crear un Supabase remoto y aplicarle `supabase/base-completa.sql` (las 19 migraciones; la local tiene 18, falta `20261015150000_categoria_salud`) | Alta | Piloto |
+| Ajustes de interfaz pedidos por la revisión del 15-oct: saldo a favor visible, solo tarjetas en diferidos, confirmar al borrar categorías, semana actual en Gastos y otros (lista en `docs/contrato-logica-core.md`) | Media | 6-10 |
 | Abono con cuenta de origen en la **web** (el teléfono ya lo tiene) | Media | Fase web |
 | Pantalla para editar ingresos (base y `actualizarIngreso` listos) | Media | 7 |
 | Anular un pago de tarjeta por error (hoy no se puede borrar, a propósito) | Baja | 3 |
@@ -411,9 +428,9 @@ Propuesta del Paso 5, como hipótesis a validar con usuarios:
 | Correo: remitentes reales vacíos, tipo de cliente OAuth de Google, verificación de Google para `gmail.readonly` (no promocionarlo hasta resolverlo) | Media | 4 |
 | El nivel de endeudamiento sale 0 % en un mes sin ingresos (core ya acepta un ingreso de referencia; falta usarlo en las pantallas) | Baja | 6 |
 | La web no tiene login ni cierre de sesión; botón "Borrar todo (temporal)" visible | Alta antes de publicar la web | Fase web |
-| Reemplazar `toISOString().slice(…)` por `fechaLocal()` en las pantallas | Media | 6-10 |
+| Reemplazar `toISOString().slice(…)` por `fechaLocal()` en las pantallas de la **web** (el teléfono ya está; quedan 9 usos en 8 archivos) | Media | Fase web |
 | Políticas RLS con `(select auth.uid())` para rendimiento; límites de intentos de login en Supabase | Baja / Media | 10 |
-| `app.json` sin `bundleIdentifier` / `package`, íconos ni splash | — | 10 |
+| Ícono y pantalla de inicio propios (identificador y actualizaciones ya configurados) | — | 10 |
 
 ## Reglas para contribuir
 
@@ -424,3 +441,15 @@ Propuesta del Paso 5, como hipótesis a validar con usuarios:
 5. **Errores con `mensajeError(err)`** y campos con `maxLength` según `LIMITES`.
 6. **Nada se da por terminado sin pruebas:** `pnpm --filter core test` y `bash supabase/tests/correr.sh` en verde.
 7. **Secretos fuera del repositorio:** los `.env` están en `.gitignore`; nunca usar `service_role` en una app.
+
+## App instalable y actualizaciones
+
+La app de teléfono se instala una vez (**EAS Build**) y recibe los cambios sola (**EAS Update**). Ya están configurados `app.json` (identificador `com.csebastia.gastosapp`, `runtimeVersion`, búsqueda de actualizaciones al abrir), `eas.json` (APK de prueba y AAB para Google Play) y `expo-updates`. Desde `apps/mobile`:
+
+```bash
+pnpm build:apk            # compila el APK instalable
+pnpm update:prueba        # publica un cambio al canal de prueba
+pnpm update:produccion    # publica a los usuarios
+```
+
+Cada comando pasa primero por `scripts/verificar-entorno-publicacion.mjs`, que **frena la publicación** si la URL de Supabase es local o la clave es la `service_role`. Configuración inicial, reglas (primero la base, migraciones compatibles hacia atrás, cambio nativo = nueva versión) y cómo volver atrás: [`docs/actualizaciones.md`](docs/actualizaciones.md).

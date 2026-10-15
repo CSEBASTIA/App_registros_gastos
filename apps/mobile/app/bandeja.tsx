@@ -16,6 +16,7 @@ import {
   marcarTransaccionDetectada,
   confirmarTransaccionDetectada,
   mensajeError,
+  parsearMonto,
   ETIQUETA_BANCO,
   type TransaccionDetectada,
   type Categoria,
@@ -165,7 +166,7 @@ function ItemBandeja({
       // Un solo paso en la base: crea el gasto/ingreso y marca el aviso
       // juntos, así reintentar tras un error de red nunca lo duplica.
       await confirmarTransaccionDetectada(item.id, {
-        monto: Number(monto.replace(",", ".")),
+        monto: parsearMonto(monto),
         descripcion,
         categoriaId: categoriaId || undefined,
         cuentaId: cuentaId || undefined,

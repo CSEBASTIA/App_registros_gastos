@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "../client";
 import type { Recordatorio } from "../types/domain";
 import type { Database } from "../types/database";
+import { siguienteFechaRecurrente } from "../lib/semanas";
 
 type RecordatorioRow = Database["public"]["Tables"]["recordatorios"]["Row"];
 
@@ -56,6 +57,27 @@ export async function marcarCompletado(id: string, completado: boolean): Promise
     .update({ completado })
     .eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * Marca un recordatorio como hecho. Si es recurrente, en vez de quedar
+ * tachado para siempre, se renueva: pasa a la siguiente fecha (semana, mes o
+ * año después) y queda pendiente otra vez. Devuelve el recordatorio actualizado.
+ */
+export async function completarRecordatorio(recordatorio: Recordatorio): Promise<Recordatorio> {
+  const cambios =
+    recordatorio.recurrente && recordatorio.frecuencia
+      ? { fecha: siguienteFechaRecurrente(recordatorio.fecha, recordatorio.frecuencia), completado: false }
+      : { completado: true };
+
+  const { data, error } = await getSupabaseClient()
+    .from("recordatorios")
+    .update(cambios)
+    .eq("id", recordatorio.id)
+    .select()
+    .single();
+  if (error) throw error;
+  return filaARecordatorio(data);
 }
 
 export async function eliminarRecordatorio(id: string): Promise<void> {

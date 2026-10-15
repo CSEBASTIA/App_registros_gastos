@@ -13,7 +13,13 @@ export const cuentaSchema = z
       .regex(/^[a-z0-9-]+$/, "Estilo inválido")
       .optional(),
     cupoTotal: montoPositivo().optional(),
-    identificador: z.string().trim().min(3).max(4).regex(/^\d+$/, "Solo dígitos").optional(),
+    identificador: z
+      .string()
+      .trim()
+      .min(3, "Los últimos dígitos deben ser 3 o 4 números")
+      .max(4, "Los últimos dígitos deben ser 3 o 4 números")
+      .regex(/^\d+$/, "Los últimos dígitos deben ser solo números")
+      .optional(),
     disponible: z.number().min(-LIMITES.monto).max(LIMITES.monto),
   })
   .refine((c) => c.tipo !== "credito" || c.cupoTotal !== undefined, {

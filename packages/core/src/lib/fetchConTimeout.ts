@@ -56,13 +56,28 @@ export function crearFetchConTimeout(opciones: OpcionesTimeout = {}): FetchLike 
     }
 
     let agotado = false;
+    let rechazarPorTiempo: ((motivo: unknown) => void) | undefined;
+    const tiempo = new Promise<never>((_, rechazar) => {
+      rechazarPorTiempo = rechazar;
+    });
+    tiempo.catch(() => {}); // evita "unhandled rejection" si nadie la espera
     const temporizador = entorno.setTimeout(() => {
       agotado = true;
       controlador.abort();
+      rechazarPorTiempo?.(new ErrorTiempoAgotado(Math.round(limite / 1000)));
     }, limite);
 
     try {
-      return await fetchBase(input, { ...init, signal: controlador.signal });
+      // Carrera con el temporizador: corta aunque el fetch ignore la señal.
+      const res = await Promise.race([fetchBase(input, { ...init, signal: controlador.signal }), tiempo]);
+
+      // El límite cubre también la descarga del cuerpo: antes se cancelaba al
+      // llegar las cabeceras y un servidor que no terminaba de enviar dejaba
+      // la pantalla colgada. Se lee dentro del límite y se entrega ya completo.
+      const sinCuerpo = metodo === "HEAD" || [101, 204, 205, 304].includes(res?.status);
+      if (!entorno.Response || typeof res?.arrayBuffer !== "function" || sinCuerpo) return res;
+      const cuerpo = await Promise.race([res.arrayBuffer(), tiempo]);
+      return new entorno.Response(cuerpo, { status: res.status, statusText: res.statusText, headers: res.headers });
     } catch (err) {
       if (agotado) throw new ErrorTiempoAgotado(Math.round(limite / 1000));
       throw err;

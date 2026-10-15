@@ -7,7 +7,8 @@ import { useTheme, font, radius, spacing, type Colors } from "../lib/theme";
 export default function ItemMovimiento({ item }: { item: MovimientoCuenta }) {
   const { color: tema } = useTheme();
   const styles = makeStyles(tema);
-  const esIngreso = item.tipo !== "gasto";
+  // `sentido` dice si suma o resta (un pago enviado o un abono resta aunque no sea "gasto").
+  const esIngreso = item.sentido ? item.sentido === "entrada" : item.tipo !== "gasto";
   return (
     <View style={styles.fila}>
       <View style={[styles.icono, { backgroundColor: `${item.color}1f` }]}>

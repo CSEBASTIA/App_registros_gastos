@@ -1,4 +1,3 @@
-import { recognize } from "tesseract.js";
 import { normalizarNumero, sugerirCategoria } from "core";
 
 export interface ReciboExtraido {
@@ -11,6 +10,7 @@ export interface ReciboExtraido {
 
 /** Corre OCR local (tesseract.js, español) sobre una imagen de recibo/factura. */
 export async function leerImagen(archivo: File): Promise<string> {
+  const { recognize } = await import("tesseract.js");
   const {
     data: { text },
   } = await recognize(archivo, "spa");
@@ -35,15 +35,31 @@ function extraerMonto(texto: string): number | undefined {
 }
 
 function extraerFecha(texto: string): string | undefined {
+  const isoDirecto = texto.match(/(\d{4})-(\d{2})-(\d{2})/);
+  if (isoDirecto) {
+    const [, anio, mes, dia] = isoDirecto;
+    if (!fechaValida(Number(anio), Number(mes), Number(dia))) return undefined;
+    return isoDirecto[0];
+  }
+
   const conGuionOBarra = texto.match(/(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/);
   if (conGuionOBarra) {
-    let [, dia, mes, anio] = conGuionOBarra;
+    const [, dia, mes, anioRaw] = conGuionOBarra;
+    let anio = anioRaw;
     if (anio.length === 2) anio = `20${anio}`;
+    if (!fechaValida(Number(anio), Number(mes), Number(dia))) return undefined;
     return `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
   }
-  const isoDirecto = texto.match(/(\d{4})-(\d{2})-(\d{2})/);
-  if (isoDirecto) return isoDirecto[0];
   return undefined;
+}
+
+function fechaValida(anio: number, mes: number, dia: number): boolean {
+  if (anio < 1 || anio > 9999 || mes < 1 || mes > 12 || dia < 1) return false;
+
+  const finDeMes = new Date(0);
+  finDeMes.setUTCHours(0, 0, 0, 0);
+  finDeMes.setUTCFullYear(anio, mes, 0);
+  return dia <= finDeMes.getUTCDate();
 }
 
 function extraerComercio(texto: string): string | undefined {

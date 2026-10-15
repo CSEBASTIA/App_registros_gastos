@@ -1,11 +1,35 @@
 {
   "expo": {
-    "name": "gastos-app",
+    "name": "fintrack",
     "slug": "gastos-app",
     "scheme": "gastosapp",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/brand/fintrack-app-icon.png",
+    "splash": {
+      "image": "./assets/brand/fintrack-lockup.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#17191c"
+    },
     "userInterfaceStyle": "automatic",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
+    "android": {
+      "package": "com.csebastia.gastosapp",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/fintrack-mark.png",
+        "backgroundColor": "#17191c"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.csebastia.gastosapp"
+    },
     "plugins": [
       "expo-router",
       "expo-secure-store"

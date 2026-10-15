@@ -15,6 +15,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
 import {
   listarIngresos,
   listarCategorias,
@@ -201,29 +202,51 @@ export default function IngresosScreen() {
                 {ingresosDelMes.map((i) => {
                   const cat = categoriaDe(i.categoriaId);
                   return (
-                    <Pressable
-                      key={i.id}
-                      onLongPress={() => confirmarEliminar(i)}
-                      style={styles.fila}
-                    >
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.filaDescripcion} numberOfLines={1}>
-                          {i.descripcion}
+                    <View key={i.id} style={styles.filaContenedor}>
+                      <Pressable
+                        accessible={false}
+                        onLongPress={() => confirmarEliminar(i)}
+                        style={({ pressed }) => [
+                          styles.fila,
+                          pressed && { opacity: 0.7 },
+                        ]}
+                      >
+                        <View style={styles.filaInfo}>
+                          <Text style={styles.filaDescripcion} numberOfLines={2}>
+                            {i.descripcion}
+                          </Text>
+                          <Text style={styles.filaMeta}>
+                            {cat?.nombre ?? "Sin fuente"}
+                            {cat?.nombre === "Otros" && i.categoriaDetalle
+                              ? ` · ${i.categoriaDetalle}`
+                              : ""}
+                            {" · "}
+                            {cuentaDe(i.cuentaId)?.nombre ?? "Sin cuenta"} ·{" "}
+                            {i.fecha}
+                          </Text>
+                        </View>
+                        <Text style={styles.filaMonto}>
+                          ${i.monto.toFixed(2)}
                         </Text>
-                        <Text style={styles.filaMeta} numberOfLines={1}>
-                          {cat?.nombre ?? "Sin fuente"}
-                          {cat?.nombre === "Otros" && i.categoriaDetalle
-                            ? ` · ${i.categoriaDetalle}`
-                            : ""}
-                          {" · "}
-                          {cuentaDe(i.cuentaId)?.nombre ?? "Sin cuenta"} ·{" "}
-                          {i.fecha}
-                        </Text>
-                      </View>
-                      <Text style={styles.filaMonto}>
-                        ${i.monto.toFixed(2)}
-                      </Text>
-                    </Pressable>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Eliminar ingreso ${i.descripcion}`}
+                        accessibilityHint="Solicita confirmación antes de eliminarlo."
+                        hitSlop={4}
+                        onPress={() => confirmarEliminar(i)}
+                        style={({ pressed }) => [
+                          styles.botonEliminar,
+                          pressed && { backgroundColor: color.dangerBg },
+                        ]}
+                      >
+                        <Ionicons
+                          name="trash-outline"
+                          size={18}
+                          color={color.danger}
+                        />
+                      </Pressable>
+                    </View>
                   );
                 })}
               </View>
@@ -265,13 +288,27 @@ const createStyles = (color: Colors) =>
       alignItems: "center",
     },
     tituloCard: { fontFamily: font.display, fontSize: 20, color: color.text },
+    filaContenedor: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderTopWidth: 1,
+      borderTopColor: color.border,
+    },
     fila: {
+      flex: 1,
       flexDirection: "row",
       alignItems: "center",
       gap: spacing(2),
       paddingVertical: spacing(3),
-      borderTopWidth: 1,
-      borderTopColor: color.border,
+      minWidth: 0,
+    },
+    filaInfo: { flex: 1, minWidth: 0 },
+    botonEliminar: {
+      width: 44,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: radius.pill,
     },
     filaDescripcion: {
       fontFamily: font.semibold,

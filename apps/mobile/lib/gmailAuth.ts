@@ -2,7 +2,7 @@ import { Platform } from "react-native";
 import * as AuthSession from "expo-auth-session";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
-import { crearFetchConTimeout } from "core";
+import { crearFetchConTimeout, esPermisoRetirado, MENSAJE_PERMISO_CORREO_VENCIDO } from "core";
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -116,6 +116,9 @@ const fetchRevocar = crearFetchConTimeout({ ms: 10_000 });
  */
 export async function desconectarCorreo(): Promise<{ revocado: boolean }> {
   const token = (await obtenerSeguro(CLAVE_REFRESH)) ?? (await obtenerSeguro(CLAVE_ACCESS));
+  // Primero se borran del teléfono (al cerrar sesión, quien entre después no
+  // debe poder usarlos ni un segundo) y luego se revocan en Google.
+  await borrarTokens();
   let revocado = false;
   if (token) {
     try {
@@ -130,10 +133,13 @@ export async function desconectarCorreo(): Promise<{ revocado: boolean }> {
       revocado = false;
     }
   }
+  return { revocado };
+}
+
+async function borrarTokens(): Promise<void> {
   await borrarSeguro(CLAVE_REFRESH);
   await borrarSeguro(CLAVE_ACCESS);
   await borrarSeguro(CLAVE_EXPIRA);
-  return { revocado };
 }
 
 /** Devuelve un access token vigente para llamar a la API de Gmail, renovándolo solo si ya venció. */
@@ -148,7 +154,18 @@ export async function obtenerAccessToken(): Promise<string> {
   const refreshToken = await obtenerSeguro(CLAVE_REFRESH);
   if (!refreshToken) throw new Error("El correo no está conectado.");
 
-  const renovado = await AuthSession.refreshAsync({ clientId: CLIENT_ID, refreshToken }, DISCOVERY);
+  let renovado: AuthSession.TokenResponse;
+  try {
+    renovado = await AuthSession.refreshAsync({ clientId: CLIENT_ID, refreshToken }, DISCOVERY);
+  } catch (err) {
+    // Permiso retirado o token caducado: reintentar no sirve. Se borran los
+    // tokens (la pantalla pasa a "sin conectar") y se pide reconectar.
+    if (esPermisoRetirado(err)) {
+      await borrarTokens();
+      throw new Error(MENSAJE_PERMISO_CORREO_VENCIDO);
+    }
+    throw err;
+  }
   await guardarTokens(renovado);
   return renovado.accessToken;
 }

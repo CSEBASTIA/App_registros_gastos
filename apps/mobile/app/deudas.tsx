@@ -19,6 +19,7 @@ import {
   eliminarDeuda,
   calcularEndeudamiento,
   mensajeError,
+  parsearMonto,
   fechaLocal,
   mesLocal,
   type Deuda,
@@ -250,7 +251,7 @@ function FilaDeuda({
   }
 
   async function confirmar() {
-    const valor = Number(monto.replace(",", "."));
+    const valor = parsearMonto(monto);
     if (!monto || !(valor > 0)) {
       setError("Ingresá un monto mayor que 0.");
       return;
@@ -306,11 +307,17 @@ function FilaDeuda({
           </Text>
         </View>
       </View>
+      {deuda.gastoId && deuda.proximoPago && (
+        <Text style={styles.etiqueta}>
+          Próxima cuota pendiente: {deuda.proximoPago}
+          {deuda.interesCuotaPendiente ? ` · interés de esta cuota: $${deuda.interesCuotaPendiente.toFixed(2)}` : ""}
+        </Text>
+      )}
       {abonando ? (
         <View style={{ gap: spacing(3) }}>
           <Campo
             etiqueta="Monto del abono"
-            placeholder={`Hasta $${deuda.saldoPendiente.toFixed(2)}`}
+            placeholder={`Hasta $${(deuda.saldoPendiente + (deuda.interesCuotaPendiente ?? 0)).toFixed(2)}`}
             keyboardType="decimal-pad"
             value={monto}
             onChangeText={setMonto}
@@ -390,9 +397,9 @@ function NuevaDeuda({
       await crearDeuda({
         nombre,
         tipo,
-        montoTotal: Number(montoTotal),
-        saldoPendiente: Number(montoTotal),
-        cuotaMensual: Number(cuotaMensual || 0),
+        montoTotal: parsearMonto(montoTotal),
+        saldoPendiente: parsearMonto(montoTotal),
+        cuotaMensual: cuotaMensual ? parsearMonto(cuotaMensual) : 0,
         fechaInicio: hoy(),
         cuentaId: cuentaId || undefined,
       });

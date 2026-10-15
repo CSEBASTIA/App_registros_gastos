@@ -13,6 +13,7 @@ import {
   listarCuentas,
   crearCuenta,
   mensajeError,
+  parsearMonto,
   OPCIONES_BANCO,
   COLOR_CUENTA_BANCO,
   ETIQUETA_BANCO,
@@ -180,7 +181,7 @@ function NuevaCuenta({
         nombre,
         tipo,
         banco,
-        disponible: Number(saldoInicial || 0),
+        disponible: saldoInicial ? parsearMonto(saldoInicial) : 0,
         identificador: identificador.trim() || undefined,
       });
       setNombre("");

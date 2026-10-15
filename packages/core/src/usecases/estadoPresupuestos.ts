@@ -1,4 +1,5 @@
 import type { Categoria, Gasto, Presupuesto } from "../types/domain";
+import { sumarMontos } from "../lib/montos";
 
 export type NivelPresupuesto = "ok" | "cerca" | "excedido";
 
@@ -30,17 +31,19 @@ export function estadoPresupuestos(
   return presupuestos
     .filter((p) => p.mes === mes)
     .map((presupuesto) => {
-      const gastado = gastosDelMes
-        .filter((g) => g.categoriaId === presupuesto.categoriaId)
-        .reduce((acc, g) => acc + g.monto, 0);
-      const porcentaje = (gastado / presupuesto.montoLimite) * 100;
+      // En centavos: 70.10 + 29.90 de un límite de 100 debe dar justo 100 %,
+      // no 100.00000000000001 % ("Superaste el límite por $0.00").
+      const gastado = sumarMontos(
+        gastosDelMes.filter((g) => g.categoriaId === presupuesto.categoriaId).map((g) => g.monto)
+      );
+      const porcentaje = Math.round((gastado / presupuesto.montoLimite) * 100 * 100) / 100;
 
       return {
         presupuesto,
         categoriaNombre:
           categorias.find((c) => c.id === presupuesto.categoriaId)?.nombre ?? "Sin categoría",
         gastado,
-        restante: presupuesto.montoLimite - gastado,
+        restante: sumarMontos([presupuesto.montoLimite, -gastado]),
         porcentaje,
         nivel: nivelDe(porcentaje),
       };

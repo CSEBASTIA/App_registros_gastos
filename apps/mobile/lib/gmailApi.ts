@@ -1,6 +1,14 @@
-import { htmlATexto, crearFetchConTimeout, fechaLocal } from "core";
+import {
+  htmlATexto,
+  crearFetchConTimeout,
+  fechaLocal,
+  juntarPaginas,
+  enLotes,
+  TOPE_CORREOS,
+  type CorreoRecibido,
+  type CorreosTraidos,
+} from "core";
 import { obtenerAccessToken } from "./gmailAuth";
-import type { CorreoRecibido } from "./graphMail";
 
 interface CabeceraGmail {
   name: string;
@@ -97,17 +105,29 @@ async function llamarGmail(path: string): Promise<any> {
   return res.json();
 }
 
-/** Mismo contrato que `traerCorreosNuevos` de graphMail.ts, para que el resto de la app no distinga el proveedor. */
-export async function traerCorreosNuevos(desde: Date, limite = 40): Promise<CorreoRecibido[]> {
+/**
+ * Mismo contrato que `traerCorreosNuevos` de graphMail.ts, para que el resto
+ * de la app no distinga el proveedor. Pagina la lista (antes solo leía 40 y
+ * el resto se perdía) y descarga los mensajes de a 10: uno que falle no tumba
+ * la búsqueda, se cuenta en `fallidos`.
+ */
+export async function traerCorreosNuevos(desde: Date, tope = TOPE_CORREOS): Promise<CorreosTraidos> {
   const despuesDe = Math.floor(desde.getTime() / 1000);
-  const lista = await llamarGmail(`/messages?q=${encodeURIComponent(`after:${despuesDe}`)}&maxResults=${limite}`);
-  const ids: string[] = (lista.messages ?? []).map((m: { id: string }) => m.id);
+  const q = encodeURIComponent(`after:${despuesDe}`);
+  const { items: ids, truncado } = await juntarPaginas<string>(async (siguiente) => {
+    const pagina = await llamarGmail(
+      `/messages?q=${q}&maxResults=100${siguiente ? `&pageToken=${encodeURIComponent(siguiente)}` : ""}`
+    );
+    return { items: (pagina.messages ?? []).map((m: { id: string }) => m.id), siguiente: pagina.nextPageToken };
+  }, tope);
 
-  const mensajes = await Promise.all(
-    ids.map((id) => llamarGmail(`/messages/${encodeURIComponent(id)}?format=full`) as Promise<MensajeGmail>)
+  const { resultados: mensajes, fallidos, primerError } = await enLotes(ids, 10, (id) =>
+    llamarGmail(`/messages/${encodeURIComponent(id)}?format=full`) as Promise<MensajeGmail>
   );
+  // Si no se pudo leer ninguno, el problema es general (red, permiso): se muestra.
+  if (mensajes.length === 0 && fallidos > 0) throw primerError;
 
-  return mensajes.map((m) => {
+  const correos = mensajes.map((m): CorreoRecibido => {
     const headers = m.payload.headers ?? [];
     const fecha = fechaLocal(new Date(Number(m.internalDate)));
     return {
@@ -118,4 +138,5 @@ export async function traerCorreosNuevos(desde: Date, limite = 40): Promise<Corr
       fecha,
     };
   });
+  return { correos, truncado, fallidos };
 }

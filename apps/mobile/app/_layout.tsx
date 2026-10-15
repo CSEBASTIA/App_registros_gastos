@@ -51,12 +51,6 @@ function ThemedLayout() {
     // tab por defecto es "resumen") — pasa también en el arranque en frío
     // con sesión ya guardada.
     const enRaiz = segments.length === 0;
-    // último paso del registro: si la confirmación de email está apagada,
-    // signUp ya deja sesión activa acá — no hay que sacar al usuario antes
-    // de que decida si conecta el correo o no (esa pantalla navega ella
-    // misma cuando termina).
-    const enConectarCorreo = segments[1] === "conectar-correo";
-
     // No navegar mientras el componente devuelve null (abajo): el Stack
     // todavía no existe y expo-router lanza "Attempted to navigate before
     // mounting the Root Layout component", que tumba la app al arrancar.
@@ -71,7 +65,7 @@ function ThemedLayout() {
       router.replace("/login");
     } else if (session && enRaiz) {
       router.replace("/resumen");
-    } else if (session && enGrupoAuth && !enConectarCorreo) {
+    } else if (session && enGrupoAuth) {
       router.replace("/resumen");
     }
   }, [session, segments, router, ready, fontsLoaded, fontError]);
@@ -87,6 +81,9 @@ function ThemedLayout() {
         headerTintColor: color.text,
         headerShadowVisible: false,
         headerTitleStyle: { fontFamily: font.display },
+        // Cada pantalla secundaria conserva su encabezado dentro del contenido;
+        // el Stack muestra la navegación de regreso sin repetir ese título.
+        headerTitle: "",
         contentStyle: { backgroundColor: color.bg },
         animation: reduceMotion ? "none" : "default",
       }}

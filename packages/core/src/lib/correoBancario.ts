@@ -1,5 +1,6 @@
 import type { Banco } from "../types/domain";
 import { normalizarNumero, sugerirCategoria } from "./textoFinanciero";
+import { fechaIso } from "../schemas/limites";
 
 /**
  * Dominios/direcciones de remitente conocidas de cada banco, para
@@ -23,8 +24,12 @@ const PALABRAS_GASTO =
 const PALABRAS_INGRESO =
   /\b(dep[oó]sito|abono\s+(?:recibido)?|acreditaci[oó]n|transferencia\s+recibida|pago\s+recibido|sueldo|rol\s+de\s+pagos)\b/i;
 
-// Monto: dígitos con miles opcionales y 2 decimales — mismo criterio que estadoCuenta.ts.
-const REGEX_MONTO = /\$?\s?(\d{1,3}(?:[.,]\d{3})*[.,]\d{2})/;
+// Monto con 2 decimales, con o sin separador de miles ("1.234,56", "1,234.56",
+// "1234.56"). Debe empezar al inicio o tras algo que no sea dígito ni separador:
+// sin esa condición, "$1234.56" se leía como 234.56.
+const REGEX_MONTO = /(?:^|[^\d.,])(\d{1,3}(?:[.,]\d{3})+[.,]\d{2}|\d+[.,]\d{2})(?!\d)/;
+// Pago a la tarjeta propia: es una salida de dinero, no un ingreso (aunque diga "abono").
+const PAGO_A_TARJETA = /\b(abono|pago)\s+(?:a|de)\s+(?:tu|su)\s+tarjeta\b/i;
 const REGEX_FECHA_DMY = /(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/;
 const REGEX_FECHA_ISO = /(\d{4})-(\d{2})-(\d{2})/;
 // "cuenta ****1234" / "tarjeta terminada en 5678" / "cta. 1234"
@@ -72,18 +77,21 @@ export function bancoDeRemitente(
   return undefined;
 }
 
+/**
+ * Solo devuelve fechas que existen en el calendario. Una fecha imposible
+ * ("2026-02-30", "31/02/2026") hacía fallar el lote entero al guardarse y
+ * bloqueaba la sincronización para siempre; ahora se ignora y se usa la
+ * fecha de recepción del correo.
+ */
 function extraerFecha(texto: string): string | undefined {
   const iso = texto.match(REGEX_FECHA_ISO);
-  if (iso) return iso[0];
+  if (iso && fechaIso().safeParse(iso[0]).success) return iso[0];
   const dmy = texto.match(REGEX_FECHA_DMY);
   if (dmy) {
     const [, dia, mes, anioRaw] = dmy;
     const anio = anioRaw.length === 2 ? `20${anioRaw}` : anioRaw;
-    const mesNum = Number(mes);
-    const diaNum = Number(dia);
-    if (mesNum >= 1 && mesNum <= 12 && diaNum >= 1 && diaNum <= 31) {
-      return `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
-    }
+    const fecha = `${anio}-${mes.padStart(2, "0")}-${dia.padStart(2, "0")}`;
+    if (fechaIso().safeParse(fecha).success) return fecha;
   }
   return undefined;
 }
@@ -94,6 +102,7 @@ function extraerFecha(texto: string): string | undefined {
  * así que esto siempre pasa por la cola de revisión — nunca se guarda solo.
  */
 function tipoDeCorreo(texto: string): "gasto" | "ingreso" | undefined {
+  if (PAGO_A_TARJETA.test(texto)) return "gasto";
   if (PALABRAS_INGRESO.test(texto)) return "ingreso";
   if (PALABRAS_GASTO.test(texto)) return "gasto";
   return undefined;

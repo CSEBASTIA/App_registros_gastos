@@ -20,6 +20,7 @@ import {
   registrarPagoTarjeta,
   movimientosDe,
   mensajeError,
+  parsearMonto,
   formatMonto,
   type Cuenta,
   type Gasto,
@@ -248,13 +249,13 @@ function PagarTarjeta({
   const [guardando, setGuardando] = useState(false);
 
   async function confirmar() {
-    if (!monto || Number(monto) <= 0) return;
+    if (!(parsearMonto(monto) > 0)) return;
     setGuardando(true);
     try {
       await registrarPagoTarjeta({
         cuentaId,
         cuentaOrigenId: cuentaOrigenId || undefined,
-        monto: Number(monto),
+        monto: parsearMonto(monto),
         fecha: hoy(),
       });
       setMonto("");

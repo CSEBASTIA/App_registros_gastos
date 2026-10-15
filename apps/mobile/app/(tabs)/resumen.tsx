@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
+  Image,
   View,
   Text,
   ScrollView,
@@ -192,7 +193,18 @@ export default function ResumenScreen() {
             gap: spacing(4),
           }}
         >
+          <View style={styles.brandLockup} accessibilityRole="image" accessibilityLabel="fintrack">
+            <Image
+              source={require("../../assets/brand/fintrack-app-icon.png")}
+              style={styles.brandIcon}
+              accessible={false}
+            />
+            <Text style={styles.brandName}>fintrack</Text>
+          </View>
           <BlurFade style={styles.intro}>
+            <Text accessibilityRole="header" style={styles.screenTitle}>
+              Resumen
+            </Text>
             <Text style={styles.introTexto}>
               Ingresos y gastos de este mes, en un solo lugar.
             </Text>
@@ -280,7 +292,13 @@ export default function ResumenScreen() {
             </View>
             <View style={styles.grafico}>
               {semana.map((dia) => (
-                <View key={dia.fecha} style={styles.diaColumna}>
+                <View
+                  key={dia.fecha}
+                  accessible
+                  accessibilityRole="text"
+                  accessibilityLabel={`${dia.fecha}: ${formatMonto(dia.total)} en gastos${dia.esHoy ? ", hoy" : ""}`}
+                  style={styles.diaColumna}
+                >
                   <View style={styles.diaPista}>
                     <View
                       style={[
@@ -545,7 +563,20 @@ function veredictoFinanciero(
 const createStyles = (color: Colors) =>
   StyleSheet.create({
     contenedor: { flex: 1, backgroundColor: color.bg },
-    intro: { marginBottom: spacing(1) },
+    brandLockup: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: spacing(2),
+    },
+    brandIcon: { width: 30, height: 30, borderRadius: 8 },
+    brandName: { fontFamily: font.semibold, fontSize: 16, color: color.text },
+    intro: { gap: spacing(2), marginBottom: spacing(1) },
+    screenTitle: {
+      fontFamily: font.display,
+      fontSize: 30,
+      lineHeight: 36,
+      color: color.text,
+    },
     introTexto: { fontFamily: font.body, fontSize: 14, color: color.textMuted },
     hero: {
       backgroundColor: color.surface,

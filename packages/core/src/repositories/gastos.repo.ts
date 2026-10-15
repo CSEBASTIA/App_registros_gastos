@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "../client";
 import type { Gasto } from "../types/domain";
 import type { Database } from "../types/database";
+import { cambiosGastoSchema } from "../schemas/gasto.schema";
 
 type GastoRow = Database["public"]["Tables"]["gastos"]["Row"];
 
@@ -15,6 +16,7 @@ function filaAGasto(row: GastoRow): Gasto {
     cuentaId: row.cuenta_id ?? undefined,
     metodoPago: (row.metodo_pago as Gasto["metodoPago"]) ?? undefined,
     mesesDiferido: row.meses_diferido ?? undefined,
+    tasaInteres: row.tasa_interes !== null ? Number(row.tasa_interes) : undefined,
     facturaPath: row.factura_path ?? undefined,
     fecha: row.fecha,
     createdAt: row.created_at,
@@ -44,6 +46,9 @@ export async function crearGasto(
       cuenta_id: gasto.cuentaId ?? null,
       metodo_pago: gasto.metodoPago ?? null,
       meses_diferido: gasto.mesesDiferido ?? null,
+      // Solo si se indicó: así crear gastos funciona también en una base sin
+      // la migración 20261015170000 (que agrega la columna).
+      ...(gasto.tasaInteres !== undefined ? { tasa_interes: gasto.tasaInteres } : {}),
       factura_path: gasto.facturaPath ?? null,
       fecha: gasto.fecha,
     })
@@ -58,7 +63,9 @@ export type CambiosGasto = Partial<
   Pick<Gasto, "monto" | "descripcion" | "categoriaId" | "categoriaDetalle" | "cuentaId" | "metodoPago" | "fecha">
 >;
 
-export async function actualizarGasto(id: string, cambios: CambiosGasto): Promise<Gasto> {
+/** Valida solo lo que se envía: antes la edición llegaba a la base sin pasar por zod. */
+export async function actualizarGasto(id: string, cambiosSinValidar: CambiosGasto): Promise<Gasto> {
+  const cambios = cambiosGastoSchema.parse(cambiosSinValidar);
   const { data, error } = await getSupabaseClient()
     .from("gastos")
     .update({

@@ -5,10 +5,15 @@ export * from "./lib/movimientosCuenta";
 export * from "./lib/marcas";
 export * from "./lib/mensajeError";
 export * from "./lib/formatMonto";
+export * from "./lib/montos";
+export * from "./lib/diferidos";
+export * from "./lib/repararTexto";
 export * from "./lib/categorias";
 export * from "./lib/metodoPago";
 export * from "./lib/textoFinanciero";
+export * from "./lib/estadoCuenta";
 export * from "./lib/correoBancario";
+export * from "./lib/sincronizacionCorreo";
 export * from "./lib/fetchConTimeout";
 export * from "./schemas/limites";
 export * from "./schemas/gasto.schema";
@@ -50,6 +55,7 @@ export {
   listarRecordatorios,
   eliminarRecordatorio,
   marcarCompletado,
+  completarRecordatorio,
 } from "./repositories/recordatorios.repo";
 export {
   listarTransaccionesPendientes,
@@ -57,6 +63,7 @@ export {
   marcarTransaccionDetectada,
   confirmarTransaccionDetectada,
   eliminarTransaccionesDetectadas,
+  avisoGuardable,
   type TransaccionDetectadaInsert,
   type DatosConfirmacion,
 } from "./repositories/transaccionesDetectadas.repo";

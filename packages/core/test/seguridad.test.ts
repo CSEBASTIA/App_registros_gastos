@@ -57,7 +57,8 @@ test("fechaLocal: 21:30 del 13 de octubre sigue siendo el 13 (no el 14 en UTC)",
 
 test("sumarMeses: cruza de año sin desfasar el día", () => {
   assert.equal(sumarMeses("2026-11-15", 2), "2027-01-15");
-  assert.equal(sumarMeses("2026-01-31", 1), "2026-03-03"); // JS desborda feb → 3 de marzo
+  // Antes JS desbordaba febrero al 3 de marzo; ahora se queda en el último día, como la base.
+  assert.equal(sumarMeses("2026-01-31", 1), "2026-02-28");
 });
 
 // --- Validación de entrada (primera barrera antes de la base) -----------
@@ -84,6 +85,7 @@ test("gastoSchema: rechaza textos vacíos, larguísimos, montos absurdos y fecha
     { monto: Number.NaN },
     { monto: 1e13 },
     { fecha: "2026-13-01" },
+    { fecha: "2026-02-30" },
     { fecha: "13/10/2026" },
     { categoriaId: "1 OR 1=1" },
   ];
@@ -105,12 +107,25 @@ test("presupuestoSchema: mes YYYY-MM válido y límite positivo", () => {
   assert.equal(presupuestoSchema.safeParse({ ...base, montoLimite: 0 }).success, false);
 });
 
-test("pagoTarjetaSchema: la cuenta de origen no puede ser la misma tarjeta", () => {
+test("pagoTarjetaSchema: acepta pagos válidos y rechaza referencias o importes inválidos", () => {
   const id = gastoValido.categoriaId;
+  const otraCuenta = "8f1c2a1e-1111-4222-8333-444455556666";
+  const pagoValido = { cuentaId: id, cuentaOrigenId: otraCuenta, monto: 10, fecha: "2026-10-13" };
+
+  assert.equal(pagoTarjetaSchema.safeParse(pagoValido).success, true);
   assert.equal(
-    pagoTarjetaSchema.safeParse({ cuentaId: id, cuentaOrigenId: id, monto: 10, fecha: "2026-10-13" }).success,
+    pagoTarjetaSchema.safeParse({ cuentaId: id, monto: 10, fecha: "2026-10-13" }).success,
+    true
+  );
+  assert.equal(
+    pagoTarjetaSchema.safeParse({ ...pagoValido, cuentaOrigenId: id }).success,
     false
   );
+  assert.equal(pagoTarjetaSchema.safeParse({ ...pagoValido, cuentaId: "no-es-uuid" }).success, false);
+  assert.equal(pagoTarjetaSchema.safeParse({ ...pagoValido, monto: 0 }).success, false);
+  assert.equal(pagoTarjetaSchema.safeParse({ ...pagoValido, monto: -10 }).success, false);
+  assert.equal(pagoTarjetaSchema.safeParse({ ...pagoValido, fecha: "2026-02-30" }).success, false);
+  assert.equal(pagoTarjetaSchema.safeParse({ ...pagoValido, fecha: "13/10/2026" }).success, false);
 });
 
 test("categoriaSchema: color solo en formato #RRGGBB", () => {

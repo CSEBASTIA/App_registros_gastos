@@ -2,6 +2,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { createClient } from "@supabase/supabase-js";
 import { setSupabaseClient, crearFetchConTimeout } from "core";
 import type { Database } from "core/src/types/database";
+import { olvidarCorreoDelDispositivo } from "./correoProveedor";
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!;
@@ -21,3 +22,9 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
 // Le pasamos el cliente ya configurado a `core` para que los
 // repositorios y casos de uso compartidos puedan usarlo.
 setSupabaseClient(supabase);
+
+// Al cerrar sesión (o si la sesión caduca), el correo conectado en este
+// teléfono se olvida: no debe pasar a la siguiente persona que inicie sesión.
+supabase.auth.onAuthStateChange((evento) => {
+  if (evento === "SIGNED_OUT") void olvidarCorreoDelDispositivo();
+});

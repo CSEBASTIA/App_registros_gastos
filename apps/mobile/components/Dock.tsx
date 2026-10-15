@@ -90,7 +90,7 @@ export default function Dock({ state, descriptors, navigation }: BottomTabBarPro
             onLongPress={() => navigation.emit({ type: "tabLongPress", target: route.key })}
             style={({ pressed }) => [styles.route, { opacity: pressed ? 0.65 : 1 }]}>
             <Ionicons name={ICONOS[route.name] ?? "ellipse-outline"} size={21} color={selected ? color.primary : color.textMuted} />
-            <Text numberOfLines={1} style={{ fontFamily: selected ? font.semibold : font.medium, fontSize: 10, color: selected ? color.primary : color.textMuted }}>{options.title ?? route.name}</Text>
+            <Text numberOfLines={1} style={{ fontFamily: selected ? font.semibold : font.medium, fontSize: 11, color: selected ? color.primary : color.textMuted }}>{options.title ?? route.name}</Text>
             {options.tabBarBadge != null && <Text style={[styles.badge, { backgroundColor: color.danger, color: color.surface }]}>{options.tabBarBadge}</Text>}
           </Pressable>;
         })}

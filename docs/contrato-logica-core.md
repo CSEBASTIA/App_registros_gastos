@@ -66,3 +66,55 @@ Cambios hechos en pantallas (dueño: Agente 3), todos con los componentes existe
 
 ## Revisión general (14-oct, 10:50)
 - `lib/catalogoTarjetas.ts`: el commit `834933c` dejó en `main` 7 `require` a imágenes de Pichincha que no existen (`pichincha-mastercard-premium-miles.jpg`, `pichincha-visa-joven.png`, `pichincha-visa-platinum-miles.jpg`, `pichincha-visa-premium-microfinanzas*.jpg`, `pichincha-visa-signature-miles.jpg`, `pichincha-visa-universidad-catolica.jpg`). Con eso la app móvil no arrancaba. Se comentaron (la tarjeta usa el degradado del banco). Al agregar cada imagen, descomentar su línea. Antes de cada commit, comprobar con `npx expo export -p android` desde `apps/mobile`.
+
+## Integridad de saldos, montos y correo (15-oct)
+
+Origen: revisión de errores con dos agentes. Todo con pruebas: core 71/71, base 89/89 (`bash supabase/tests/correr.sh`).
+
+### Reglas nuevas de la base (migración `20261015120000_integridad_saldos`)
+- **Saldo a favor:** el `disponible` de una tarjeta puede pasar de `cupo_total` (pagar de más ya no pierde dinero). Usado = `max(0, cupo_total − disponible)`; a favor = `max(0, disponible − cupo_total)`.
+- Editar el monto o la cuenta de un gasto ya pagado reajusta solo la diferencia (antes se perdía cupo).
+- **Un diferido solo va a una tarjeta de crédito** (o sin cuenta) y exige `mesesDiferido`. Su cuota es `ceil(monto·100 / meses) / 100`.
+- No se puede borrar una deuda automática mientras exista su gasto, ni una deuda con abonos (borrar la cuenta del usuario sí funciona).
+- Un aviso de la Bandeja ya resuelto no cambia de estado.
+- Al borrar una categoría propia, sus gastos e ingresos pasan a "Otros" con el nombre viejo como detalle.
+
+### Funciones de core nuevas o cambiadas
+- `parsearMonto(texto)`: "12,50", "1.234,56", "$ 25" → número con 2 decimales; NaN si no es un monto. **Usar en todo campo de monto** en lugar de `Number(texto)` (que da NaN con coma). También `sumarMontos`, `redondearCentavos`.
+- `mensajeError`: los errores de zod salen en español (un monto vacío da "Escribe un monto válido, por ejemplo 12,50."). Además traduce los códigos 23503, 23514, 23505 y 57014 de Postgres.
+- `actualizarGasto` valida con `cambiosGastoSchema`. `""` en cuenta, detalle o método significa "quitarlo".
+- `completarRecordatorio(r)`: si es recurrente, pasa a la siguiente fecha en vez de quedar tachado. `siguienteFechaRecurrente`, y `sumarMeses` usa el último día del mes (31-ene + 1 = 28-feb).
+- `movimientosDe(cuentaId, gastos, pagos, ingresos, categorias, abonos?)`: la cuenta de origen muestra los pagos a tarjeta y los abonos. **Usar `item.sentido` ("entrada" | "salida") para el signo**, no `tipo`. Es opcional en el tipo solo para no romper a quien arma movimientos a mano (como `resumen.tsx`, que debería llenarlo).
+- `etiquetaFecha` usa el día local.
+- `insertarTransaccionesDetectadas` omite los avisos imposibles y devuelve `{ enviados, descartados }`. `marcarTransaccionDetectada` solo acepta `"descartado"` y borra el asunto.
+- `lib/sincronizacionCorreo`: `avisosDeCorreos`, `juntarPaginas`, `enLotes`, `desdeParaSincronizar`, `resumenSincronizacion` y `esPermisoRetirado`.
+- `crearFetchConTimeout`: el límite cubre también la descarga del cuerpo.
+
+### Cambios hechos en archivos del teléfono
+- `lib/correoProveedor.ts`:
+  - `sincronizarCorreo()` pagina hasta 500 correos. La marca es la hora de inicio, con 10 min de solape, y no avanza si falló algún correo.
+  - `desconectarYBorrarCorreo()` borra primero los datos y luego quita el permiso.
+  - `olvidarCorreoDelDispositivo()`.
+  - La conexión de correo queda ligada a quien la hizo: si entra otra persona, se olvida.
+- `lib/supabase.ts`: al cerrar sesión (`SIGNED_OUT`) se olvida el correo del teléfono. Antes, quien entrara después seguía leyendo el correo de la persona anterior. **`mas.tsx` no necesita cambios.**
+- `lib/gmailAuth.ts` y `outlookAuth.ts`: si el permiso fue retirado (`invalid_grant`), se borran los tokens y se pide reconectar. Gmail borra los tokens antes de revocar.
+- `lib/gmailApi.ts` y `graphMail.ts`: paginación y descarga de a 10 (un correo malo no tumba la búsqueda). En Graph, la fecha va en el día local y solo se sigue un `nextLink` de graph.microsoft.com.
+- Pantallas (dueño: Agente 3), cambios mínimos sin tocar el diseño:
+  - `app/correo.tsx`: los botones Buscar y Desconectar llaman a las funciones de `lib/correoProveedor`. El resultado se arma con `resumenSincronizacion`.
+  - `parsearMonto` en `gasto/nuevo`, `ingreso/nuevo`, `(tabs)/tarjetas`, `cuentas`, `deudas`, `recordatorios`, `tarjeta/[id]`, `bandeja` y `presupuestos`.
+  - `gasto/nuevo`: la vista previa de la cuota redondea como la base.
+  - `cuenta/[id].tsx`: carga pagos y abonos y los pasa a `movimientosDe`.
+  - `recordatorios.tsx`: tocar un recordatorio usa `completarRecordatorio` y muestra el error si falla.
+  - `components/ItemMovimiento.tsx` (teléfono y web): el signo sale de `sentido`.
+
+### Pendiente para los agentes de interfaz
+1. Campos de monto: `keyboardType="decimal-pad"`, `maxLength={12}`. Los formularios nuevos deben usar `parsearMonto`.
+2. Gastos (`(tabs)/gastos.tsx`): al abrir el mes actual, empezar en la semana de hoy, no siempre en la 1 (`useState(1)`).
+3. Categorías (`categorias.tsx`): borrar sin confirmación y sin `.catch`. Pedir confirmación ("sus movimientos pasan a Otros") y mostrar el error.
+4. `gasto/nuevo.tsx`: el `useFocusEffect` vuelve a poner `cuentaIdInicial` cada vez que la pantalla recupera el foco y pisa la cuenta elegida. Aplicarlo solo la primera vez.
+5. Diferido en `gasto/nuevo.tsx`: con método "diferido", listar solo tarjetas de crédito (la base rechaza otra cuenta).
+6. Pago de tarjeta (`tarjeta/[id].tsx`): mostrar la deuda actual (`cupo_total − disponible`) y un atajo "Pagar todo". Si paga de más, avisar que queda saldo a favor.
+7. Tarjetas (`TarjetaVisual`, detalle, web `Tarjetas.tsx`): con `disponible > cupo_total` mostrar "Saldo a favor $X". Nunca un usado negativo ni una barra de más del 100 %.
+8. Web, edición de gastos: en diferidos, deshabilitar monto, cuenta, método y plazo (reenviar valores sin cambios no falla). Web, abono a deuda: agregar "Pagar desde", como en el teléfono.
+9. `components/GraficoBarras.tsx`: `key={d.etiqueta}` se repite si dos datos tienen la misma etiqueta. Usar un id estable.
+10. `app/correo.tsx`: los textos de desconexión usan voseo ("entrá", "revisá"); el resto de la app usa tú.

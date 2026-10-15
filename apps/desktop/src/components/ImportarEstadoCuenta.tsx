@@ -40,19 +40,20 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
       const transacciones = parseEstadoCuenta(texto);
       if (transacciones.length === 0) {
         setError(
-          "No se reconocieron transacciones en el documento. Si es un PDF escaneado (sin texto seleccionable), prueba subiendo una foto o captura de pantalla en su lugar."
+          "No se reconocieron transacciones en el documento. Revisa que se vean la fecha de consumo, el comercio y el monto; también puedes probar con una foto más nítida."
         );
         setFase("elegir");
         return;
       }
 
       const categoriaPorNombre = new Map(categorias.map((c) => [c.nombre, c.id]));
+      const otrosId = categoriaPorNombre.get("Otros") ?? "";
       setFilas(
         transacciones.map((t, i) => ({
           ...t,
           id: i,
           seleccionado: !t.posiblePago,
-          categoriaId: (t.categoriaSugerida && categoriaPorNombre.get(t.categoriaSugerida)) || "",
+          categoriaId: categoriaPorNombre.get(t.categoriaSugerida) ?? otrosId,
         }))
       );
       setFase("revisar");
@@ -103,13 +104,13 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
           {fase === "elegir" && (
             <>
               <p className="subtitulo">
-                Sube el PDF o una foto/captura de tu estado de cuenta y la app va a detectar los consumos
+                Sube el PDF, CSV o una foto/captura de tu estado de cuenta y la app va a detectar los consumos
                 automáticamente. Vas a poder revisar y corregir cada fila antes de guardar nada.
               </p>
               <input
                 ref={inputRef}
                 type="file"
-                accept=".pdf,application/pdf,image/*"
+                accept=".pdf,application/pdf,.csv,text/csv,.txt,text/plain,image/*"
                 style={{ display: "none" }}
                 onChange={elegirArchivo}
               />

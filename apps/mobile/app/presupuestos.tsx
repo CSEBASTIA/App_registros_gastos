@@ -23,6 +23,7 @@ import {
   listarPresupuestos,
   mesLocal,
   mensajeError,
+  parsearMonto,
   type Categoria,
   type EstadoPresupuesto,
   type Gasto,
@@ -379,7 +380,7 @@ function FormularioPresupuesto({
   const [guardando, setGuardando] = useState(false);
 
   async function enviar() {
-    const montoLimite = Number(monto.replace(",", "."));
+    const montoLimite = parsearMonto(monto);
     if (!categoriaId) {
       setError("Elegí una categoría de gasto.");
       return;

@@ -14,6 +14,7 @@ import {
   listarCuentas,
   crearIngreso,
   mensajeError,
+  parsearMonto,
   fechaLocal,
   type Categoria,
   type Cuenta,
@@ -68,14 +69,14 @@ export default function NuevoIngreso() {
 
   async function agregar() {
     setError(null);
-    if (!monto || Number(monto) <= 0) {
+    if (!(parsearMonto(monto) > 0)) {
       setError("El monto no puede ser un valor negativo.");
       return;
     }
     setGuardando(true);
     try {
       await crearIngreso({
-        monto: Number(monto),
+        monto: parsearMonto(monto),
         descripcion: descripcion || categoriaSeleccionada?.nombre || "Ingreso",
         categoriaId: categoriaId || undefined,
         categoriaDetalle: esOtros ? categoriaDetalle : undefined,

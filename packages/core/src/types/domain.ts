@@ -22,6 +22,8 @@ export interface Gasto {
   metodoPago?: MetodoPago;
   /** Solo cuando metodoPago === "diferido": a cuántos meses (3-24). Genera una deuda automáticamente. */
   mesesDiferido?: number;
+  /** Tasa nominal anual acordada para el diferido; 0 significa sin interés. */
+  tasaInteres?: number;
   /** Ruta del archivo (PDF o imagen) dentro del bucket privado "facturas", ej. "<usuario_id>/<archivo>". */
   facturaPath?: string;
   fecha: string;
@@ -112,6 +114,8 @@ export interface Deuda {
   tasaInteres?: number;
   fechaInicio: string;
   proximoPago?: string;
+  /** Interés pendiente de la cuota actual en un diferido automático. */
+  interesCuotaPendiente?: number;
   cuentaId?: string;
   /** Si esta deuda se creó sola a partir de un gasto diferido, el id de ese gasto. */
   gastoId?: string;

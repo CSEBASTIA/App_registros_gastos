@@ -86,7 +86,7 @@ function Vista() {
         <aside className="sidebar">
           <div className="brand">
             <Logo size={28} />
-            <span>Gastos App</span>
+            <span>fintrack</span>
           </div>
           <nav className="nav">
             {TABS.map((t) => {
@@ -119,7 +119,7 @@ function Vista() {
           <GradienteAnimado colores={["#3552d1", "#2941ac", "#5f7ae8"]} velocidad={26} desenfoque="fuerte" />
           <div className="login-arte-marca">
             <Logo size={30} />
-            <span>Gastos App</span>
+            <span>fintrack</span>
           </div>
           <p className="login-arte-frase">Tus gastos, ingresos y tarjetas en un solo lugar</p>
         </section>
@@ -148,7 +148,7 @@ function Vista() {
       <aside className="sidebar">
         <div className="brand">
           <Logo size={28} />
-          <span>Gastos App</span>
+          <span>fintrack</span>
         </div>
         <nav className="nav">
           {TABS.map((t) => {
@@ -181,7 +181,6 @@ function Vista() {
             gastos={gastos}
             ingresos={ingresos}
             categorias={categorias}
-            correoUsuario="sebas@ejemplo.com"
           />
           <div className="card" style={{ padding: 0, marginTop: 24 }}>
             <table className="tabla">

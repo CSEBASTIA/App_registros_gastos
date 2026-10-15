@@ -70,10 +70,24 @@ export function mesLocal(fecha: Date = new Date()): string {
   return fechaLocal(fecha).slice(0, 7);
 }
 
-/** Suma `meses` a una fecha "YYYY-MM-DD" y devuelve el resultado en el mismo formato. */
+/**
+ * Suma `meses` a una fecha "YYYY-MM-DD". Si el día no existe en el mes de
+ * destino, se usa el último día de ese mes (31-ene + 1 = 28-feb), igual que
+ * la base de datos: antes JavaScript lo desbordaba al 3 de marzo y la pantalla
+ * anunciaba una fecha de primera cuota distinta de la guardada.
+ */
 export function sumarMeses(fechaIso: string, meses: number): string {
   const [anio, mes, dia] = fechaIso.split("-").map(Number);
-  return fechaLocal(new Date(anio, mes - 1 + meses, dia));
+  const ultimoDia = new Date(anio, mes - 1 + meses + 1, 0).getDate();
+  return fechaLocal(new Date(anio, mes - 1 + meses, Math.min(dia, ultimoDia)));
+}
+
+/** Siguiente fecha de un recordatorio recurrente. */
+export function siguienteFechaRecurrente(fechaIso: string, frecuencia: "semanal" | "mensual" | "anual"): string {
+  if (frecuencia === "mensual") return sumarMeses(fechaIso, 1);
+  if (frecuencia === "anual") return sumarMeses(fechaIso, 12);
+  const [anio, mes, dia] = fechaIso.split("-").map(Number);
+  return fechaLocal(new Date(anio, mes - 1, dia + 7));
 }
 
 /** Mueve un mes "YYYY-MM" `delta` meses (positivo o negativo). */

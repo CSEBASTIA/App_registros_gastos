@@ -10,15 +10,7 @@ import {
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import {
-  listarCuentas,
-  parsearCorreoBancario,
-  insertarTransaccionesDetectadas,
-  eliminarTransaccionesDetectadas,
-  mensajeError,
-  type Cuenta,
-  type TransaccionDetectadaInsert,
-} from "core";
+import { mensajeError, resumenSincronizacion } from "core";
 import Tarjeta from "../components/Tarjeta";
 import Boton from "../components/Boton";
 import ErrorTexto from "../components/ErrorTexto";
@@ -29,26 +21,13 @@ import {
   proveedorConfigurado,
   proveedorConectado,
   conectarProveedor,
-  desconectarProveedorActivo,
-  traerCorreosDelProveedorActivo,
+  desconectarYBorrarCorreo,
+  sincronizarCorreo,
+  CLAVE_ULTIMA_SYNC,
   type ProveedorCorreo,
 } from "../lib/correoProveedor";
 
-const CLAVE_ULTIMA_SYNC = "correo_ultima_sync";
 const PROVEEDORES: ProveedorCorreo[] = ["gmail", "outlook"];
-
-function cuentaParaTransaccion(
-  cuentas: Cuenta[],
-  banco: Cuenta["banco"] | undefined,
-  identificador: string | undefined,
-) {
-  if (!banco) return undefined;
-  const delBanco = cuentas.filter((c) => c.banco === banco);
-  if (delBanco.length === 1) return delBanco[0].id;
-  if (identificador)
-    return delBanco.find((c) => c.identificador === identificador)?.id;
-  return undefined; // ambiguo — se elige a mano en la Bandeja.
-}
 
 export default function CorreoScreen() {
   const { color } = useTheme();
@@ -99,12 +78,9 @@ export default function CorreoScreen() {
     setError(null);
     setAvisoDesconexion(null);
     try {
-      // 1) Quita el permiso (en Google también en sus servidores) y borra los tokens.
-      const { proveedor, revocado } = await desconectarProveedorActivo();
+      // Borra lo leído de los correos y luego quita el permiso (ver lib/correoProveedor).
+      const { proveedor, revocado, borrados } = await desconectarYBorrarCorreo();
       setConectado(null);
-      // 2) Borra lo que la app guardó de los correos. Los gastos ya confirmados se quedan.
-      const borrados = await eliminarTransaccionesDetectadas();
-      await AsyncStorage.removeItem(CLAVE_ULTIMA_SYNC);
       setUltimaSync(null);
       setResultado(null);
       const permiso = revocado
@@ -129,50 +105,14 @@ export default function CorreoScreen() {
     setResultado(null);
     setBuscando(true);
     try {
-      const desdeGuardado = await AsyncStorage.getItem(CLAVE_ULTIMA_SYNC);
-      // primera vez: mira los últimos 14 días, no toda la casilla.
-      const desde = desdeGuardado
-        ? new Date(desdeGuardado)
-        : new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
-
-      const correos = await traerCorreosDelProveedorActivo(desde);
-      const cuentas = await listarCuentas();
-
-      const detectadas: TransaccionDetectadaInsert[] = [];
-      for (const correo of correos) {
-        const parseado = parsearCorreoBancario(
-          correo.remitente,
-          correo.asunto,
-          correo.cuerpoTexto,
-        );
-        if (!parseado.tipo || !parseado.monto) continue; // sin tipo o sin monto no sirve de nada en la cola
-
-        detectadas.push({
-          mensajeId: correo.mensajeId,
-          tipo: parseado.tipo,
-          monto: parseado.monto,
-          descripcion: parseado.descripcion,
-          banco: parseado.banco,
-          cuentaId: cuentaParaTransaccion(
-            cuentas,
-            parseado.banco,
-            parseado.identificadorCuenta,
-          ),
-          fecha: parseado.fecha ?? correo.fecha,
-          correoAsunto: correo.asunto,
-        });
-      }
-
-      await insertarTransaccionesDetectadas(detectadas);
-      await AsyncStorage.setItem(CLAVE_ULTIMA_SYNC, new Date().toISOString());
-      setUltimaSync(new Date().toISOString());
-      setResultado(
-        detectadas.length === 0
-          ? "No encontré movimientos nuevos que reconocer."
-          : `Encontré ${detectadas.length} movimiento(s) nuevo(s) — revisalos en la Bandeja.`,
-      );
+      // Paginación, marca de búsqueda y conteos: ver sincronizarCorreo en lib/correoProveedor.
+      const r = await sincronizarCorreo();
+      if (r.marca) setUltimaSync(r.marca);
+      setResultado(resumenSincronizacion(r));
     } catch (err) {
       setError(mensajeError(err));
+      // Si el permiso venció, los tokens ya se borraron: refleja "sin conectar".
+      proveedorConectado().then(setConectado).catch(() => {});
     } finally {
       setBuscando(false);
     }

@@ -72,7 +72,7 @@
   <tr><td>Gastos, ingresos, deudas, abonos, pagos de tarjeta, presupuestos, categorías y recordatorios</td><td>Mostrarte tu resumen, tus presupuestos, tu plan de deudas y recomendaciones.</td></tr>
   <tr><td>Fotos o PDF de facturas que decidas adjuntar</td><td>Que puedas consultarlas después. Se guardan en un espacio privado al que solo tú accedes.</td></tr>
   <tr><td>Correo (opcional, solo si conectas Gmail u Outlook)</td><td>Detectar avisos de tu banco y proponerte movimientos para que los confirmes. Ver la sección 3.</td></tr>
-  <tr><td>Ubicación de tus pagos (opcional, solo si activas «Guardar la ubicación de mis pagos») y con qué billetera pagaste (Apple Pay, Google Wallet)</td><td>Mostrarte en qué lugares pagas y cuánto gastas en cada uno. La ubicación se toma solo al registrar un pago y con la app abierta, nunca en segundo plano, y se guarda redondeada a unos 11 metros. Puedes apagarla y borrar todas tus ubicaciones desde la app sin borrar tus gastos. Si tocas «Abrir en Mapas», ese punto se abre en la app de mapas de tu teléfono.</td></tr>
+  <tr><td>Ubicación de tus pagos (opcional, solo si activas «Guardar la ubicación de mis pagos») y con qué billetera pagaste (Apple Pay, Google Wallet)</td><td>Mostrarte en qué lugares pagas y cuánto gastas en cada uno. La ubicación se toma solo al registrar un pago y con la app abierta, nunca en segundo plano, y se guarda redondeada a unos 11 metros. Puedes apagarla y borrar todas tus ubicaciones desde la app sin borrar tus gastos. Si abres el detalle de un pago con ubicación, verás un mapa de esa zona (ver la sección 4). Si tocas «Abrir en Mapas», ese punto se abre en la app de mapas de tu teléfono.</td></tr>
   <tr><td>Atajo de Apple Pay (opcional): los pagos que envía tu iPhone (monto, comercio, nombre de la tarjeta o pase y, si lo incluyes, la ubicación) y una clave de captura</td><td>Dejar esos pagos en tu bandeja para que los confirmes. Del atajo guardamos solo la huella de la clave de captura (no la clave) y el nombre que le pongas; con ella no se pueden leer tus datos, solo dejar avisos pendientes. Nada se vuelve gasto sin tu confirmación.</td></tr>
   <tr><td>Datos técnicos de seguridad: dirección IP, tipo de dispositivo o navegador y fechas de inicio de sesión</td><td>Mantener tu sesión, detectar accesos indebidos y limitar abusos. Los registra nuestro proveedor de inicio de sesión (Supabase).</td></tr>
 </table>
@@ -90,14 +90,15 @@
 </ul>
 
 <h2>4. Con quién compartimos datos</h2>
-<p>No vendemos ni alquilamos tus datos. Solo los manejan estos proveedores, que actúan por encargo nuestro y únicamente para que la app funcione:</p>
+<p>No vendemos ni alquilamos tus datos. Estos proveedores los manejan por encargo nuestro y únicamente para que la app funcione:</p>
 <ul>
   <li><strong>Supabase</strong>: base de datos, inicio de sesión y almacenamiento de facturas. Servidores en [región del proyecto de Supabase, por ejemplo Estados Unidos].</li>
   <li><strong>Vercel</strong>: aloja la versión web.</li>
   <li><strong>Expo</strong>: entrega las actualizaciones de la app.</li>
   <li><strong>Google o Microsoft</strong>: solo si conectas tu correo, y solo para ese fin.</li>
 </ul>
-<p>Algunos de estos servidores están fuera de Ecuador. Al aceptar esta política autorizas expresamente esa transferencia internacional, que se hace con proveedores que aplican medidas de seguridad adecuadas. Si quieres saber más sobre esas garantías, escríbenos. También entregaríamos datos si una autoridad competente lo exige conforme a la ley.</p>
+<p><strong>Aparte, un servicio externo que no actúa por encargo nuestro: el mapa del detalle de un pago.</strong> Solo si abres el detalle de un pago que guardó su ubicación (algo que solo existe si activaste esa función), la app pide las imágenes del mapa de esa zona a los servidores de mapas de OpenStreetMap (<code>tile.openstreetmap.org</code>), de la Fundación OpenStreetMap. Para dibujarlo, ese servidor recibe tu dirección IP, el tipo de dispositivo o navegador y la zona que se pide (cuadros de mapa de unos 600 metros alrededor del pago). <strong>No recibe</strong> el monto, el comercio, la cuenta ni tu correo. Según su propia política, esa fundación registra la IP, el navegador y la hora de los accesos y reparte el tráfico con una red de entrega de contenido; cuánto tiempo guarda esos registros lo define ella: <a href="https://osmfoundation.org/wiki/Privacy_Policy">política de privacidad de la Fundación OpenStreetMap</a>. Si no quieres que esto ocurra, no actives «Guardar la ubicación de mis pagos», o borra tus ubicaciones desde la app.</p>
+<p>Algunos de estos servidores, incluidos los de mapas, están fuera de Ecuador. Al aceptar esta política autorizas expresamente esa transferencia internacional, que se hace con proveedores que aplican medidas de seguridad adecuadas. Si quieres saber más sobre esas garantías, escríbenos. También entregaríamos datos si una autoridad competente lo exige conforme a la ley.</p>
 
 <h2>5. Cómo protegemos tus datos</h2>
 <ul>

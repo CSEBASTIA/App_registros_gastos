@@ -88,3 +88,14 @@ Construidas según el contrato, **detrás del interruptor `EXPO_PUBLIC_EXIGIR_AC
 **Errores que corregí por el camino:** `aria-checked` no llegaba al DOM en web (solo `accessibilityState`); y una carrera en la guarda: si otra persona iniciaba sesión en el mismo teléfono, el "al día" de la anterior seguía vigente un instante. Ahora el resultado va atado al id de usuario.
 
 **Pendiente:** la fila «Eliminar mi cuenta» de Más (fase 1 del contrato) sigue sin construirse, y la política de privacidad dice que existe. Antes de publicar en tienda hay que hacerla.
+
+## Adenda 2: mapa de OpenStreetMap (16-oct)
+
+La sesión de Wallet agregó un mapa en el detalle de un pago con ubicación: el teléfono pide 9 imágenes (teselas, zoom 16) a `tile.openstreetmap.org`. Eso es un servicio externo que ve la **IP y la zona aproximada** (no el monto), así que la política y el registro tenían que decirlo **antes** de que el código salga.
+
+- **Política** (`privacidad.html`, secciones 2 y 4): párrafo nuevo, con el enlace a la política de la Fundación OpenStreetMap. Lo trata como servicio externo, no como encargado, y dice qué ve y qué no.
+- **Registro de tratamiento**: fila nueva de proveedor, nota de sus condiciones de uso y una línea en «Lo que NO se hace».
+- **README legal**: pregunta 13 para el abogado, y fuentes primarias (política de uso de teselas y de privacidad de la Fundación, leídas el 16-oct).
+- **Google Play** (`publicacion-produccion.md`): salvedad sobre si cuenta como «compartir» ubicación aproximada.
+- **Versión sin cambio** (`2026-10-16`): nadie la había aceptado todavía y la base rechaza fechas futuras. Desde la primera aceptación, un cambio así sube la versión.
+- **Para el código de Wallet** (no lo toqué): la política de uso pide la atribución «© OpenStreetMap contributors» (la app muestra «© OpenStreetMap»), y recomienda no depender de ese servidor si la app crece. Y la opción más respetuosa con la privacidad es cargar el mapa solo cuando la persona toque «Ver mapa».

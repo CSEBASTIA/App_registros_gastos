@@ -15,6 +15,7 @@ export * from "./lib/estadoCuenta";
 export * from "./lib/correoBancario";
 export * from "./lib/sincronizacionCorreo";
 export * from "./lib/fetchConTimeout";
+export { FILAS_POR_PAGINA, type RangoFechas } from "./lib/paginacion";
 export * from "./schemas/limites";
 export * from "./schemas/gasto.schema";
 export * from "./schemas/presupuesto.schema";
@@ -67,6 +68,17 @@ export {
   type TransaccionDetectadaInsert,
   type DatosConfirmacion,
 } from "./repositories/transaccionesDetectadas.repo";
+export { eliminarMiCuenta, CONFIRMACION_ELIMINAR_CUENTA } from "./repositories/cuentaUsuario.repo";
+export { totalesPorMes, type TotalMes } from "./repositories/totales.repo";
+export {
+  contrasenaSchema,
+  validarContrasena,
+  solicitarRecuperacion,
+  sesionDesdeEnlace,
+  cambiarContrasena,
+  parametrosDeEnlace,
+  MENSAJE_RECUPERACION_ENVIADA,
+} from "./repositories/acceso.repo";
 
 export * from "./usecases/crearCategoria";
 export * from "./usecases/crearGasto";

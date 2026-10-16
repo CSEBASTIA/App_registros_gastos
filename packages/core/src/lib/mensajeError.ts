@@ -51,6 +51,43 @@ function mensajeDePostgres(codigo: string | undefined): string | undefined {
 }
 
 /**
+ * Errores de inicio de sesión de Supabase (vienen en inglés: antes la
+ * pantalla mostraba "Invalid login credentials"). Por código; si una versión
+ * vieja no trae código, por el texto.
+ */
+const MENSAJES_AUTH: Record<string, string> = {
+  invalid_credentials: "Correo o contraseña incorrectos.",
+  email_not_confirmed: "Todavía no confirmaste tu correo. Revisa tu bandeja de entrada (y la de spam).",
+  user_already_exists: "Ya existe una cuenta con ese correo. Inicia sesión o recupera tu contraseña.",
+  email_exists: "Ya existe una cuenta con ese correo. Inicia sesión o recupera tu contraseña.",
+  weak_password: "La contraseña es muy débil: usa al menos 8 caracteres, con letras y números.",
+  same_password: "La nueva contraseña debe ser distinta de la anterior.",
+  over_email_send_rate_limit: "Ya te enviamos un correo hace poco. Espera unos minutos antes de pedir otro.",
+  over_request_rate_limit: "Demasiados intentos seguidos. Espera unos minutos e inténtalo de nuevo.",
+  otp_expired: "El enlace venció o ya se usó. Pide uno nuevo.",
+  flow_state_not_found: "El enlace venció o se abrió en otro dispositivo. Pide uno nuevo desde este teléfono.",
+  flow_state_expired: "El enlace venció. Pide uno nuevo.",
+  bad_code_verifier: "El enlace se pidió desde otro dispositivo. Pide uno nuevo desde este teléfono.",
+  email_address_invalid: "Ese correo no es válido.",
+  validation_failed: "Revisa el correo y la contraseña.",
+  signup_disabled: "El registro de cuentas nuevas está cerrado por ahora.",
+  session_not_found: "Tu sesión venció. Vuelve a iniciar sesión.",
+  refresh_token_not_found: "Tu sesión venció. Vuelve a iniciar sesión.",
+};
+const TEXTOS_AUTH: [RegExp, string][] = [
+  [/^Invalid login credentials$/i, "invalid_credentials"],
+  [/^Email not confirmed$/i, "email_not_confirmed"],
+  [/^User already registered$/i, "user_already_exists"],
+  [/^Email rate limit exceeded$/i, "over_email_send_rate_limit"],
+];
+
+function mensajeDeAuth(codigo: string | undefined, mensaje: string): string | undefined {
+  if (codigo && MENSAJES_AUTH[codigo]) return MENSAJES_AUTH[codigo];
+  const porTexto = TEXTOS_AUTH.find(([re]) => re.test(mensaje.trim()));
+  return porTexto ? MENSAJES_AUTH[porTexto[1]] : undefined;
+}
+
+/**
  * Convierte cualquier error en un mensaje para la persona.
  * - Los errores de Supabase (PostgrestError, AuthError, StorageError) NO son
  *   instancias de `Error`: son objetos planos con `message` (y `code`).
@@ -58,6 +95,7 @@ function mensajeDePostgres(codigo: string | undefined): string | undefined {
  * - Los de red se traducen a un mensaje claro.
  * - Los de Postgres conocidos (clave foránea, regla, duplicado) se traducen;
  *   los mensajes propios de la base (triggers) ya están en español y pasan tal cual.
+ * - Los de inicio de sesión (Supabase Auth) se traducen por código.
  */
 export function mensajeError(err: unknown): string {
   const problema = problemaDeValidacion(err);
@@ -76,5 +114,5 @@ export function mensajeError(err: unknown): string {
   }
 
   if (FALLO_DE_RED.test(mensaje.trim())) return MENSAJE_SIN_CONEXION;
-  return mensajeDePostgres(codigo) ?? mensaje;
+  return mensajeDePostgres(codigo) ?? mensajeDeAuth(codigo, mensaje) ?? mensaje;
 }

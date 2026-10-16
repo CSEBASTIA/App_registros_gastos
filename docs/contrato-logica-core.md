@@ -118,3 +118,77 @@ Origen: revisión de errores con dos agentes. Todo con pruebas: core 71/71, base
 8. Web, edición de gastos: en diferidos, deshabilitar monto, cuenta, método y plazo (reenviar valores sin cambios no falla). Web, abono a deuda: agregar "Pagar desde", como en el teléfono.
 9. `components/GraficoBarras.tsx`: `key={d.etiqueta}` se repite si dos datos tienen la misma etiqueta. Usar un id estable.
 10. `app/correo.tsx`: los textos de desconexión usan voseo ("entrá", "revisá"); el resto de la app usa tú.
+
+### Proyecto de Supabase web (15-oct)
+- Proyecto nuevo `ikyoawstrwihaqefosbq` creado con `supabase/base-completa.sql` (19 migraciones). Los `.env` del teléfono y de la web apuntan a él con la clave publishable; la local quedó comentada.
+- Ya tiene las 23 migraciones: la de interés diferido, la de eliminar cuenta y la de rendimiento se aplicaron el 15-oct (comprobado por REST). `crearGasto` sigue enviando `tasa_interes` solo si se indicó, lo que no cambia nada ahora que la columna existe.
+
+## Paso 1 antes de producción (15-oct)
+
+Migraciones nuevas, listas para pegar en Supabase web (`supabase/para-supabase-web/`):
+- **Migración de eliminar cuenta** (`20261015190000_eliminar_cuenta`): función `eliminar_mi_cuenta('ELIMINAR')`. Borra al usuario de auth y, en cascada, sus datos de las 10 tablas. Solo la puede llamar quien tiene sesión, y solo sobre sí mismo. Se niega si quedan facturas en Storage.
+- **Migración de rendimiento** (`20261015200000_rendimiento`):
+  - 12 índices de claves foráneas.
+  - Las 35 reglas de RLS con `(select auth.uid())`, mismo significado.
+  - Función `totales_por_mes(desde, hasta)`.
+
+Funciones de core nuevas o cambiadas:
+- `eliminarMiCuenta(confirmacion)`: borra las facturas con la API de Storage, llama a la función de la base y cierra la sesión local. `CONFIRMACION_ELIMINAR_CUENTA = "ELIMINAR"`.
+- `listarGastos(rango?)` y `listarIngresos(rango?)`, con `rango = { desde?, hasta? }` ("YYYY-MM-DD", incluidos):
+  - **Ya no se cortan en 1.000 filas**: piden todas las páginas.
+  - Con rango, filtran en la base y descargan mucho menos.
+  - `listarAbonosDeuda` y `listarPagosTarjeta` también paginan.
+- `totalesPorMes(desde, hasta)` → `[{ mes, totalGastos, totalIngresos }]`, con los meses vacíos en 0. Máximo 10 años.
+
+Cambios hechos en pantallas del teléfono (dueño: Agente 3), mínimos:
+- Borrar gasto, ingreso o recordatorio: si falla, se muestra "No se pudo eliminar" con el motivo. Antes fallaba en silencio, por ejemplo con un diferido con abonos.
+- `categorias.tsx`: borrar pide confirmación ("sus gastos e ingresos pasan a Otros") y muestra el error. **Punto 3 de la lista del 15-oct: hecho.**
+
+Pendiente para los agentes de interfaz (paso 1):
+1. **Más → "Eliminar mi cuenta"**, obligatorio para Google Play:
+   - Explicar que borra todo y no se puede deshacer.
+   - Pedir que escriba `ELIMINAR` y llamar a `eliminarMiCuenta(texto)`.
+   - Mostrar `mensajeError(err)` si falla.
+   - Al terminar, la sesión se cierra sola (y el teléfono olvida el correo conectado).
+2. **Pasar rango donde solo se necesita un periodo**:
+   - Gastos e Ingresos: el mes elegido.
+   - Recomendaciones: el mes y los 3 anteriores.
+   - Gráficos de 6 meses: `totalesPorMes`, sin descargar los movimientos.
+
+## Fase 2 antes de producción: acceso, privacidad y errores (15-oct)
+
+### Lógica lista en core (probada)
+- `validarContrasena(texto)` → mensaje del primer requisito que falta, o `null`. Reglas: 8 a 72 caracteres, con letras y números (`contrasenaSchema`).
+- `solicitarRecuperacion(correo, redirectTo)` → envía el correo y devuelve `MENSAJE_RECUPERACION_ENVIADA`. Es siempre el mismo texto, exista o no la cuenta, para no revelar quién usa la app.
+- `sesionDesdeEnlace(url)` → canjea el código del enlace del correo (flujo PKCE). **Rechaza los enlaces con `#access_token=`**: cualquiera podría armar uno para dejar a otra persona conectada a una cuenta ajena.
+- `cambiarContrasena(nueva, repetida)` → valida, comprueba que coincidan y la cambia.
+- `mensajeError` ahora traduce los errores de inicio de sesión de Supabase. Por ejemplo, *"Invalid login credentials"* sale como "Correo o contraseña incorrectos." **Login y registro ya lo muestran sin cambios.**
+- Clientes de Supabase (teléfono y web) con `flowType: "pkce"`.
+- `apps/mobile/public/privacidad.html`: política de privacidad (borrador, ver abajo). Se publica con la versión web en `/privacidad.html`, y la sección para eliminar la cuenta queda en `/privacidad.html#eliminar-cuenta`.
+- Nueva variable `EXPO_PUBLIC_URL_PRIVACIDAD`. `build:play` y `update:produccion` se frenan si falta; `build:apk` no.
+
+### Pantallas a construir (dueño: Agente 3), con los componentes y el estilo actuales
+1. **Login → "¿Olvidaste tu contraseña?"**: abre la nueva `app/(auth)/recuperar.tsx`.
+   - Un campo de correo y un botón "Enviar enlace", deshabilitado mientras envía.
+   - Llamar `await solicitarRecuperacion(correo, Linking.createURL("/restablecer"))` (con `expo-linking`) y mostrar el texto que devuelve.
+   - Errores con `mensajeError`: correo inválido, demasiados intentos.
+2. **`app/restablecer.tsx`**, en la raíz y **no** dentro de `(auth)`:
+   - Leer la URL con `Linking.useURL()` y llamar `await sesionDesdeEnlace(url)` una sola vez. Mientras tanto: "Verificando enlace…".
+   - Si falla: `mensajeError(err)` y un botón "Pedir otro enlace" que lleve a `/recuperar`.
+   - Si funciona: nueva contraseña y repetirla, con el texto "Al menos 8 caracteres, con letras y números". Llamar `await cambiarContrasena(nueva, repetida)`, avisar "Contraseña actualizada" y hacer `router.replace("/resumen")`.
+   - **No mostrar ni registrar la URL**: lleva el código.
+3. **`app/_layout.tsx`**: la guarda de sesión tiene que dejar pasar `restablecer`. Hoy, sin sesión mandaría a `/login`, y al abrirse la sesión del enlace mandaría a `/resumen` antes de cambiar la contraseña.
+   - Al inicio del efecto de redirección: `if (segments[0] === "restablecer") return;`.
+   - Registrar `<Stack.Screen name="restablecer" options={{ title: "Nueva contraseña" }} />`.
+4. **Registro**:
+   - Antes de `signUp`: `const problema = validarContrasena(password); if (problema) return setError(problema);`.
+   - Mostrar los requisitos bajo el campo.
+   - Bajo el botón: "Al crear tu cuenta aceptas la Política de privacidad", con enlace.
+5. **Más**:
+   - "Política de privacidad": `WebBrowser.openBrowserAsync(process.env.EXPO_PUBLIC_URL_PRIVACIDAD!)`. Si la variable falta, ocultar la opción.
+   - "Eliminar mi cuenta": ver la fase 1.
+6. **Pantalla de error**: exportar en `app/_layout.tsx` `export function ErrorBoundary({ error, retry }: ErrorBoundaryProps)` (de expo-router).
+   - Mostrar "Algo salió mal", "Tus datos están a salvo", un botón "Reintentar" (`retry`) y otro "Volver al inicio".
+   - El texto técnico del error, solo con `__DEV__`.
+   - Sin esto, un fallo al dibujar una pantalla deja la app en blanco.
+7. **Textos**: en `registro.tsx` y `correo.tsx` todavía hay voseo ("iniciá", "entrá", "revisá"). El resto de la app usa tú.

@@ -1,0 +1,113 @@
+<!doctype html>
+<!--
+  BORRADOR (15-oct-2026). Antes de publicar:
+  1. Completar todo lo que está entre [corchetes].
+  2. Revisarlo con un abogado (Ley Orgánica de Protección de Datos Personales de Ecuador).
+  3. Mantenerlo al día: si la app empieza a usar otro servicio (por ejemplo,
+     reportes de fallos o analítica), hay que agregarlo aquí antes.
+  Se publica con la versión web en /privacidad.html. Google Play pide esta
+  dirección y la de /privacidad.html#eliminar-cuenta.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidad · fintrack</title>
+<style>
+  :root { --fondo: #ffffff; --texto: #1f2937; --suave: #6b7280; --borde: #e5e7eb; --acento: #0f766e; --caja: #f3f4f6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fondo: #111827; --texto: #e5e7eb; --suave: #9ca3af; --borde: #374151; --acento: #5eead4; --caja: #1f2937; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.8rem; line-height: 1.25; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 36px 0 8px; padding-top: 8px; border-top: 1px solid var(--borde); }
+  p, li { max-width: 68ch; }
+  .fecha { color: var(--suave); margin: 0 0 24px; }
+  .resumen { background: var(--caja); border-radius: 12px; padding: 16px 20px; }
+  .resumen ul { margin: 8px 0 0; padding-left: 20px; }
+  table { border-collapse: collapse; width: 100%; font-size: .95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 8px; border-bottom: 1px solid var(--borde); }
+  th { color: var(--suave); font-weight: 600; }
+  a { color: var(--acento); }
+  .tabla { overflow-x: auto; }
+</style>
+</head>
+<body>
+<main>
+<h1>Política de privacidad</h1>
+<p class="fecha">Vigente desde el [fecha de publicación]. Aplica a la app fintrack (Android y web).</p>
+
+<div class="resumen">
+  <strong>En resumen</strong>
+  <ul>
+    <li>Guardamos lo que tú registras (cuentas, gastos, ingresos, deudas…) para mostrarte tus finanzas. Nada más.</li>
+    <li>No vendemos tus datos, no mostramos publicidad y no usamos analítica de terceros.</li>
+    <li>Cada persona solo puede ver sus propios datos.</li>
+    <li>Puedes borrar tu cuenta y todos tus datos desde la app, cuando quieras.</li>
+  </ul>
+</div>
+
+<h2>1. Quién es responsable de tus datos</h2>
+<p>[Nombre completo o razón social], [cédula o RUC], con domicilio en [ciudad], Ecuador. Para cualquier tema de privacidad, escríbenos a <a href="mailto:[correo de contacto]">[correo de contacto]</a>.</p>
+
+<h2>2. Qué datos tratamos y para qué</h2>
+<div class="tabla">
+<table>
+  <tr><th>Dato</th><th>Para qué</th></tr>
+  <tr><td>Correo electrónico y contraseña</td><td>Crear tu cuenta e iniciar sesión. La contraseña se guarda cifrada; nadie puede leerla.</td></tr>
+  <tr><td>Cuentas y tarjetas: nombre, banco, tipo, últimos 4 dígitos (si los pones), saldo y cupo</td><td>Calcular tu saldo disponible y el uso de tus tarjetas. Nunca pedimos el número completo de una tarjeta ni claves bancarias.</td></tr>
+  <tr><td>Gastos, ingresos, deudas, abonos, pagos de tarjeta, presupuestos, categorías y recordatorios</td><td>Mostrarte tu resumen, tus presupuestos, tu plan de deudas y recomendaciones.</td></tr>
+  <tr><td>Fotos o PDF de facturas que decidas adjuntar</td><td>Que puedas consultarlas después. Se guardan en un espacio privado al que solo tú accedes.</td></tr>
+  <tr><td>Correo (opcional, solo si conectas Gmail u Outlook)</td><td>Detectar avisos de tu banco y proponerte movimientos para que los confirmes. Ver la sección 3.</td></tr>
+</table>
+</div>
+<p>Las recomendaciones y el puntaje financiero se calculan con reglas fijas sobre tus propios datos, solo para informarte. No tomamos decisiones automatizadas que tengan efectos legales sobre ti.</p>
+<p>La base legal es tu consentimiento al crear la cuenta y la ejecución del servicio que pides. Puedes retirar tu consentimiento borrando tu cuenta.</p>
+
+<h2>3. Conexión con tu correo (opcional)</h2>
+<ul>
+  <li>Solo funciona si tú lo activas en <em>Más → Correo</em>. La app se usa completa sin conectarlo.</li>
+  <li>El contenido de los correos se analiza <strong>en tu teléfono</strong>. Del correo de un banco guardamos solo el monto, la fecha, el banco y el asunto. El asunto se borra cuando confirmas o descartas el aviso.</li>
+  <li>El permiso de acceso (el "token") se guarda solo en el almacenamiento seguro de tu teléfono, nunca en nuestros servidores.</li>
+  <li>Al desconectar el correo o cerrar sesión se borra ese permiso. Con Google, también se revoca en sus servidores.</li>
+  <li>El uso que la app hace de la información recibida de las APIs de Google se ajusta a la <a href="https://developers.google.com/terms/api-services-user-data-policy">Política de Datos de Usuario de los Servicios de API de Google</a>, incluidos los requisitos de Uso Limitado.</li>
+</ul>
+
+<h2>4. Con quién compartimos datos</h2>
+<p>No vendemos ni alquilamos tus datos. Solo los manejan estos proveedores, para que la app funcione:</p>
+<ul>
+  <li><strong>Supabase</strong>: base de datos, inicio de sesión y almacenamiento de facturas. Servidores en [región del proyecto de Supabase, por ejemplo Estados Unidos].</li>
+  <li><strong>Vercel</strong>: aloja la versión web.</li>
+  <li><strong>Expo</strong>: entrega las actualizaciones de la app.</li>
+  <li><strong>Google o Microsoft</strong>: solo si conectas tu correo, y solo para ese fin.</li>
+</ul>
+<p>Algunos de estos servidores están fuera de Ecuador. Al usar la app aceptas esa transferencia internacional, que se hace con proveedores que aplican medidas de seguridad adecuadas. También entregaríamos datos si una autoridad competente lo exige conforme a la ley.</p>
+
+<h2>5. Cómo protegemos tus datos</h2>
+<ul>
+  <li>Toda la comunicación va cifrada (HTTPS).</li>
+  <li>La base de datos aplica reglas por usuario: cada persona solo puede leer y cambiar lo suyo.</li>
+  <li>Las facturas se guardan en un espacio privado, con enlaces de acceso temporales.</li>
+  <li>Ninguna clave con acceso total a la base está dentro de la app.</li>
+</ul>
+
+<h2>6. Cuánto tiempo guardamos tus datos</h2>
+<p>Mientras tengas tu cuenta. Si la eliminas, borramos tus datos y facturas de inmediato. Las copias de respaldo del proveedor se eliminan solas en un plazo de hasta [número] días.</p>
+
+<h2>7. Tus derechos</h2>
+<p>Según la Ley Orgánica de Protección de Datos Personales, puedes pedir el acceso, la rectificación y actualización, la eliminación, la portabilidad y la suspensión del tratamiento de tus datos, u oponerte a él. Puedes editar y borrar tus datos directamente en la app. Para lo demás, escríbenos a <a href="mailto:[correo de contacto]">[correo de contacto]</a> y responderemos en un plazo máximo de [número] días. Si no estás conforme con nuestra respuesta, puedes acudir a la Superintendencia de Protección de Datos Personales.</p>
+
+<h2 id="eliminar-cuenta">8. Cómo eliminar tu cuenta</h2>
+<p><strong>Desde la app:</strong> <em>Más → Eliminar mi cuenta</em>, escribe <strong>ELIMINAR</strong> y confirma. Se borran al instante tu cuenta, tus cuentas y tarjetas, gastos, ingresos, deudas, abonos, pagos, presupuestos, categorías, recordatorios, avisos del correo y facturas. No se puede deshacer.</p>
+<p><strong>Si ya no tienes la app:</strong> escríbenos desde el correo de tu cuenta a <a href="mailto:[correo de contacto]?subject=Eliminar%20mi%20cuenta">[correo de contacto]</a> con el asunto "Eliminar mi cuenta". La eliminaremos en un plazo máximo de [número] días y te confirmaremos por correo.</p>
+
+<h2>9. Menores de edad</h2>
+<p>La app está dirigida a mayores de 18 años. Si sabemos que una cuenta pertenece a un menor, la eliminaremos.</p>
+
+<h2>10. Cambios a esta política</h2>
+<p>Si cambiamos algo importante, te avisaremos en la app antes de que el cambio aplique. La fecha de arriba indica la última versión.</p>
+</main>
+</body>
+</html>

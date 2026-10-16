@@ -13,6 +13,10 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: false,
+    // Los enlaces del correo (recuperar contraseña) traen un código que solo
+    // se canjea en este dispositivo: nadie puede armar uno que deje a otra
+    // persona conectada a una cuenta ajena. Ver sesionDesdeEnlace en core.
+    flowType: "pkce",
   },
   // Toda petición a Supabase (datos, auth y Storage) se corta a los 15 s
   // (60 s para subir archivos) en vez de quedarse esperando para siempre.

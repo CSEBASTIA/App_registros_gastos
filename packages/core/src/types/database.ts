@@ -400,6 +400,14 @@ export type Database = {
         /** Id del gasto/ingreso creado, o null si el aviso ya estaba confirmado. */
         Returns: string | null;
       };
+      eliminar_mi_cuenta: {
+        Args: { p_confirmacion: string };
+        Returns: undefined;
+      };
+      totales_por_mes: {
+        Args: { p_desde: string; p_hasta: string };
+        Returns: { mes: string; total_gastos: number; total_ingresos: number }[];
+      };
     };
   };
 };

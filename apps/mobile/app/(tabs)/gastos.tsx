@@ -99,7 +99,12 @@ export default function GastosScreen() {
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: () => eliminarGasto(gasto.id).then(cargar),
+        // Si la base no lo permite (p. ej. un diferido con abonos) o no hay
+        // red, se avisa: antes fallaba en silencio y parecía borrado.
+        onPress: () =>
+          eliminarGasto(gasto.id)
+            .then(cargar)
+            .catch((err) => Alert.alert("No se pudo eliminar", mensajeError(err))),
       },
     ]);
   }

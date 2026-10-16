@@ -4,7 +4,7 @@ App de finanzas personales para Ecuador (Banco Guayaquil, Pichincha, Produbanco 
 
 **El producto principal es la app de teléfono** (`apps/mobile`). La versión web (`apps/desktop`) hoy es la más completa y sirve de referencia para la migración. Las dos comparten la misma lógica (`packages/core`) y el mismo backend (Supabase).
 
-> **Estado (15-oct-2026):** saldos confiables (con saldo a favor), montos con coma decimal, correo opcional que se olvida al cerrar sesión, y primer uso directo hacia el primer gasto, aplicados y verificados: **71/71 pruebas de lógica, 89/89 de base de datos** (incluye dos abonos simultáneos), tipos sin errores en core, web y teléfono, y la app de Android compila. El plan de 10 pasos y el informe del Paso 1 están en [`docs/plan-10-pasos-y-paso-1.docx`](docs/plan-10-pasos-y-paso-1.docx); el piloto, en [`docs/piloto.md`](docs/piloto.md). Qué migración está desplegada en cada entorno: ver [Estado de despliegue](#estado-de-despliegue).
+> **Estado (15-oct-2026):** saldos confiables (con saldo a favor), montos con coma decimal, correo opcional que se olvida al cerrar sesión, eliminar la cuenta, consultas sin el tope de 1.000 filas, recuperar la contraseña con enlaces seguros y política de privacidad (borrador), verificados: **93/93 pruebas de lógica, 104/104 de base de datos** (incluye dos abonos simultáneos), tipos sin errores en core, web y teléfono, y la app compila para Android y web. Lo que falta para producción: ver [Pendientes](#pendientes-y-riesgos-conocidos) y [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md); el informe de esta etapa está en [`docs/informe-preparacion-produccion-15oct.docx`](docs/informe-preparacion-produccion-15oct.docx). El plan de 10 pasos y el informe del Paso 1 están en [`docs/plan-10-pasos-y-paso-1.docx`](docs/plan-10-pasos-y-paso-1.docx); el piloto, en [`docs/piloto.md`](docs/piloto.md). Qué migración está desplegada en cada entorno: ver [Estado de despliegue](#estado-de-despliegue).
 
 ## Contenido
 
@@ -136,13 +136,15 @@ supabase migration up        # base local
 supabase db push             # proyecto remoto
 ```
 
-**Proyecto de Supabase nuevo, sin la CLI:** [`supabase/base-completa.sql`](supabase/base-completa.sql) tiene la base entera en un solo archivo: las 19 migraciones en orden y las categorías globales. En Supabase, abre *SQL Editor → New query*, pega el archivo completo y pulsa *Run*. Debe terminar mostrando `migraciones_registradas = 19`.
+**Proyecto de Supabase nuevo, sin la CLI:** [`supabase/base-completa.sql`](supabase/base-completa.sql) tiene la base entera en un solo archivo: las 23 migraciones en orden y las categorías globales. En Supabase, abre *SQL Editor → New query*, pega el archivo completo y pulsa *Run*. Debe terminar mostrando `migraciones_registradas = 23`.
+
+**Proyecto que ya tiene la base:** las migraciones nuevas van en [`supabase/para-supabase-web/`](supabase/para-supabase-web/), una por archivo y con nombre legible (por ejemplo `migracion-de-rendimiento.sql`). Se pegan igual en el SQL Editor y deben terminar mostrando `aplicada = sí`. Se generan con `bash supabase/preparar-migracion-web.sh "Migración de …" <versiones>`.
 
 - Es para un proyecto **vacío**. Corre en una sola transacción: si algo falla, no cambia nada.
 - Marca las migraciones como aplicadas, así que después `supabase db push` solo aplicará las nuevas.
 - No trae datos de ninguna persona.
 - Al agregar una migración, regenéralo con `bash supabase/generar-base-completa.sh`.
-- Verificado en una base desechable: queda idéntico a aplicar las migraciones una por una, y pasan las 88 pruebas de base de datos.
+- Verificado en una base desechable: queda idéntico a aplicar las migraciones una por una, y pasan las pruebas de base de datos.
 
 Ejecutar:
 
@@ -276,6 +278,9 @@ Todas las tablas tienen Row Level Security con `auth.uid() = usuario_id`. Única
 | `20261014150000_agregar_bancos_pacifico_y_austro` | Banco del Pacífico y Banco del Austro como bancos |
 | `20261015120000_integridad_saldos` | Saldo a favor en tarjetas, edición de gastos pagados por diferencia, diferidos solo en tarjeta y con plazo, deudas protegidas al borrar, avisos resueltos inmutables, categorías borradas pasan a "Otros", abono con mínimo de $0,01 |
 | `20261015150000_categoria_salud` | Categoría global "Salud" |
+| `20261015170000_diferidos_cupo_interes` y `20261015180000_proteger_tasa_diferido` | **Migración de interés diferido:** el diferido reserva todo el capital, el interés se cobra con cada cuota, compras sobre el cupo bloqueadas, tasa protegida |
+| `20261015190000_eliminar_cuenta` | **Migración de eliminar cuenta:** `eliminar_mi_cuenta('ELIMINAR')` borra al usuario y todos sus datos (exigido por Google Play) |
+| `20261015200000_rendimiento` | **Migración de rendimiento:** índices de claves foráneas, RLS con `(select auth.uid())` y `totales_por_mes` |
 
 ### Estado de despliegue
 
@@ -283,8 +288,8 @@ Actualizar esta tabla cada vez que se aplique una migración en un entorno.
 
 | Entorno | Migraciones aplicadas | Última | Fecha |
 |---|---|---|---|
-| Supabase local (Docker, `127.0.0.1:54321`) | 18 de 19 (falta `20261015150000_categoria_salud`) | `20261015120000_integridad_saldos` | 15-oct-2026 |
-| Supabase remoto | — | — | El proyecto anterior (`yzuwuvjywxiujtvxpdkx`) ya no existe; falta crear uno nuevo |
+| Supabase local (Docker, `127.0.0.1:54321`) | 21 de 23 (faltan eliminar cuenta y rendimiento) | `20261015180000_proteger_tasa_diferido` | 15-oct-2026 |
+| Supabase web (`ikyoawstrwihaqefosbq`) | 23 de 23 | `20261015200000_rendimiento` | 15-oct-2026 (comprobado por REST: `eliminar_mi_cuenta` y `totales_por_mes` existen y rechazan a quien no tiene sesión) |
 
 Para comprobarlo en cualquier base: `select version, name from supabase_migrations.schema_migrations order by version;`
 
@@ -347,8 +352,8 @@ Los textos que vienen de correos de terceros se recortan antes de guardarse.
 ## Pruebas y verificación
 
 ```bash
-pnpm --filter core test          # 71 pruebas de lógica
-bash supabase/tests/correr.sh    # 89 pruebas de base de datos (requiere Docker)
+pnpm --filter core test          # 93 pruebas de lógica
+bash supabase/tests/correr.sh    # 104 pruebas de base de datos (requiere Docker)
 ```
 
 - **Lógica:** cálculos comparados contra resultados hechos a mano: presupuestos, plan de deudas, score, timeouts, fechas locales, mensajes de error y validación.
@@ -358,6 +363,8 @@ bash supabase/tests/correr.sh    # 89 pruebas de base de datos (requiere Docker)
   - `saldos_confiables.sql` (13): edición de ingresos, pagos de tarjeta, borrado de cuentas y diferidos.
   - `correo_bandeja.sql` (10): confirmación atómica e idempotente, aislamiento entre usuarios y borrado de los datos del correo.
   - `integridad_saldos.sql` (16): saldo a favor, edición de gastos pagados, diferidos, borrado de deudas y categorías, avisos resueltos y borrado de un usuario con abonos.
+  - `diferidos_cupo_interes.sql` (5): cupo, interés de las cuotas y tasa protegida.
+  - `eliminar_cuenta_y_rendimiento.sql` (10): eliminar la cuenta borra todo lo propio y nada ajeno, índices, RLS optimizada y totales por mes.
   - Concurrencia (1): dos abonos simultáneos de 70 sobre una deuda de 100 dejan la cuenta en −100, no en −140.
 - **Compilación:**
 
@@ -419,7 +426,9 @@ Propuesta del Paso 5, como hipótesis a validar con usuarios:
 
 | Pendiente | Gravedad | Paso |
 |---|---|---|
-| Crear un Supabase remoto y aplicarle `supabase/base-completa.sql` (las 19 migraciones; la local tiene 18, falta `20261015150000_categoria_salud`) | Alta | Piloto |
+| Pantallas de acceso y privacidad: "Eliminar mi cuenta", "Olvidé mi contraseña" y nueva contraseña, enlace a la política de privacidad y pantalla de error. La lógica ya está en core; la especificación está en `docs/contrato-logica-core.md` (fases 1 y 2) | Alta (Google Play) | Producción |
+| Completar y revisar con un abogado la política de privacidad (`apps/mobile/public/privacidad.html`, borrador) y configurar Supabase, Vercel y Google Play según [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md) | Alta | Producción |
+| Actualizar Expo SDK 51: Google Play exige Android 15 o más reciente; resuelve también los avisos de dependencias de las herramientas | Alta para la tienda | Producción |
 | Ajustes de interfaz pedidos por la revisión del 15-oct: saldo a favor visible, solo tarjetas en diferidos, confirmar al borrar categorías, semana actual en Gastos y otros (lista en `docs/contrato-logica-core.md`) | Media | 6-10 |
 | Abono con cuenta de origen en la **web** (el teléfono ya lo tiene) | Media | Fase web |
 | Pantalla para editar ingresos (base y `actualizarIngreso` listos) | Media | 7 |

@@ -3,6 +3,7 @@ import type { AbonoDeuda, Deuda } from "../types/domain";
 import type { Database } from "../types/database";
 import { abonoDeudaSchema } from "../schemas/deuda.schema";
 import { fechaLocal } from "../lib/semanas";
+import { traerTodasLasFilas } from "../lib/paginacion";
 
 type DeudaRow = Database["public"]["Tables"]["deudas"]["Row"];
 
@@ -97,12 +98,13 @@ export async function registrarAbonoDeuda(
 }
 
 export async function listarAbonosDeuda(deudaId?: string): Promise<AbonoDeuda[]> {
-  let query = getSupabaseClient().from("abonos_deuda").select("*");
-  if (deudaId) query = query.eq("deuda_id", deudaId);
-
-  const { data, error } = await query.order("fecha", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map((row) => ({
+  // Todas las páginas: con los años, los abonos también pasan de 1.000.
+  const filas = await traerTodasLasFilas<Database["public"]["Tables"]["abonos_deuda"]["Row"]>((inicio, fin) => {
+    let query = getSupabaseClient().from("abonos_deuda").select("*");
+    if (deudaId) query = query.eq("deuda_id", deudaId);
+    return query.order("fecha", { ascending: false }).order("id").range(inicio, fin);
+  });
+  return filas.map((row) => ({
     id: row.id,
     deudaId: row.deuda_id,
     cuentaId: row.cuenta_id ?? undefined,

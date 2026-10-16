@@ -2,6 +2,7 @@ import { getSupabaseClient } from "../client";
 import type { Gasto } from "../types/domain";
 import type { Database } from "../types/database";
 import { cambiosGastoSchema } from "../schemas/gasto.schema";
+import { traerTodasLasFilas, validarRango, type RangoFechas } from "../lib/paginacion";
 
 type GastoRow = Database["public"]["Tables"]["gastos"]["Row"];
 
@@ -23,14 +24,23 @@ function filaAGasto(row: GastoRow): Gasto {
   };
 }
 
-export async function listarGastos(): Promise<Gasto[]> {
-  const { data, error } = await getSupabaseClient()
-    .from("gastos")
-    .select("*")
-    .order("fecha", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []).map(filaAGasto);
+/**
+ * Gastos más recientes primero. Trae todas las páginas (sin el tope de 1.000
+ * filas de Supabase). Con `rango`, solo ese periodo: descarga mucho menos.
+ */
+export async function listarGastos(rango: RangoFechas = {}): Promise<Gasto[]> {
+  const { desde, hasta } = validarRango(rango);
+  const filas = await traerTodasLasFilas<GastoRow>((inicio, fin) => {
+    let consulta = getSupabaseClient().from("gastos").select("*");
+    if (desde) consulta = consulta.gte("fecha", desde);
+    if (hasta) consulta = consulta.lte("fecha", hasta);
+    return consulta
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(inicio, fin);
+  });
+  return filas.map(filaAGasto);
 }
 
 export async function crearGasto(

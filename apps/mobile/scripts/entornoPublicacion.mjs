@@ -44,9 +44,22 @@ function rolDelJwt(token) {
 const HOST_LOCAL =
   /^(localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|10\.\d+\.\d+\.\d+|192\.168\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|\[?::1\]?)$/i;
 
-/** Devuelve la lista de problemas que impiden publicar (vacía = todo bien). */
-export function revisar(valores) {
+/**
+ * Devuelve la lista de problemas que impiden publicar (vacía = todo bien).
+ * Con `produccion` (tienda y actualizaciones a usuarios reales) exige además
+ * la dirección pública de la política de privacidad: Google Play la pide y la
+ * app la enlaza desde Más y el registro.
+ */
+export function revisar(valores, { produccion = false } = {}) {
   const errores = [];
+  if (produccion) {
+    const privacidad = valores.EXPO_PUBLIC_URL_PRIVACIDAD ?? "";
+    if (!privacidad) {
+      errores.push("Falta EXPO_PUBLIC_URL_PRIVACIDAD (dirección pública de la política de privacidad).");
+    } else if (!/^https:\/\/[^/\s]+\.[^/\s]+\//.test(privacidad)) {
+      errores.push("EXPO_PUBLIC_URL_PRIVACIDAD debe ser una dirección https pública (por ejemplo https://tu-app.vercel.app/privacidad.html).");
+    }
+  }
   const url = valores.EXPO_PUBLIC_SUPABASE_URL ?? "";
   const clave = valores.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "";
 

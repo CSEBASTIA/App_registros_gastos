@@ -2,6 +2,7 @@ import { getSupabaseClient } from "../client";
 import type { Ingreso } from "../types/domain";
 import type { Database } from "../types/database";
 import { cambiosIngresoSchema, type CambiosIngreso } from "../schemas/ingreso.schema";
+import { traerTodasLasFilas, validarRango, type RangoFechas } from "../lib/paginacion";
 
 type IngresoRow = Database["public"]["Tables"]["ingresos"]["Row"];
 
@@ -18,14 +19,20 @@ function filaAIngreso(row: IngresoRow): Ingreso {
   };
 }
 
-export async function listarIngresos(): Promise<Ingreso[]> {
-  const { data, error } = await getSupabaseClient()
-    .from("ingresos")
-    .select("*")
-    .order("fecha", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []).map(filaAIngreso);
+/** Igual que `listarGastos`: todas las páginas y, opcionalmente, solo un periodo. */
+export async function listarIngresos(rango: RangoFechas = {}): Promise<Ingreso[]> {
+  const { desde, hasta } = validarRango(rango);
+  const filas = await traerTodasLasFilas<IngresoRow>((inicio, fin) => {
+    let consulta = getSupabaseClient().from("ingresos").select("*");
+    if (desde) consulta = consulta.gte("fecha", desde);
+    if (hasta) consulta = consulta.lte("fecha", hasta);
+    return consulta
+      .order("fecha", { ascending: false })
+      .order("created_at", { ascending: false })
+      .order("id")
+      .range(inicio, fin);
+  });
+  return filas.map(filaAIngreso);
 }
 
 export async function crearIngreso(

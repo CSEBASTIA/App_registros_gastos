@@ -76,7 +76,10 @@ export default function RecordatoriosScreen() {
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: () => eliminarRecordatorio(r.id).then(cargar),
+        onPress: () =>
+          eliminarRecordatorio(r.id)
+            .then(cargar)
+            .catch((err) => Alert.alert("No se pudo eliminar", mensajeError(err))),
       },
     ]);
   }

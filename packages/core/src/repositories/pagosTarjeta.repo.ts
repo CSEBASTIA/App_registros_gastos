@@ -1,6 +1,7 @@
 import { getSupabaseClient } from "../client";
 import type { PagoTarjeta } from "../types/domain";
 import type { Database } from "../types/database";
+import { traerTodasLasFilas } from "../lib/paginacion";
 
 type PagoRow = Database["public"]["Tables"]["pagos_tarjeta"]["Row"];
 
@@ -16,12 +17,13 @@ function filaAPago(row: PagoRow): PagoTarjeta {
 }
 
 export async function listarPagosTarjeta(cuentaId?: string): Promise<PagoTarjeta[]> {
-  let query = getSupabaseClient().from("pagos_tarjeta").select("*");
-  if (cuentaId) query = query.eq("cuenta_id", cuentaId);
-
-  const { data, error } = await query.order("fecha", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(filaAPago);
+  // Todas las páginas (sin el tope de 1.000 filas de Supabase).
+  const filas = await traerTodasLasFilas<PagoRow>((inicio, fin) => {
+    let query = getSupabaseClient().from("pagos_tarjeta").select("*");
+    if (cuentaId) query = query.eq("cuenta_id", cuentaId);
+    return query.order("fecha", { ascending: false }).order("id").range(inicio, fin);
+  });
+  return filas.map(filaAPago);
 }
 
 export async function crearPagoTarjeta(

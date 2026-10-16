@@ -1,5 +1,6 @@
 import { useCallback, useState } from "react";
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ActivityIndicator,
@@ -295,7 +296,23 @@ function FilaCategoria({
             accessibilityRole="button"
             accessibilityLabel={"Eliminar " + categoria.nombre}
             style={styles.iconAction}
-            onPress={() => eliminarCategoria(categoria.id).then(onCambio)}
+            onPress={() =>
+              Alert.alert(
+                "Eliminar categoría",
+                `¿Eliminar "${categoria.nombre}"? Sus gastos e ingresos pasan a "Otros".`,
+                [
+                  { text: "Cancelar", style: "cancel" },
+                  {
+                    text: "Eliminar",
+                    style: "destructive",
+                    onPress: () =>
+                      eliminarCategoria(categoria.id)
+                        .then(onCambio)
+                        .catch((err) => Alert.alert("No se pudo eliminar", mensajeError(err))),
+                  },
+                ],
+              )
+            }
           >
             <Ionicons name="trash-outline" size={18} color={color.danger} />
           </Pressable>

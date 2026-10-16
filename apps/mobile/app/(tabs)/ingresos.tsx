@@ -99,7 +99,10 @@ export default function IngresosScreen() {
       {
         text: "Eliminar",
         style: "destructive",
-        onPress: () => eliminarIngreso(ingreso.id).then(cargar),
+        onPress: () =>
+          eliminarIngreso(ingreso.id)
+            .then(cargar)
+            .catch((err) => Alert.alert("No se pudo eliminar", mensajeError(err))),
       },
     ]);
   }

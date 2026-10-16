@@ -10,9 +10,9 @@
     "test": "node --test \"test/*.test.mjs\"",
     "verificar:publicacion": "node scripts/verificar-entorno-publicacion.mjs",
     "build:apk": "node scripts/verificar-entorno-publicacion.mjs && eas build --platform android --profile preview",
-    "build:play": "node scripts/verificar-entorno-publicacion.mjs && eas build --platform android --profile production",
+    "build:play": "node scripts/verificar-entorno-publicacion.mjs --produccion && eas build --platform android --profile production",
     "update:prueba": "node scripts/verificar-entorno-publicacion.mjs && eas update --channel preview",
-    "update:produccion": "node scripts/verificar-entorno-publicacion.mjs && eas update --channel production"
+    "update:produccion": "node scripts/verificar-entorno-publicacion.mjs --produccion && eas update --channel production"
   },
   "dependencies": {
     "@babel/runtime": "^7.29.7",

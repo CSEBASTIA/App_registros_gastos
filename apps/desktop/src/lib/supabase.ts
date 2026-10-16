@@ -10,6 +10,8 @@ export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
     storage: window.localStorage,
     autoRefreshToken: true,
     persistSession: true,
+    // Enlaces del correo con código canjeable solo en este navegador (ver sesionDesdeEnlace en core).
+    flowType: "pkce",
   },
   // Toda petición a Supabase (datos, auth y Storage) se corta a los 15 s
   // (60 s para subir archivos) en vez de quedarse esperando para siempre.

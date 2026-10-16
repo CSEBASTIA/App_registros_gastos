@@ -43,6 +43,15 @@ test("revisar: frena si faltan variables o si quedó activo el modo sin login", 
   assert.ok(revisar({ ...ok, EXPO_PUBLIC_SIN_LOGIN: "1" }).some((e) => /SIN_LOGIN/.test(e)));
 });
 
+test("revisar: para la tienda exige la política de privacidad en una dirección https pública; para pruebas no", () => {
+  assert.deepEqual(revisar(ok), [], "el APK de prueba no la necesita");
+  assert.ok(revisar(ok, { produccion: true }).some((e) => /EXPO_PUBLIC_URL_PRIVACIDAD/.test(e)));
+  for (const url of ["http://mi-app.vercel.app/privacidad.html", "https://localhost/privacidad.html", "privacidad.html"]) {
+    assert.ok(revisar({ ...ok, EXPO_PUBLIC_URL_PRIVACIDAD: url }, { produccion: true }).length > 0, url);
+  }
+  assert.deepEqual(revisar({ ...ok, EXPO_PUBLIC_URL_PRIVACIDAD: "https://mi-app.vercel.app/privacidad.html" }, { produccion: true }), []);
+});
+
 test("leerEnv: .env.production manda sobre .env, y el entorno manda sobre ambos", () => {
   const dir = mkdtempSync(join(tmpdir(), "entorno-"));
   try {

@@ -5,7 +5,8 @@ Lo que se configura fuera del código: en los paneles de Supabase, Vercel y Goog
 ## 1. Supabase (panel web)
 
 **Authentication → URL Configuration**
-- *Site URL*: `https://<tu-app>.vercel.app`.
+- Para la prueba actual solo con el APK: *Site URL* `gastosapp://confirmacion` y *Redirect URLs* `gastosapp://confirmacion`. Así los correos de registro vuelven al teléfono y no a `localhost`.
+- Cuando la versión web esté lista para producción: *Site URL* `https://<tu-app>.vercel.app` y conserva `gastosapp://confirmacion` en *Redirect URLs*. El registro móvil envía esta dirección explícitamente.
 - *Redirect URLs*: son las únicas direcciones a las que puede volver un enlace del correo. Sin ellas, "Olvidé mi contraseña" no funciona.
   - `gastosapp://**`: la app instalada.
   - `https://<tu-app>.vercel.app/**`: la versión web.

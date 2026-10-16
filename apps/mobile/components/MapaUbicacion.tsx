@@ -3,9 +3,9 @@
 // Mapas. Solo se carga al abrir el detalle, porque pedir las teselas le dice
 // al servidor de mapas la zona aproximada.
 import { useMemo, useState } from "react";
-import { Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { ATRIBUCION_MAPA, TAMANO_TESELA, mapaEstatico, type Ubicacion } from "core";
+import { ATRIBUCION_MAPA, TAMANO_TESELA, URL_ATRIBUCION_MAPA, mapaEstatico, type Ubicacion } from "core";
 import { font } from "../lib/theme";
 
 // Política de uso de OpenStreetMap: la app se identifica. En la web lo hace el navegador.
@@ -74,9 +74,15 @@ export default function MapaUbicacion({ ubicacion, alto = 150, onPress }: Props)
         <Ionicons name="open-outline" size={12} color="#111111" />
         <Text style={styles.abrirTexto}>Abrir en Mapas</Text>
       </View>
-      <View pointerEvents="none" style={styles.atribucion}>
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel={`${ATRIBUCION_MAPA}: ver los derechos del mapa`}
+        hitSlop={6}
+        onPress={() => Linking.openURL(URL_ATRIBUCION_MAPA).catch(() => undefined)}
+        style={styles.atribucion}
+      >
         <Text style={styles.atribucionTexto}>{ATRIBUCION_MAPA}</Text>
-      </View>
+      </Pressable>
     </Pressable>
   );
 }

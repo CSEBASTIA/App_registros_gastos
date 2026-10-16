@@ -34,3 +34,9 @@ test("mapaEstatico: la longitud da la vuelta en 180° y la plantilla se puede ca
     "https://mapas.test/2/0/1",
   ]);
 });
+
+test("atribución: el texto y el enlace que pide la política de OpenStreetMap", async () => {
+  const { ATRIBUCION_MAPA, URL_ATRIBUCION_MAPA } = await import("../src/lib/mapaEstatico.ts");
+  assert.equal(ATRIBUCION_MAPA, "© OpenStreetMap contributors");
+  assert.equal(URL_ATRIBUCION_MAPA, "https://www.openstreetmap.org/copyright");
+});

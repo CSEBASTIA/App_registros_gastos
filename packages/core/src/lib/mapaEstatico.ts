@@ -12,8 +12,9 @@ import type { Ubicacion } from "../types/domain";
 export const TAMANO_TESELA = 256;
 export const ZOOM_MAPA = 16;
 export const PLANTILLA_TESELAS = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
-/** Obligatoria al mostrar teselas de OpenStreetMap. */
-export const ATRIBUCION_MAPA = "© OpenStreetMap";
+/** Obligatoria al mostrar teselas de OpenStreetMap, con enlace a su página de derechos. */
+export const ATRIBUCION_MAPA = "© OpenStreetMap contributors";
+export const URL_ATRIBUCION_MAPA = "https://www.openstreetmap.org/copyright";
 
 const LATITUD_MAXIMA = 85.05112878; // límite de la proyección de los mapas web
 

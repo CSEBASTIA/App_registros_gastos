@@ -36,22 +36,30 @@ Lo que se configura fuera del código: en los paneles de Supabase, Vercel y Goog
   - `EXPO_PUBLIC_SUPABASE_URL`
   - `EXPO_PUBLIC_SUPABASE_ANON_KEY`: la clave **publishable**, nunca la *secret*.
   - `EXPO_PUBLIC_URL_PRIVACIDAD`: `https://<tu-app>.vercel.app/privacidad.html`.
-- Comprueba que abra `https://<tu-app>.vercel.app/privacidad.html`.
+  - `EXPO_PUBLIC_URL_TERMINOS`: `https://<tu-app>.vercel.app/terminos.html`.
+  - `EXPO_PUBLIC_CORREO_PRIVACIDAD`: el correo de contacto de las páginas legales.
+  - `EXPO_PUBLIC_EXIGIR_ACEPTACION`: **déjala vacía hasta aplicar las migraciones de aceptación** (paso 5 de la sección 3) y completar las páginas legales; después, `1`. Con `1`, el registro pide la casilla y quien inicia sesión sin haber aceptado pasa por la pantalla «Revisa y acepta». Si la pones en `1` antes de las migraciones, esa pantalla bloquea a todos.
+  - Las mismas tres (y las dos de Supabase) van también en las variables de **EAS** (entornos `preview` y `production`) o en `apps/mobile/.env.production`: el `.env` no se sube a Git ni a EAS.
+- Comprueba que abran `https://<tu-app>.vercel.app/privacidad.html` y `https://<tu-app>.vercel.app/terminos.html`.
 
-## 3. Política de privacidad
+## 3. Documentos legales
 
-`apps/mobile/public/privacidad.html` es un **borrador**. Antes de publicarla:
-1. Completa todo lo que está entre [corchetes]:
-   - responsable;
+`apps/mobile/public/terminos.html` y `privacidad.html` son **borradores**. Todo el detalle (qué completar, qué decidí, preguntas para el abogado, cómo se mantienen) está en [`docs/legal/README.md`](legal/README.md). Antes de publicarlos:
+1. Completa todo lo que está entre [corchetes] **en las dos páginas**:
+   - responsable (nombre o razón social, cédula o RUC, ciudad);
    - correo de contacto;
+   - fecha de publicación;
    - región de Supabase (está en *Project Settings → General*);
-   - plazos.
-2. Haz que la revise un abogado. Aplica la Ley Orgánica de Protección de Datos Personales de Ecuador.
-3. Si la app empieza a usar otro servicio (reportes de fallos, analítica), agrégalo a la política **antes** de activarlo.
+   - días de respaldos del proveedor.
+2. Haz que los revise un abogado. Aplica la Ley Orgánica de Protección de Datos Personales de Ecuador, y los términos, la de Defensa del Consumidor.
+3. Si la app empieza a usar otro servicio (reportes de fallos, analítica), agrégalo a la política y al [registro de tratamiento](legal/registro-tratamiento-datos.md) **antes** de activarlo, y sube la versión de la página (`version-legal` y `VERSION_LEGAL`).
+4. `pnpm --filter mobile verificar:publicacion --produccion` debe terminar en ✔: **se niega a seguir** mientras quede un [dato por completar] o falte una de las tres variables. `build:play` y `update:produccion` ya lo corren.
+5. **Aplica en Supabase las migraciones de aceptación y de exportación** (`para-supabase-web/16-10-2026 5AM/2 …` y `3 …`): sin ellas la app no puede guardar que la persona aceptó. Cada una debe mostrar `aplicada = sí`.
+6. **Enciende la aceptación**: con las migraciones aplicadas y las páginas completas, pon `EXPO_PUBLIC_EXIGIR_ACEPTACION=1` (en Vercel, en EAS y en `.env.production`). Las pantallas ya están construidas y vienen **apagadas**: mientras la variable no sea `1`, la app no pide ni guarda la aceptación y no cambia nada para nadie. `build:play` y `update:produccion` se niegan a seguir si no es `1`. Ver «Documentos legales y aceptación» en `contrato-logica-core.md`.
 
 ## 4. Google Play Console
 
-- **Política de privacidad**: `https://<tu-app>.vercel.app/privacidad.html`.
+- **Política de privacidad**: `https://<tu-app>.vercel.app/privacidad.html`. Los términos no se piden en el formulario, pero la ficha de la tienda puede enlazarlos: `https://<tu-app>.vercel.app/terminos.html`.
 - **Eliminación de la cuenta**:
   - Dentro de la app: *Más → Eliminar mi cuenta*. La pantalla está pendiente para el agente de interfaz; la lógica ya está.
   - Dirección web: `https://<tu-app>.vercel.app/privacidad.html#eliminar-cuenta`.
@@ -75,3 +83,5 @@ Lo que se configura fuera del código: en los paneles de Supabase, Vercel y Goog
 | Ubicación → Ubicación precisa (desde la versión 1.1.0) | No | Funcionalidad de la app: el lugar de cada pago y el resumen por lugar. Solo si el usuario activa «Guardar la ubicación de mis pagos», solo con la app abierta (el permiso en segundo plano está bloqueado), redondeada a unos 11 m y borrable. Google la cuenta como "precisa" porque es más fina que 3 km² |
 
 La app no recopila contactos, identificadores del dispositivo ni datos de uso, y no usa analítica ni publicidad. La ubicación solo se recopila si el usuario la activa (fila anterior). Si eso cambia, hay que actualizar este formulario y la política de privacidad.
+
+**Una salvedad (16-oct):** la política de privacidad ahora dice, con honestidad, que el proveedor de inicio de sesión (Supabase) registra la dirección IP, el tipo de dispositivo o navegador y las fechas de sesión por seguridad. Eso lo hace Supabase, no código nuestro, pero **confirma en la ayuda de Google Play si debes declararlo** (por ejemplo, como «Identificadores de dispositivo u otros») para que el formulario y la política digan lo mismo. Además, la constancia de aceptación (documento, versión, plataforma y fecha, ligada a la cuenta) cuenta como «administración de la cuenta»: no es un tipo de dato nuevo.

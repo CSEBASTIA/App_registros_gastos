@@ -427,7 +427,8 @@ Propuesta del Paso 5, como hipótesis a validar con usuarios:
 | Pendiente | Gravedad | Paso |
 |---|---|---|
 | Pantallas de acceso y privacidad: "Eliminar mi cuenta", "Olvidé mi contraseña" y nueva contraseña, enlace a la política de privacidad y pantalla de error. La lógica ya está en core; la especificación está en `docs/contrato-logica-core.md` (fases 1 y 2) | Alta (Google Play) | Producción |
-| Completar y revisar con un abogado la política de privacidad (`apps/mobile/public/privacidad.html`, borrador) y configurar Supabase, Vercel y Google Play según [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md) | Alta | Producción |
+| Completar y revisar con un abogado los términos y condiciones y la política de privacidad (`apps/mobile/public/terminos.html` y `privacidad.html`, borradores; qué completar y qué preguntarle al abogado: [`docs/legal/README.md`](docs/legal/README.md)), y configurar Supabase, Vercel y Google Play según [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md) | Alta | Producción |
+| Pantallas de aceptación de términos y privacidad (casilla en el registro y pantalla para cuentas anteriores). La base y la lógica ya están: ver «Documentos legales y aceptación» en `docs/contrato-logica-core.md` | Alta (sin ellas la app no pide ni guarda la aceptación) | Producción |
 | Actualizar Expo SDK 51: Google Play exige Android 15 o más reciente; resuelve también los avisos de dependencias de las herramientas | Alta para la tienda | Producción |
 | Ajustes de interfaz pedidos por la revisión del 15-oct: saldo a favor visible, solo tarjetas en diferidos, confirmar al borrar categorías, semana actual en Gastos y otros (lista en `docs/contrato-logica-core.md`) | Media | 6-10 |
 | Abono con cuenta de origen en la **web** (el teléfono ya lo tiene) | Media | Fase web |

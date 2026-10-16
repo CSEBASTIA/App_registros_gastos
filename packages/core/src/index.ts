@@ -19,6 +19,7 @@ export * from "./lib/ubicacion";
 export * from "./lib/ubicacionDispositivo";
 export * from "./lib/corteTarjeta";
 export * from "./lib/recordatorios";
+export * from "./lib/legal";
 export { FILAS_POR_PAGINA, type RangoFechas } from "./lib/paginacion";
 export * from "./schemas/limites";
 export * from "./schemas/gasto.schema";
@@ -99,6 +100,12 @@ export {
   type ClaveCaptura,
 } from "./repositories/clavesCaptura.repo";
 export { eliminarMiCuenta, CONFIRMACION_ELIMINAR_CUENTA } from "./repositories/cuentaUsuario.repo";
+export {
+  listarAceptaciones,
+  documentosLegalesPendientes,
+  registrarAceptacion,
+  aceptarDocumentosPendientes,
+} from "./repositories/legal.repo";
 export { totalesPorMes, type TotalMes } from "./repositories/totales.repo";
 export {
   contrasenaSchema,

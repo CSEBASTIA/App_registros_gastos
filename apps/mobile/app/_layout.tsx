@@ -1,11 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Stack, usePathname, useRouter } from "expo-router";
 import type { Session } from "@supabase/supabase-js";
+import { destinoPorAceptacion, documentosLegalesPendientes, mensajeError, type DocumentoLegal, type EstadoAceptacion } from "core";
 import { supabase } from "../lib/supabase";
+import { AceptacionContext, EXIGIR_ACEPTACION, type Aceptacion } from "../lib/legal";
 import { ThemeProvider, useTheme, font } from "../lib/theme";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { Animated } from "react-native";
+import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
 
 // Sin sesión, RLS bloquea toda lectura y escritura: la app se ve vacía y
 // guardar un gasto falla. Por eso el login va activo también en desarrollo.
@@ -45,6 +47,44 @@ function ThemedLayout() {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  // Aceptación de términos y privacidad (solo con EXPO_PUBLIC_EXIGIR_ACEPTACION=1).
+  // Se comprueba una vez por persona que inicia sesión, no en cada pantalla.
+  // `para` es la persona a quien corresponde el resultado: si inicia sesión
+  // otra en el mismo teléfono, el resultado de la anterior no vale (así no se
+  // ve ni un instante el resumen de alguien que aún no aceptó).
+  const [legal, setLegal] = useState<{ para?: string; estado: EstadoAceptacion; pendientes: DocumentoLegal[]; error?: string }>({
+    estado: "comprobando",
+    pendientes: [],
+  });
+  const [intentoLegal, setIntentoLegal] = useState(0);
+  const usuarioId = session?.user.id;
+  const estadoLegal: EstadoAceptacion = legal.para === usuarioId ? legal.estado : "comprobando";
+  useEffect(() => {
+    if (!EXIGIR_ACEPTACION || LOGIN_DESACTIVADO || !usuarioId) return;
+    let vigente = true;
+    setLegal({ para: usuarioId, estado: "comprobando", pendientes: [] });
+    documentosLegalesPendientes()
+      .then((pendientes) => {
+        if (vigente) setLegal({ para: usuarioId, estado: pendientes.length > 0 ? "pendiente" : "al-dia", pendientes });
+      })
+      .catch((err) => {
+        if (vigente) setLegal({ para: usuarioId, estado: "error", pendientes: [], error: mensajeError(err) });
+      });
+    return () => {
+      vigente = false;
+    };
+  }, [usuarioId, intentoLegal]);
+  const aceptacion = useMemo<Aceptacion>(
+    () => ({
+      estado: estadoLegal,
+      pendientes: legal.para === usuarioId ? legal.pendientes : [],
+      error: legal.para === usuarioId ? legal.error : undefined,
+      reintentar: () => setIntentoLegal((n) => n + 1),
+      alDia: () => setLegal({ para: usuarioId, estado: "al-dia", pendientes: [] }),
+    }),
+    [legal, estadoLegal, usuarioId]
+  );
+
   useEffect(() => {
     // Los grupos de rutas no aparecen en la URL. Comprobar la ruta visible
     // evita devolver a login mientras cambia entre login y registro.
@@ -62,6 +102,15 @@ function ThemedLayout() {
       return;
     }
 
+    // Con la aceptación exigida, quien inició sesión no pasa de la pantalla de
+    // aceptación hasta aceptar la versión vigente (ver destinoPorAceptacion).
+    const porAceptacion = destinoPorAceptacion({ exigir: EXIGIR_ACEPTACION, haySesion: !!session, estado: estadoLegal, ruta });
+    if (porAceptacion === "esperar") return;
+    if (porAceptacion) {
+      router.replace(porAceptacion);
+      return;
+    }
+
     if (!session && !enGrupoAuth) {
       router.replace("/(auth)/login");
     } else if (session && enRaiz) {
@@ -69,11 +118,12 @@ function ThemedLayout() {
     } else if (session && enGrupoAuth) {
       router.replace("/resumen");
     }
-  }, [session, pathname, router, ready, fontsLoaded, fontError]);
+  }, [session, pathname, router, ready, fontsLoaded, fontError, estadoLegal]);
 
   if (session === undefined || !ready || (!fontsLoaded && !fontError)) return null;
 
   return (
+    <AceptacionContext.Provider value={aceptacion}>
     <Animated.View style={{ flex: 1, backgroundColor: color.bg, opacity }}>
     <StatusBar style={mode === "dark" ? "light" : "dark"} backgroundColor={color.bg} />
     <Stack
@@ -108,7 +158,15 @@ function ThemedLayout() {
       <Stack.Screen name="google-wallet" options={{ title: "Conectar Google Wallet" }} />
       <Stack.Screen name="lugares" options={{ title: "Lugares" }} />
       <Stack.Screen name="lugar/[id]" options={{ title: "Lugar" }} />
+      <Stack.Screen name="aceptar-terminos" options={{ headerShown: false, gestureEnabled: false }} />
     </Stack>
+    {/* Mientras se comprueba la aceptación no se ve ninguna pantalla de la app. */}
+    {EXIGIR_ACEPTACION && !!session && estadoLegal === "comprobando" && (
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: color.bg, alignItems: "center", justifyContent: "center" }]}>
+        <ActivityIndicator color={color.primary} />
+      </View>
+    )}
     </Animated.View>
+    </AceptacionContext.Provider>
   );
 }

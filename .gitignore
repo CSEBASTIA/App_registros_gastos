@@ -1,12 +1,12 @@
 # dependencias
 node_modules/
 
-# variables de entorno
+# variables de entorno: todas las variantes (.env.staging, .env.test, prod.env…).
+# Solo los .env.example se versionan.
 .env
-.env.local
-.env.production
-.env.development
-.env.*.local
+.env.*
+*.env
+!.env.example
 
 # builds
 dist/
@@ -54,3 +54,22 @@ credentials.json
 *.p8
 *.p12
 *.mobileprovision
+
+# credenciales de servicios (el Client ID de Google/Microsoft es público; el
+# "client secret", las claves de servicio y las claves privadas no)
+client_secret*.json
+service-account*.json
+google-services.json
+GoogleService-Info.plist
+*.pem
+*.key
+
+# datos personales (docs/legal/README.md): solicitudes de las personas, copias
+# de datos que se les entregan, evidencia de incidentes y correspondencia legal
+docs/legal/privado/
+exportacion-datos-*.json
+
+# volcados y respaldos de la base: contienen datos reales de personas
+*.dump
+*.backup
+supabase/backups/

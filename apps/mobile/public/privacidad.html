@@ -1,10 +1,18 @@
 <!doctype html>
 <!--
-  BORRADOR (15-oct-2026). Antes de publicar:
-  1. Completar todo lo que está entre [corchetes].
-  2. Revisarlo con un abogado (Ley Orgánica de Protección de Datos Personales de Ecuador).
+  BORRADOR (16-oct-2026). Antes de publicar:
+  1. Completar todo lo que está entre [corchetes] (los mismos datos del
+     responsable que en terminos.html). El verificador de publicación
+     (`pnpm verificar:publicacion --produccion`) se niega a seguir mientras
+     quede alguno.
+  2. Revisarlo con un abogado (Ley Orgánica de Protección de Datos Personales
+     de Ecuador y su reglamento). Los puntos que más necesitan su criterio
+     están en docs/legal/README.md.
   3. Mantenerlo al día: si la app empieza a usar otro servicio (por ejemplo,
-     reportes de fallos o analítica), hay que agregarlo aquí antes.
+     reportes de fallos o analítica), hay que agregarlo aquí ANTES, y cambiar
+     la etiqueta `version-legal` (una fecha) Y `VERSION_LEGAL` en
+     packages/core/src/lib/legal.ts para que la app vuelva a pedir la
+     aceptación. Una prueba comprueba que coincidan.
   Se publica con la versión web en /privacidad.html. Google Play pide esta
   dirección y la de /privacidad.html#eliminar-cuenta.
 -->
@@ -12,6 +20,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="version-legal" content="2026-10-16">
 <title>Política de privacidad · fintrack</title>
 <style>
   :root { --fondo: #ffffff; --texto: #1f2937; --suave: #6b7280; --borde: #e5e7eb; --acento: #0f766e; --caja: #f3f4f6; }
@@ -37,7 +46,7 @@
 <body>
 <main>
 <h1>Política de privacidad</h1>
-<p class="fecha">Vigente desde el [fecha de publicación]. Aplica a la app fintrack (Android y web).</p>
+<p class="fecha">Versión 2026-10-16 · Vigente desde el [fecha de publicación]. Aplica a la app fintrack (Android y web). Léela junto con los <a href="terminos.html">Términos y condiciones</a>.</p>
 
 <div class="resumen">
   <strong>En resumen</strong>
@@ -45,7 +54,8 @@
     <li>Guardamos lo que tú registras (cuentas, gastos, ingresos, deudas…) para mostrarte tus finanzas. Nada más.</li>
     <li>No vendemos tus datos, no mostramos publicidad y no usamos analítica de terceros.</li>
     <li>Cada persona solo puede ver sus propios datos.</li>
-    <li>Puedes borrar tu cuenta y todos tus datos desde la app, cuando quieras.</li>
+    <li>Las funciones que usan tu correo, tu ubicación o Apple Pay son opcionales, y las activas tú.</li>
+    <li>Puedes pedir una copia de tus datos o borrar tu cuenta y todos tus datos, cuando quieras.</li>
   </ul>
 </div>
 
@@ -57,15 +67,18 @@
 <table>
   <tr><th>Dato</th><th>Para qué</th></tr>
   <tr><td>Correo electrónico y contraseña</td><td>Crear tu cuenta e iniciar sesión. La contraseña se guarda cifrada; nadie puede leerla.</td></tr>
+  <tr><td>Constancia de aceptación: qué documento aceptaste (términos o privacidad), qué versión, desde qué plataforma y cuándo</td><td>Demostrar tu consentimiento y saber qué versión de estos textos aceptaste.</td></tr>
   <tr><td>Cuentas y tarjetas: nombre, banco, tipo, últimos 4 dígitos (si los pones), saldo y cupo</td><td>Calcular tu saldo disponible y el uso de tus tarjetas. Nunca pedimos el número completo de una tarjeta ni claves bancarias.</td></tr>
   <tr><td>Gastos, ingresos, deudas, abonos, pagos de tarjeta, presupuestos, categorías y recordatorios</td><td>Mostrarte tu resumen, tus presupuestos, tu plan de deudas y recomendaciones.</td></tr>
   <tr><td>Fotos o PDF de facturas que decidas adjuntar</td><td>Que puedas consultarlas después. Se guardan en un espacio privado al que solo tú accedes.</td></tr>
   <tr><td>Correo (opcional, solo si conectas Gmail u Outlook)</td><td>Detectar avisos de tu banco y proponerte movimientos para que los confirmes. Ver la sección 3.</td></tr>
   <tr><td>Ubicación de tus pagos (opcional, solo si activas «Guardar la ubicación de mis pagos») y con qué billetera pagaste (Apple Pay, Google Wallet)</td><td>Mostrarte en qué lugares pagas y cuánto gastas en cada uno. La ubicación se toma solo al registrar un pago y con la app abierta, nunca en segundo plano, y se guarda redondeada a unos 11 metros. Puedes apagarla y borrar todas tus ubicaciones desde la app sin borrar tus gastos. Si tocas «Abrir en Mapas», ese punto se abre en la app de mapas de tu teléfono.</td></tr>
+  <tr><td>Atajo de Apple Pay (opcional): los pagos que envía tu iPhone (monto, comercio, nombre de la tarjeta o pase y, si lo incluyes, la ubicación) y una clave de captura</td><td>Dejar esos pagos en tu bandeja para que los confirmes. Del atajo guardamos solo la huella de la clave de captura (no la clave) y el nombre que le pongas; con ella no se pueden leer tus datos, solo dejar avisos pendientes. Nada se vuelve gasto sin tu confirmación.</td></tr>
+  <tr><td>Datos técnicos de seguridad: dirección IP, tipo de dispositivo o navegador y fechas de inicio de sesión</td><td>Mantener tu sesión, detectar accesos indebidos y limitar abusos. Los registra nuestro proveedor de inicio de sesión (Supabase).</td></tr>
 </table>
 </div>
 <p>Las recomendaciones y el puntaje financiero se calculan con reglas fijas sobre tus propios datos, solo para informarte. No tomamos decisiones automatizadas que tengan efectos legales sobre ti.</p>
-<p>La base legal es tu consentimiento al crear la cuenta y la ejecución del servicio que pides. Puedes retirar tu consentimiento borrando tu cuenta.</p>
+<p>La base legal es tu consentimiento al crear la cuenta y la ejecución del servicio que pides. Para las funciones opcionales (correo, ubicación, Apple Pay), tu consentimiento adicional al activarlas. Puedes retirar tu consentimiento apagando esas funciones o borrando tu cuenta.</p>
 
 <h2>3. Conexión con tu correo (opcional)</h2>
 <ul>
@@ -77,14 +90,14 @@
 </ul>
 
 <h2>4. Con quién compartimos datos</h2>
-<p>No vendemos ni alquilamos tus datos. Solo los manejan estos proveedores, para que la app funcione:</p>
+<p>No vendemos ni alquilamos tus datos. Solo los manejan estos proveedores, que actúan por encargo nuestro y únicamente para que la app funcione:</p>
 <ul>
   <li><strong>Supabase</strong>: base de datos, inicio de sesión y almacenamiento de facturas. Servidores en [región del proyecto de Supabase, por ejemplo Estados Unidos].</li>
   <li><strong>Vercel</strong>: aloja la versión web.</li>
   <li><strong>Expo</strong>: entrega las actualizaciones de la app.</li>
   <li><strong>Google o Microsoft</strong>: solo si conectas tu correo, y solo para ese fin.</li>
 </ul>
-<p>Algunos de estos servidores están fuera de Ecuador. Al usar la app aceptas esa transferencia internacional, que se hace con proveedores que aplican medidas de seguridad adecuadas. También entregaríamos datos si una autoridad competente lo exige conforme a la ley.</p>
+<p>Algunos de estos servidores están fuera de Ecuador. Al aceptar esta política autorizas expresamente esa transferencia internacional, que se hace con proveedores que aplican medidas de seguridad adecuadas. Si quieres saber más sobre esas garantías, escríbenos. También entregaríamos datos si una autoridad competente lo exige conforme a la ley.</p>
 
 <h2>5. Cómo protegemos tus datos</h2>
 <ul>
@@ -92,23 +105,31 @@
   <li>La base de datos aplica reglas por usuario: cada persona solo puede leer y cambiar lo suyo.</li>
   <li>Las facturas se guardan en un espacio privado, con enlaces de acceso temporales.</li>
   <li>Ninguna clave con acceso total a la base está dentro de la app.</li>
+  <li>Si ocurre una vulneración de seguridad que ponga en riesgo tus derechos, la notificaremos a la Superintendencia de Protección de Datos Personales y a ti, en los plazos que fija la ley, explicándote qué pasó y qué puedes hacer.</li>
 </ul>
 
 <h2>6. Cuánto tiempo guardamos tus datos</h2>
-<p>Mientras tengas tu cuenta. Si la eliminas, borramos tus datos y facturas de inmediato. Las copias de respaldo del proveedor se eliminan solas en un plazo de hasta [número] días.</p>
+<p>Mientras tengas tu cuenta. Si la eliminas, borramos tus datos, tus facturas y la constancia de tus aceptaciones de inmediato. Las copias de respaldo del proveedor se eliminan solas en un plazo de hasta [número] días. Los registros técnicos de seguridad (sección 2) los conserva el proveedor por el tiempo limitado que él define.</p>
 
 <h2>7. Tus derechos</h2>
-<p>Según la Ley Orgánica de Protección de Datos Personales, puedes pedir el acceso, la rectificación y actualización, la eliminación, la portabilidad y la suspensión del tratamiento de tus datos, u oponerte a él. Puedes editar y borrar tus datos directamente en la app. Para lo demás, escríbenos a <a href="mailto:[correo de contacto]">[correo de contacto]</a> y responderemos en un plazo máximo de [número] días. Si no estás conforme con nuestra respuesta, puedes acudir a la Superintendencia de Protección de Datos Personales.</p>
+<p>Según la Ley Orgánica de Protección de Datos Personales, puedes pedir el acceso a tus datos, su rectificación y actualización, su eliminación, la portabilidad (recibir una copia en un formato que puedas leer y llevar a otro servicio), la suspensión del tratamiento, y oponerte a él. También puedes retirar tu consentimiento y no ser objeto de decisiones basadas únicamente en tratamientos automatizados. Ejercer tus derechos no tiene costo.</p>
+<p>Puedes ver, editar y borrar tus datos directamente en la app. Para lo demás (por ejemplo, pedir una copia de todos tus datos), escríbenos a <a href="mailto:[correo de contacto]">[correo de contacto]</a> desde el correo de tu cuenta y te responderemos en un plazo máximo de 15 días desde que recibimos tu solicitud. Si no estás conforme con nuestra respuesta, puedes acudir a la Superintendencia de Protección de Datos Personales.</p>
 
 <h2 id="eliminar-cuenta">8. Cómo eliminar tu cuenta</h2>
-<p><strong>Desde la app:</strong> <em>Más → Eliminar mi cuenta</em>, escribe <strong>ELIMINAR</strong> y confirma. Se borran al instante tu cuenta, tus cuentas y tarjetas, gastos, ingresos, deudas, abonos, pagos, presupuestos, categorías, recordatorios, avisos del correo y facturas. No se puede deshacer.</p>
-<p><strong>Si ya no tienes la app:</strong> escríbenos desde el correo de tu cuenta a <a href="mailto:[correo de contacto]?subject=Eliminar%20mi%20cuenta">[correo de contacto]</a> con el asunto "Eliminar mi cuenta". La eliminaremos en un plazo máximo de [número] días y te confirmaremos por correo.</p>
+<p><strong>Desde la app:</strong> <em>Más → Eliminar mi cuenta</em>, escribe <strong>ELIMINAR</strong> y confirma. Se borran al instante tu cuenta, tus cuentas y tarjetas, gastos, ingresos, deudas, abonos, pagos, presupuestos, categorías, recordatorios, avisos del correo, claves de Apple Pay, lugares, facturas y la constancia de tus aceptaciones. No se puede deshacer.</p>
+<p><strong>Si ya no tienes la app:</strong> escríbenos desde el correo de tu cuenta a <a href="mailto:[correo de contacto]?subject=Eliminar%20mi%20cuenta">[correo de contacto]</a> con el asunto "Eliminar mi cuenta". La eliminaremos en un plazo máximo de 15 días y te confirmaremos por correo.</p>
 
 <h2>9. Menores de edad</h2>
 <p>La app está dirigida a mayores de 18 años. Si sabemos que una cuenta pertenece a un menor, la eliminaremos.</p>
 
-<h2>10. Cambios a esta política</h2>
-<p>Si cambiamos algo importante, te avisaremos en la app antes de que el cambio aplique. La fecha de arriba indica la última versión.</p>
+<h2>10. Almacenamiento en tu navegador (versión web)</h2>
+<p>La versión web guarda en tu navegador (almacenamiento local) lo necesario para mantener tu sesión y tus preferencias, como el tema claro u oscuro. No usamos cookies de publicidad ni de seguimiento, ni analítica de terceros. Al cerrar sesión se borra la sesión guardada.</p>
+
+<h2>11. Cambios a esta política</h2>
+<p>Si cambiamos algo importante, te avisaremos en la app antes de que el cambio aplique y, si hace falta tu consentimiento, te pediremos aceptar la versión nueva. La versión y la fecha de arriba indican la última.</p>
+
+<h2>12. Contacto y reclamos</h2>
+<p>Dudas sobre esta política o tus datos: <a href="mailto:[correo de contacto]">[correo de contacto]</a>. También puedes presentar un reclamo ante la Superintendencia de Protección de Datos Personales.</p>
 </main>
 </body>
 </html>

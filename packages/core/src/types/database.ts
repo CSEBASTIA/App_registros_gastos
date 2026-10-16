@@ -144,6 +144,21 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      // Solo se lee: se escribe con `registrar_aceptacion_legal` (y en el registro, con un disparador).
+      aceptaciones_legales: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          documento: string;
+          version: string;
+          plataforma: string | null;
+          origen: string;
+          aceptado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       presupuestos: {
         Row: {
           id: string;
@@ -490,6 +505,10 @@ export type Database = {
       };
       eliminar_mi_cuenta: {
         Args: { p_confirmacion: string };
+        Returns: undefined;
+      };
+      registrar_aceptacion_legal: {
+        Args: { p_documento: string; p_version: string; p_plataforma?: string };
         Returns: undefined;
       };
       totales_por_mes: {

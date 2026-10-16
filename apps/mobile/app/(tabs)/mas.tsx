@@ -13,13 +13,17 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { listarTransaccionesPendientes } from "core";
 import { supabase } from "../../lib/supabase";
+import { DOCUMENTOS, abrirDocumento } from "../../lib/legal";
 import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
 
 const ITEMS: {
   titulo: string;
   subtitulo: string;
-  ruta: string;
+  /** Pantalla de la app. Las filas de documentos legales llevan `url` en su lugar. */
+  ruta?: string;
+  /** Dirección que se abre en el navegador (documentos legales). */
+  url?: string;
   icono: keyof typeof Ionicons.glyphMap;
 }[] = [
   {
@@ -82,6 +86,16 @@ const ITEMS: {
     ruta: "/correo",
     icono: "mail-outline",
   },
+  // Documentos legales: solo se muestran si su dirección está configurada
+  // (EXPO_PUBLIC_URL_TERMINOS / EXPO_PUBLIC_URL_PRIVACIDAD).
+  ...(["terminos", "privacidad"] as const)
+    .filter((doc) => !!DOCUMENTOS[doc].url)
+    .map((doc) => ({
+      titulo: DOCUMENTOS[doc].titulo,
+      subtitulo: DOCUMENTOS[doc].subtitulo,
+      url: DOCUMENTOS[doc].url,
+      icono: "document-text-outline" as const,
+    })),
 ];
 
 export default function Mas() {
@@ -162,14 +176,14 @@ export default function Mas() {
 
           {ITEMS.map((item) => (
             <Pressable
-              key={item.ruta}
-              accessibilityRole="button"
+              key={item.ruta ?? item.url}
+              accessibilityRole={item.url ? "link" : "button"}
               android_ripple={{ color: color.primaryBg }}
               style={({ pressed }) => [
                 styles.fila,
                 pressed && { backgroundColor: color.primaryBg },
               ]}
-              onPress={() => router.push(item.ruta as never)}
+              onPress={() => (item.url ? abrirDocumento(item.url) : router.push(item.ruta as never))}
             >
               <View style={styles.icono}>
                 <Ionicons name={item.icono} size={20} color={color.primary} />

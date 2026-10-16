@@ -11,10 +11,13 @@ import {
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import * as Linking from "expo-linking";
-import { mensajeError } from "core";
+import { datosAceptacionRegistro, mensajeError, plataformaLegal } from "core";
 import { supabase } from "../../lib/supabase";
+import { EXIGIR_ACEPTACION, URL_PRIVACIDAD, URL_TERMINOS } from "../../lib/legal";
 import Campo from "../../components/Campo";
 import Boton from "../../components/Boton";
+import Casilla from "../../components/Casilla";
+import EnlaceLegal from "../../components/EnlaceLegal";
 import ErrorTexto from "../../components/ErrorTexto";
 import Tarjeta from "../../components/Tarjeta";
 import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
@@ -29,18 +32,28 @@ export default function Registro() {
   const [aviso, setAviso] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
   const [reenviando, setReenviando] = useState(false);
+  const [acepto, setAcepto] = useState(false);
 
   const destinoConfirmacion = Linking.createURL("confirmacion");
 
   async function crearCuenta() {
     setError(null);
     setAviso(null);
+    if (EXIGIR_ACEPTACION && !acepto) {
+      setError("Para crear tu cuenta, acepta los términos y la política de privacidad.");
+      return;
+    }
     setCargando(true);
     try {
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
-        options: { emailRedirectTo: destinoConfirmacion },
+        options: {
+          emailRedirectTo: destinoConfirmacion,
+          // La base anota la aceptación con la hora del servidor al crear la
+          // cuenta, aunque la persona aún no haya confirmado el correo.
+          data: EXIGIR_ACEPTACION ? datosAceptacionRegistro(plataformaLegal(Platform.OS)) : undefined,
+        },
       });
       if (error) throw error;
       // Activación: tras crear la cuenta se va directo a la app (el Resumen
@@ -127,6 +140,17 @@ export default function Registro() {
               value={password}
               onChangeText={setPassword}
             />
+            {EXIGIR_ACEPTACION && (
+              <Casilla
+                marcada={acepto}
+                onChange={setAcepto}
+                etiqueta="Acepto los términos y condiciones y la política de privacidad"
+                disabled={cargando}
+              >
+                Acepto los <EnlaceLegal url={URL_TERMINOS}>Términos y condiciones</EnlaceLegal> y la{" "}
+                <EnlaceLegal url={URL_PRIVACIDAD}>Política de privacidad</EnlaceLegal>.
+              </Casilla>
+            )}
             {error && <ErrorTexto>{error}</ErrorTexto>}
             {aviso && (
               <Text accessibilityLiveRegion="polite" style={styles.subtitulo}>
@@ -138,7 +162,7 @@ export default function Registro() {
               variante="primario"
               onPress={crearCuenta}
               loading={cargando}
-              disabled={cargando || reenviando}
+              disabled={cargando || reenviando || (EXIGIR_ACEPTACION && !acepto)}
             />
             <Boton
               titulo={reenviando ? "Reenviando…" : "Reenviar correo de confirmación"}

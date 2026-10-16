@@ -1,12 +1,12 @@
 -- =====================================================================
 -- gastos-app — BASE DE DATOS COMPLETA
 -- Generado por supabase/generar-base-completa.sh el 2026-10-16 con las
--- 30 migraciones de supabase/migrations + seed.sql. No editar a mano.
+-- 32 migraciones de supabase/migrations + seed.sql. No editar a mano.
 --
 -- Cómo usarlo en Supabase (web):
 --   1. Proyecto nuevo → SQL Editor → New query.
 --   2. Pegar TODO este archivo y pulsar Run.
---   3. Debe terminar mostrando "migraciones_registradas = 30".
+--   3. Debe terminar mostrando "migraciones_registradas = 32".
 --
 -- Es para un proyecto VACÍO. Corre en una sola transacción: si algo falla
 -- (por ejemplo, si la base ya existía), se detiene sin cambiar nada.
@@ -3314,6 +3314,219 @@ revoke all on function public.leer_aviso_google_wallet(text, text) from public, 
 notify pgrst, 'reload schema';
 
 
+-- >>> 20261016210000_aceptaciones_legales.sql
+-- Migración de aceptación de términos y privacidad.
+--
+-- La Ley Orgánica de Protección de Datos Personales de Ecuador pide un
+-- consentimiento que se pueda demostrar, y los términos y condiciones solo
+-- obligan a quien los aceptó. Esta migración guarda, por persona, qué
+-- documento aceptó (términos o privacidad), qué versión y cuándo.
+--
+-- 1) Tabla `aceptaciones_legales`: la persona solo puede LEER lo suyo. Nadie la
+--    escribe directo (ni ella misma): así la fecha la pone el servidor y la
+--    prueba no se puede maquillar ni borrar a mano. Se borra en cascada al
+--    eliminar la cuenta, igual que el resto de sus datos.
+-- 2) `registrar_aceptacion_legal`: lo que llama la app cuando alguien acepta
+--    una versión nueva (o la primera, en las cuentas anteriores a esta migración).
+-- 3) Disparador en `auth.users`: al registrarse, la app manda en los datos del
+--    usuario (`acepta_terminos`, `acepta_privacidad`, `plataforma`) la versión
+--    que la persona marcó. Con confirmación por correo, `signUp` no deja sesión
+--    hasta que confirma; por eso la aceptación se anota aquí, en el servidor,
+--    en el mismo momento de crear la cuenta.
+--
+-- Las versiones son fechas (`2026-10-16`): la de la última revisión del texto.
+-- Deben coincidir con `VERSION_LEGAL` de packages/core y con la etiqueta
+-- `version-legal` de apps/mobile/public/{terminos,privacidad}.html.
+
+create table if not exists public.aceptaciones_legales (
+  id uuid primary key default gen_random_uuid(),
+  usuario_id uuid not null references auth.users(id) on delete cascade,
+  documento text not null check (documento in ('terminos', 'privacidad')),
+  version text not null check (version ~ '^\d{4}-\d{2}-\d{2}$'),
+  plataforma text check (plataforma in ('android', 'ios', 'web')),
+  -- 'registro': al crear la cuenta; 'app': después, desde la pantalla de aceptación.
+  origen text not null check (origen in ('registro', 'app')),
+  aceptado_en timestamptz not null default now(),
+  unique (usuario_id, documento, version)
+);
+
+alter table public.aceptaciones_legales enable row level security;
+
+-- Solo lectura de lo propio. Sin insert/update/delete para nadie desde la API.
+revoke all on public.aceptaciones_legales from anon, authenticated;
+grant select on public.aceptaciones_legales to authenticated;
+
+drop policy if exists "aceptaciones_legales: select propio" on public.aceptaciones_legales;
+create policy "aceptaciones_legales: select propio" on public.aceptaciones_legales
+  for select to authenticated using ((select auth.uid()) = usuario_id);
+
+-- Una versión es creíble si es una fecha entre los primeros documentos
+-- (2026-10-01) y mañana. Acota los valores posibles: nadie puede llenar la
+-- tabla con versiones inventadas.
+create or replace function public.es_version_legal(p_version text)
+returns boolean
+language sql
+stable
+set search_path = public, pg_temp
+as $$
+  select p_version ~ '^\d{4}-\d{2}-\d{2}$'
+    and p_version >= '2026-10-01'
+    and p_version <= to_char(current_date + 1, 'YYYY-MM-DD');
+$$;
+
+revoke all on function public.es_version_legal(text) from public, anon, authenticated;
+
+create or replace function public.registrar_aceptacion_legal(
+  p_documento text,
+  p_version text,
+  p_plataforma text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_usuario uuid := auth.uid();
+begin
+  if v_usuario is null then
+    raise exception 'Necesitas iniciar sesión.' using errcode = '42501';
+  end if;
+  if p_documento is null or p_documento not in ('terminos', 'privacidad') then
+    raise exception 'Documento legal desconocido.' using errcode = '22023';
+  end if;
+  if not coalesce(public.es_version_legal(p_version), false) then
+    raise exception 'Versión del documento no válida.' using errcode = '22023';
+  end if;
+  if p_plataforma is not null and p_plataforma not in ('android', 'ios', 'web') then
+    raise exception 'Plataforma no válida.' using errcode = '22023';
+  end if;
+  -- Tope por si alguien intenta llenar la tabla con versiones distintas.
+  if (select count(*) from public.aceptaciones_legales where usuario_id = v_usuario) >= 50 then
+    raise exception 'Demasiadas aceptaciones registradas.' using errcode = '54000';
+  end if;
+
+  -- Repetir la misma versión no cambia nada (conserva la primera fecha).
+  insert into public.aceptaciones_legales (usuario_id, documento, version, plataforma, origen)
+  values (v_usuario, p_documento, p_version, p_plataforma, 'app')
+  on conflict (usuario_id, documento, version) do nothing;
+end;
+$$;
+
+revoke all on function public.registrar_aceptacion_legal(text, text, text) from public, anon;
+grant execute on function public.registrar_aceptacion_legal(text, text, text) to authenticated;
+
+-- Aceptación hecha en el registro. Nunca debe impedir crear la cuenta: si algo
+-- falla, avisa y sigue; la app volverá a pedir la aceptación al entrar.
+create or replace function public.anotar_aceptaciones_del_registro()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_documento text;
+  v_version text;
+  v_plataforma text := new.raw_user_meta_data ->> 'plataforma';
+begin
+  if v_plataforma is not null and v_plataforma not in ('android', 'ios', 'web') then
+    v_plataforma := null;
+  end if;
+  foreach v_documento in array array['terminos', 'privacidad'] loop
+    v_version := new.raw_user_meta_data ->> ('acepta_' || v_documento);
+    if coalesce(public.es_version_legal(v_version), false) then
+      insert into public.aceptaciones_legales (usuario_id, documento, version, plataforma, origen)
+      values (new.id, v_documento, v_version, v_plataforma, 'registro')
+      on conflict (usuario_id, documento, version) do nothing;
+    end if;
+  end loop;
+  return new;
+exception when others then
+  raise warning 'No se pudo anotar la aceptación legal de %: %', new.id, sqlerrm;
+  return new;
+end;
+$$;
+
+revoke all on function public.anotar_aceptaciones_del_registro() from public, anon, authenticated;
+
+drop trigger if exists aceptaciones_del_registro on auth.users;
+create trigger aceptaciones_del_registro
+  after insert on auth.users
+  for each row execute function public.anotar_aceptaciones_del_registro();
+
+
+-- >>> 20261016211000_exportar_datos_persona.sql
+-- Migración de exportación de datos personales.
+--
+-- La Ley Orgánica de Protección de Datos Personales de Ecuador da derecho de
+-- acceso y de portabilidad: la persona puede pedir una copia de TODOS sus
+-- datos en un formato que pueda leer y llevar a otro servicio, y hay un plazo
+-- corto para responder (docs/legal/procedimiento-derechos-titular.md).
+--
+-- `exportar_datos_persona(correo)` arma esa copia en un solo JSON. La corre
+-- quien administra el proyecto desde el SQL Editor (nunca la app): por eso no
+-- se concede a `anon` ni a `authenticated`, y además se niega a correr si la
+-- llaman con esos roles. Quien la corre debe haber comprobado antes que la
+-- solicitud viene del correo de esa cuenta.
+--
+-- No incluye la huella de las claves de captura de Apple Pay (es un secreto
+-- derivado: solo sale el prefijo y el nombre). Las facturas (archivos en
+-- Storage) salen como lista de nombres; los archivos se bajan del panel de
+-- Storage, carpeta con el id de la persona.
+--
+-- Una prueba comprueba que TODA tabla con `usuario_id` aparezca en la copia:
+-- si alguien agrega una tabla de datos personales y olvida añadirla aquí, falla.
+
+create or replace function public.exportar_datos_persona(p_correo text)
+returns jsonb
+language plpgsql
+stable
+set search_path = public, pg_temp
+as $$
+declare
+  v_usuario uuid;
+begin
+  if current_user in ('anon', 'authenticated') then
+    raise exception 'Solo la administración puede exportar datos.' using errcode = '42501';
+  end if;
+
+  select id into v_usuario from auth.users where lower(email) = lower(btrim(p_correo));
+  if v_usuario is null then
+    raise exception 'No existe una cuenta con ese correo.' using errcode = 'P0002';
+  end if;
+
+  return jsonb_build_object(
+    'exportado_en', now(),
+    'cuenta', (
+      select jsonb_build_object('id', u.id, 'correo', u.email, 'creada', u.created_at, 'ultimo_ingreso', u.last_sign_in_at)
+      from auth.users u where u.id = v_usuario
+    ),
+    'aceptaciones_legales', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.aceptado_en, t.documento), '[]'::jsonb) from public.aceptaciones_legales t where t.usuario_id = v_usuario),
+    'cuentas', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.created_at, t.id), '[]'::jsonb) from public.cuentas t where t.usuario_id = v_usuario),
+    'categorias', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.nombre, t.id), '[]'::jsonb) from public.categorias t where t.usuario_id = v_usuario),
+    'gastos', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.fecha, t.created_at, t.id), '[]'::jsonb) from public.gastos t where t.usuario_id = v_usuario),
+    'ingresos', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.fecha, t.created_at, t.id), '[]'::jsonb) from public.ingresos t where t.usuario_id = v_usuario),
+    'deudas', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.created_at, t.id), '[]'::jsonb) from public.deudas t where t.usuario_id = v_usuario),
+    'abonos_deuda', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.fecha, t.created_at, t.id), '[]'::jsonb) from public.abonos_deuda t where t.usuario_id = v_usuario),
+    'pagos_tarjeta', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.fecha, t.created_at, t.id), '[]'::jsonb) from public.pagos_tarjeta t where t.usuario_id = v_usuario),
+    'presupuestos', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.mes, t.id), '[]'::jsonb) from public.presupuestos t where t.usuario_id = v_usuario),
+    'recordatorios', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.fecha, t.id), '[]'::jsonb) from public.recordatorios t where t.usuario_id = v_usuario),
+    'transacciones_detectadas', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.created_at, t.id), '[]'::jsonb) from public.transacciones_detectadas t where t.usuario_id = v_usuario),
+    'lugares', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' order by t.created_at, t.id), '[]'::jsonb) from public.lugares t where t.usuario_id = v_usuario),
+    -- Sin la huella: es un secreto derivado de la clave.
+    'claves_captura', (select coalesce(jsonb_agg(to_jsonb(t) - 'usuario_id' - 'huella' order by t.created_at, t.id), '[]'::jsonb) from public.claves_captura t where t.usuario_id = v_usuario),
+    'facturas_guardadas', (
+      select coalesce(jsonb_agg(o.name order by o.name), '[]'::jsonb)
+      from storage.objects o
+      where o.bucket_id = 'facturas' and (storage.foldername(o.name))[1] = v_usuario::text
+    )
+  );
+end;
+$$;
+
+revoke all on function public.exportar_datos_persona(text) from public, anon, authenticated;
+
+
 -- >>> seed.sql (categorías globales)
 -- Categorías globales de gasto. Se puede correr más de una vez sin duplicar
 -- (va también dentro de base-completa.sql).
@@ -3365,7 +3578,9 @@ insert into supabase_migrations.schema_migrations (version, name) values
   ('20261016150000', 'resumen_por_lugar'),
   ('20261016160000', 'casas_comerciales_y_corte'),
   ('20261016170000', 'recordatorios_diferidos'),
-  ('20261016180000', 'captura_google_wallet')
+  ('20261016180000', 'captura_google_wallet'),
+  ('20261016210000', 'aceptaciones_legales'),
+  ('20261016211000', 'exportar_datos_persona')
 on conflict (version) do nothing;
 
 commit;

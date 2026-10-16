@@ -183,7 +183,7 @@ Pendiente para los agentes de interfaz (paso 1):
 4. **Registro**:
    - Antes de `signUp`: `const problema = validarContrasena(password); if (problema) return setError(problema);`.
    - Mostrar los requisitos bajo el campo.
-   - Bajo el botón: "Al crear tu cuenta aceptas la Política de privacidad", con enlace.
+   - Bajo el botón: "Al crear tu cuenta aceptas la Política de privacidad", con enlace. **Reemplazado el 16-oct por una casilla de aceptación: ver «Documentos legales y aceptación» al final.**
 5. **Más**:
    - "Política de privacidad": `WebBrowser.openBrowserAsync(process.env.EXPO_PUBLIC_URL_PRIVACIDAD!)`. Si la variable falta, ocultar la opción.
    - "Eliminar mi cuenta": ver la fase 1.
@@ -308,6 +308,41 @@ Migración `20261016170000_recordatorios_diferidos`. **Pantalla hecha** en el te
 - Al registrar abonos (`registrarAbonoDeuda`), la base marca como hechas las cuotas ya pagadas; al saldar la deuda, todas. Al borrar el diferido se borran sus recordatorios automáticos; los manuales que apuntaban a esa deuda se quedan, sin deuda.
 - `organizarRecordatorios(lista, hoy)` → `{ proximos, cuotasDespues, anteriores }`: de cada diferido muestra solo la cuota que toca y cuántas quedan; una cuota sigue a la vista hasta la fecha de la siguiente y después pasa a «anteriores» (así, al terminar el plazo, no queda nada pendiente). `textoVencimiento(fecha, hoy)` da «hoy», «mañana», «en 4 días», «venció hace 3 días».
 - Los avisos en el teléfono (notificaciones) de estos recordatorios llegan con la fase D.
+
+## Documentos legales y aceptación (16-oct)
+
+Términos y condiciones nuevos, política de privacidad ampliada y **constancia de aceptación en la base**. Todo el detalle legal está en [`docs/legal/README.md`](legal/README.md); aquí solo lo que toca a las pantallas.
+
+### Base de datos (probada: 27 + 10 pruebas nuevas, y la suite completa en verde)
+Hora y qué es, como pide el usuario (archivos en `supabase/para-supabase-web/16-10-2026 5AM/`):
+- **gastos-app — Migración de aceptación de términos y privacidad · 16-10-2026 5AM** (`20261016210000`, archivo `2`): tabla `aceptaciones_legales` (**solo lectura** para la persona), función `registrar_aceptacion_legal` y un disparador en `auth.users` que anota la aceptación del registro con la hora del servidor.
+- **gastos-app — Migración de exportación de datos personales · 16-10-2026 5AM** (`20261016211000`, archivo `3`): `exportar_datos_persona(correo)`, solo para quien administra (derechos de acceso y portabilidad). **La app no la usa.**
+
+### Lógica lista en core (probada, 19 pruebas)
+- `VERSION_LEGAL` (`{ terminos, privacidad }`, una fecha cada una), `DOCUMENTOS_LEGALES`, `plataformaLegal(Platform.OS)` → `"android" | "ios" | "web"`.
+- `datosAceptacionRegistro(plataforma?)` → el objeto para `signUp({ options: { data } })`.
+- `documentosLegalesPendientes()` → qué documentos faltan de aceptar (vacío = al día). Una versión más nueva ya aceptada no se vuelve a pedir.
+- `aceptarDocumentosPendientes(plataforma?)` → registra todos los pendientes; devuelve cuáles. Es idempotente: reintentar es seguro.
+- `registrarAceptacion(documento, plataforma?)` y `listarAceptaciones()`, por si hace falta algo más fino.
+- `destinoPorAceptacion({ exigir, haySesion, estado, ruta })`: qué hace la guarda de rutas (`"esperar"`, una ruta o `null`). `EstadoAceptacion` y `RUTA_ACEPTAR_TERMINOS` también salen de core.
+- **La pantalla nunca elige la versión**: siempre es la de la app (`VERSION_LEGAL`). Así nadie «acepta» un texto que no vio.
+- Páginas públicas: `apps/mobile/public/terminos.html` y `privacidad.html`. Variables: `EXPO_PUBLIC_URL_TERMINOS`, `EXPO_PUBLIC_URL_PRIVACIDAD` (ya existía) y `EXPO_PUBLIC_CORREO_PRIVACIDAD`. **Las tres vacías en desarrollo: ocultar los enlaces si faltan.**
+
+### Pantallas (construidas el 16-oct por la sesión de lógica, a pedido del usuario)
+Todo va detrás de **`EXPO_PUBLIC_EXIGIR_ACEPTACION=1`** (apagado por defecto): con el interruptor apagado la app se comporta **exactamente como antes**. Se enciende cuando la base ya tiene las migraciones de aceptación y las páginas legales están completas; sin las migraciones, la pantalla de aceptación bloquearía a todos. `build:play` y `update:produccion` exigen que sea `1`.
+1. **Registro** (`app/(auth)/registro.tsx`): casilla obligatoria «Acepto los Términos y condiciones y la Política de privacidad» (`components/Casilla.tsx` y `EnlaceLegal.tsx`; solo la casilla alterna, los enlaces abren el documento). «Crear cuenta» queda deshabilitado hasta marcarla, y `signUp` manda `datosAceptacionRegistro(plataformaLegal(Platform.OS))` en `options.data`: el disparador de la base anota la aceptación aunque aún no se haya confirmado el correo.
+2. **`app/aceptar-terminos.tsx`** (con `components/PantallaAceptacion.tsx`, que solo dibuja): «Revisa y acepta para continuar», con los documentos pendientes como enlaces, «Acepto y continuar» (`aceptarDocumentosPendientes`) y «No acepto: cerrar sesión». Estados: verificando, error al comprobar (con «Reintentar»: no se entra sin saber) y error al guardar.
+3. **`app/_layout.tsx`**: tras iniciar sesión comprueba `documentosLegalesPendientes()` una vez por persona (el resultado va atado al id de usuario: si entra otra en el mismo teléfono, no vale el de la anterior) y aplica `destinoPorAceptacion` (lógica pura de core, con pruebas): verificando → espera con un velo; pendiente o error → `/aceptar-terminos`; al día → resumen. La pantalla avisa por `AceptacionContext` (`lib/legal.ts`).
+4. **Más**: filas «Términos y condiciones» y «Política de privacidad» (abren el documento), visibles solo si su dirección está configurada. La fila «Eliminar mi cuenta» de la fase 1 **sigue pendiente**.
+
+**Probado:** `destinoPorAceptacion` (4 pruebas), tipos sin errores y, en el navegador, la casilla y el botón (marcar habilita, desmarcar deshabilita, `aria-checked` correcto), la pantalla de aceptación en sus 4 estados, las filas de Más y que **con el interruptor apagado el registro queda idéntico**. **No probado con sesión real:** sin una cuenta de prueba y las migraciones aplicadas en Supabase no se pudo recorrer el flujo completo (registro, aceptación guardada, pantalla de aceptar, resumen).
+
+**No hacer**: no guardar la aceptación en `AsyncStorage` ni en el teléfono: no es prueba. La constancia vive solo en la base.
+
+### Para quien agregue tablas o servicios
+- Una tabla nueva con `usuario_id` **debe** tener `ON DELETE CASCADE` hacia `auth.users`, estar en `exportar_datos_persona` y en `docs/legal/registro-tratamiento-datos.md`. Pruebas de base y de lógica fallan si falta alguna de las tres.
+- Si el **fondo** de un texto legal cambia, hay que cambiar su etiqueta `version-legal` **y** `VERSION_LEGAL`: la app vuelve a pedir la aceptación (una prueba exige que coincidan).
+- `build:play` y `update:produccion` se frenan mientras las páginas legales tengan `[datos por completar]` o falten las tres variables.
 
 ## Billeteras y ubicación — Fase 4 (16-oct): captura de Google Wallet
 

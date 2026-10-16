@@ -7,10 +7,14 @@
 # Uso (desde la raíz del repo):
 #   bash supabase/preparar-migracion-web.sh "Migración de interés diferido" 20261015170000 20261015180000
 # Crea: supabase/para-supabase-web/migracion-de-interes-diferido.sql
+# Toda actualización de la base lleva la hora y qué es, en el encabezado y en la
+# carpeta: «gastos-app — Migración de interés diferido · 16-10-2026 5AM».
 set -euo pipefail
 
 TITULO="$1"; shift
 DIR="$(cd "$(dirname "$0")" && pwd)"
+# Hora de preparación, igual que el nombre de la carpeta: "16-10-2026 5AM".
+HORA="$(date '+%d-%m-%Y %-I%p')"
 mkdir -p "$DIR/para-supabase-web"
 # Nombre de archivo sin tildes ("Migración de interés" → "migracion-de-interes").
 NOMBRE="$(echo "$TITULO" | sed 's/á/a/g; s/Á/a/g; s/é/e/g; s/É/e/g; s/í/i/g; s/Í/i/g; s/ó/o/g; s/Ó/o/g; s/ú/u/g; s/Ú/u/g; s/ü/u/g; s/ñ/n/g; s/Ñ/n/g' | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-|-$//g')"
@@ -26,7 +30,7 @@ done
 {
   cat <<EOF
 -- =====================================================================
--- gastos-app — ${TITULO}
+-- gastos-app — ${TITULO} · ${HORA}
 -- Para un proyecto que ya tiene la base anterior. Incluye ${#ARCHIVOS[@]} archivo(s):
 EOF
   for f in "${ARCHIVOS[@]}"; do printf -- '--   - %s\n' "$(basename "$f")"; done
@@ -58,3 +62,5 @@ EOF
 } > "$SALIDA"
 
 echo "generado $SALIDA"
+echo "Nombre para el SQL Editor: gastos-app — ${TITULO} · ${HORA}"
+echo "Muévelo a supabase/para-supabase-web/${HORA}/ con el nombre «N - tabla(s).sql»."

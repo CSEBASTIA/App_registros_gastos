@@ -1,0 +1,139 @@
+<!doctype html>
+<!--
+  BORRADOR (16-oct-2026). Antes de publicar:
+  1. Completar todo lo que está entre [corchetes] (los mismos datos del
+     responsable que en privacidad.html). El verificador de publicación
+     (`pnpm verificar:publicacion --produccion`) se niega a seguir mientras
+     quede alguno.
+  2. Revisarlo con un abogado: Ley Orgánica de Defensa del Consumidor, Ley de
+     Comercio Electrónico y Ley Orgánica de Protección de Datos Personales.
+     Los puntos que más necesitan su criterio están en docs/legal/README.md.
+  3. Si cambia el fondo del texto, cambiar la etiqueta `version-legal` (una
+     fecha) Y `VERSION_LEGAL` en packages/core/src/lib/legal.ts: así la app
+     vuelve a pedir la aceptación. Una prueba comprueba que coincidan.
+  Se publica con la versión web en /terminos.html y la app lo abre desde el
+  registro y desde Más.
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="version-legal" content="2026-10-16">
+<title>Términos y condiciones · fintrack</title>
+<style>
+  :root { --fondo: #ffffff; --texto: #1f2937; --suave: #6b7280; --borde: #e5e7eb; --acento: #0f766e; --caja: #f3f4f6; }
+  @media (prefers-color-scheme: dark) {
+    :root { --fondo: #111827; --texto: #e5e7eb; --suave: #9ca3af; --borde: #374151; --acento: #5eead4; --caja: #1f2937; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.8rem; line-height: 1.25; margin: 0 0 4px; }
+  h2 { font-size: 1.2rem; margin: 36px 0 8px; padding-top: 8px; border-top: 1px solid var(--borde); }
+  p, li { max-width: 68ch; }
+  .fecha { color: var(--suave); margin: 0 0 24px; }
+  .resumen { background: var(--caja); border-radius: 12px; padding: 16px 20px; }
+  .resumen ul { margin: 8px 0 0; padding-left: 20px; }
+  a { color: var(--acento); }
+</style>
+</head>
+<body>
+<main>
+<h1>Términos y condiciones</h1>
+<p class="fecha">Versión 2026-10-16 · Vigente desde el [fecha de publicación]. Aplica a la app fintrack (Android y web). Léelos junto con la <a href="privacidad.html">Política de privacidad</a>.</p>
+
+<div class="resumen">
+  <strong>En resumen</strong>
+  <ul>
+    <li>fintrack te ayuda a registrar y entender tus finanzas personales. No es un banco, no mueve tu dinero y no te da asesoría financiera.</li>
+    <li>Lo que registras es tuyo. Lo usamos solo para que la app funcione, como explica la política de privacidad.</li>
+    <li>Debes ser mayor de 18 años y cuidar tu contraseña.</li>
+    <li>Puedes dejar de usar la app y borrar tu cuenta cuando quieras.</li>
+    <li>Hoy es gratis. Si algún día cobramos algo, te lo diremos antes.</li>
+  </ul>
+</div>
+
+<h2>1. Quién ofrece la app y qué aceptas</h2>
+<p>fintrack la ofrece [Nombre completo o razón social], [cédula o RUC], con domicilio en [ciudad], Ecuador («nosotros»).</p>
+<p>Al marcar la casilla de aceptación al crear tu cuenta, o al aceptar una versión nueva cuando la app te lo pida, aceptas estos términos y la <a href="privacidad.html">Política de privacidad</a>. Guardamos qué versión aceptaste, desde qué plataforma y cuándo, como constancia. Si no estás de acuerdo, no uses la app.</p>
+<p>Para usarla debes tener 18 años cumplidos y capacidad legal para aceptar estos términos.</p>
+
+<h2>2. Qué es fintrack, y qué no es</h2>
+<ul>
+  <li>Es una herramienta para registrar, organizar y ver tus finanzas: cuentas, tarjetas, gastos, ingresos, deudas, presupuestos y recordatorios.</li>
+  <li><strong>No somos un banco, una entidad financiera, una casa de valores ni un asesor.</strong> No guardamos ni movemos tu dinero, no hacemos pagos ni transferencias, y nunca te pedimos claves bancarias ni el número completo de una tarjeta.</li>
+  <li>Las recomendaciones, el puntaje financiero, las proyecciones y los planes de pago se calculan con reglas fijas sobre lo que tú registras. Son informativos: no son asesoría financiera, tributaria ni legal, y las decisiones son tuyas.</li>
+  <li>Los saldos y totales dependen de lo que registras. Compáralos con los estados de cuenta de tu banco: si hay diferencia, vale lo que diga tu banco.</li>
+  <li>No estamos afiliados a los bancos, casas comerciales, Apple, Google ni Microsoft, ni ellos nos respaldan. Sus nombres y logotipos pertenecen a sus dueños y se usan solo para identificarlos.</li>
+</ul>
+
+<h2>3. Tu cuenta</h2>
+<ul>
+  <li>Usa un correo tuyo y datos verdaderos. La cuenta es personal: no la compartas.</li>
+  <li>La contraseña debe tener al menos 8 caracteres, con letras y números. Cuídala: lo que se haga con tu cuenta se considera hecho por ti, salvo que nos avises a tiempo de un uso que no autorizaste.</li>
+  <li>Si crees que alguien entró a tu cuenta, cambia la contraseña y escríbenos.</li>
+  <li>La clave de captura de Apple Pay funciona como una contraseña: no la compartas y, si pierdes el iPhone, revócala en <em>Más → Conectar Apple Pay</em>.</li>
+</ul>
+
+<h2>4. Cómo puedes usar la app</h2>
+<p>Puedes usarla para tus finanzas personales. No puedes:</p>
+<ul>
+  <li>usarla para actividades ilegales o fraudulentas;</li>
+  <li>intentar entrar a datos de otras personas o saltarte los controles de seguridad;</li>
+  <li>sobrecargar el servicio, automatizar el acceso de forma abusiva o superar los límites de uso;</li>
+  <li>copiar, descompilar, revender o ceder la app, salvo lo que la ley permita;</li>
+  <li>subir archivos con virus o contenido ilícito;</li>
+  <li>hacerte pasar por otra persona, ni registrar datos personales de terceros sin su permiso;</li>
+  <li>probar la seguridad del sistema sin nuestro permiso por escrito. Si encuentras una falla, avísanos en <a href="mailto:[correo de contacto]">[correo de contacto]</a>.</li>
+</ul>
+
+<h2>5. Tus datos y lo que registras</h2>
+<ul>
+  <li>Lo que registras es tuyo. Nos das permiso limitado para guardarlo, calcularlo, mostrártelo y hacer copias de respaldo, solo para prestarte el servicio. No vendemos tus datos ni mostramos publicidad.</li>
+  <li>El tratamiento de tus datos personales se rige por la <a href="privacidad.html">Política de privacidad</a>.</li>
+  <li>Las funciones opcionales (conectar tu correo de Gmail u Outlook, guardar la ubicación de tus pagos, el atajo de Apple Pay) las activas tú y puedes apagarlas cuando quieras.</li>
+  <li>Puedes borrar tus datos y eliminar tu cuenta desde la app (<em>Más → Eliminar mi cuenta</em>). Si quieres una copia de tus datos, pídela como explica la política de privacidad.</li>
+</ul>
+
+<h2>6. Servicios de terceros</h2>
+<p>La app funciona con proveedores externos (por ejemplo Supabase, Vercel y Expo, y Google o Microsoft si conectas tu correo). No los controlamos: pueden tener interrupciones que no dependen de nosotros, y sus propios términos aplican al servicio que te dan. Cuando conectas tu correo, usas esa cuenta bajo los términos de Google o de Microsoft.</p>
+
+<h2>7. Disponibilidad y cambios del servicio</h2>
+<p>La app está en una etapa temprana. Hacemos lo razonable para mantenerla disponible y sin errores, pero no podemos garantizar que funcione sin interrupciones. Podemos hacer mantenimientos y cambiar, mejorar o retirar funciones. Si retiramos una función importante, te avisaremos con anticipación para que puedas pedir tus datos o borrarlos. Guarda siempre los estados de cuenta y comprobantes originales de tus finanzas.</p>
+
+<h2>8. Precio</h2>
+<p>Hoy usar fintrack no tiene costo. Si en el futuro hay funciones de pago, te lo diremos antes, con el precio claro, y no te cobraremos nada sin que lo aceptes. Lo que cobren terceros (tu operadora de internet, tu banco) corre por tu cuenta.</p>
+
+<h2>9. Propiedad intelectual</h2>
+<p>La app, su diseño, su código, su marca y sus textos son nuestros o de quienes nos los licencian. Te damos una licencia personal, limitada, no exclusiva, intransferible y revocable para usarla según estos términos. Esto no cambia que lo que tú registras sigue siendo tuyo (sección 5).</p>
+
+<h2>10. Responsabilidad</h2>
+<ul>
+  <li>Hacemos lo razonable para que la app funcione y para proteger tus datos (ver la sección 5 de la política de privacidad).</li>
+  <li>En la medida que la ley lo permita, no respondemos por las decisiones que tomes con base en la app, por errores causados por datos mal registrados, por fallos de internet, de tu dispositivo o de nuestros proveedores, ni por pérdidas indirectas.</li>
+  <li>Nada de esto limita lo que la ley no permite limitar: tus derechos como consumidor, tus derechos de protección de datos personales, ni nuestra responsabilidad por dolo o culpa grave.</li>
+</ul>
+
+<h2>11. Suspender o terminar el uso</h2>
+<ul>
+  <li><strong>Tú</strong> puedes dejar de usar la app cuando quieras y eliminar tu cuenta (sección 8 de la política de privacidad).</li>
+  <li><strong>Nosotros</strong> podemos suspender o cerrar una cuenta por un incumplimiento grave de estos términos (fraude, ataques, abuso) o porque una autoridad competente lo exija. Cuando sea posible te avisaremos antes y podrás responder.</li>
+  <li>Al terminar, lo relativo a propiedad intelectual, responsabilidad y ley aplicable sigue vigente, y tus datos se tratan como dice la política de privacidad.</li>
+</ul>
+
+<h2>12. Cambios a estos términos</h2>
+<p>Si cambiamos algo importante, te avisaremos en la app antes de que el cambio aplique y te pediremos aceptar la versión nueva para seguir usándola. Si no estás de acuerdo, puedes eliminar tu cuenta. Los arreglos menores (por ejemplo, una errata) no necesitan una nueva aceptación. La versión y la fecha de arriba identifican el texto que aceptaste.</p>
+
+<h2>13. Ley aplicable y reclamos</h2>
+<ul>
+  <li>Estos términos se rigen por las leyes de la República del Ecuador.</li>
+  <li>Si tienes un reclamo, escríbenos primero a <a href="mailto:[correo de contacto]">[correo de contacto]</a>: intentaremos resolverlo en un plazo máximo de 15 días.</li>
+  <li>Esto no limita tu derecho a acudir a las autoridades de defensa del consumidor, a la Superintendencia de Protección de Datos Personales (en temas de datos) ni a los jueces competentes del Ecuador.</li>
+  <li>Si alguna parte de estos términos no fuera válida, el resto sigue vigente.</li>
+</ul>
+
+<h2>14. Contacto</h2>
+<p>Dudas sobre estos términos: <a href="mailto:[correo de contacto]">[correo de contacto]</a>.</p>
+</main>
+</body>
+</html>

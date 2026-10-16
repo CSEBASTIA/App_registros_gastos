@@ -27,6 +27,7 @@ function filaATransaccion(row: Row): TransaccionDetectada {
     comercio: row.comercio ?? undefined,
     ubicacion: ubicacionDeFila(row),
     tarjetaFinal: row.tarjeta_final ?? undefined,
+    pagadoEn: row.pagado_en ?? undefined,
     estado: row.estado as TransaccionDetectada["estado"],
     createdAt: row.created_at,
   };

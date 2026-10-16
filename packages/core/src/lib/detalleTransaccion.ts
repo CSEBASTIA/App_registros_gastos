@@ -71,6 +71,7 @@ export function filasDetalleGasto(
   return sinVacias([
     { clave: "id", etiqueta: "ID de la transacción", valor: g.id, mono: true },
     { clave: "fecha", etiqueta: "Fecha", valor: fechaLarga(g.fecha) },
+    !!g.pagadoEn && { clave: "pagado", etiqueta: "Hora del pago", valor: fechaHora(g.pagadoEn, opciones) },
     { clave: "registrado", etiqueta: "Registrado", valor: fechaHora(g.createdAt, opciones) },
     !!ctx.lugar && { clave: "lugar", etiqueta: "Lugar", valor: ctx.lugar.nombre },
     !!g.ubicacion && { clave: "ubicacion", etiqueta: "Ubicación", valor: textoUbicacion(g.ubicacion), mono: true },
@@ -100,7 +101,10 @@ export function filasDetalleIngreso(
   ]);
 }
 
-/** Un aviso de la bandeja: su `createdAt` es la hora en que llegó (para Apple Pay o Google Wallet, la del pago). */
+/**
+ * Un aviso de la bandeja: para Apple Pay o Google Wallet, la hora del pago es
+ * `pagadoEn` (la de la notificación) o, si no hay, cuando llegó el aviso.
+ */
 export function filasDetalleAviso(
   t: TransaccionDetectada,
   ctx: { cuenta?: Cuenta },
@@ -110,7 +114,7 @@ export function filasDetalleAviso(
   return sinVacias([
     { clave: "id", etiqueta: "ID del aviso", valor: t.id, mono: true },
     { clave: "origen", etiqueta: "Detectado por", valor: ETIQUETA_ORIGEN_TRANSACCION[t.origen] },
-    { clave: "llego", etiqueta: esBilletera ? "Hora del pago" : "Llegó", valor: fechaHora(t.createdAt, opciones) },
+    { clave: "llego", etiqueta: esBilletera ? "Hora del pago" : "Llegó", valor: fechaHora(t.pagadoEn ?? t.createdAt, opciones) },
     { clave: "fecha", etiqueta: "Fecha", valor: fechaLarga(t.fecha) },
     !!t.comercio && { clave: "comercio", etiqueta: "Comercio", valor: t.comercio },
     !!t.ubicacion && { clave: "ubicacion", etiqueta: "Ubicación", valor: textoUbicacion(t.ubicacion), mono: true },

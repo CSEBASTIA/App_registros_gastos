@@ -19,6 +19,8 @@ export * from "./lib/ubicacion";
 export * from "./lib/ubicacionDispositivo";
 export * from "./lib/corteTarjeta";
 export * from "./lib/recordatorios";
+export * from "./lib/detalleTransaccion";
+export * from "./lib/mapaEstatico";
 export * from "./lib/legal";
 export { FILAS_POR_PAGINA, type RangoFechas } from "./lib/paginacion";
 export * from "./schemas/limites";

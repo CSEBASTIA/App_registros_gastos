@@ -28,6 +28,17 @@ export function diaDelMes(fechaIso: string): number {
   return Number(fechaIso.slice(8, 10));
 }
 
+/** Número de semana (1-4) de una fecha "YYYY-MM-DD", con el corte de `semanasDelMes`. */
+export function semanaDeFecha(fechaIso: string): number {
+  const dia = diaDelMes(fechaIso);
+  return dia <= 7 ? 1 : dia <= 14 ? 2 : dia <= 21 ? 3 : 4;
+}
+
+/** La semana con la que se abre un mes: la de hoy si es el mes actual; si no, la 1. */
+export function semanaInicial(mes: string, hoy: string = fechaLocal()): number {
+  return hoy.startsWith(mes) ? semanaDeFecha(hoy) : 1;
+}
+
 export function enRangoSemana(fechaIso: string, rango: RangoSemana): boolean {
   const dia = diaDelMes(fechaIso);
   return dia >= rango.desde && dia <= rango.hasta;

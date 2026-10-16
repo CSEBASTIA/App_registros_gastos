@@ -1,8 +1,8 @@
 import { SafeAreaView } from "react-native-safe-area-context";
 import SelectorChips from "../../components/SelectorChips";
-import { mensajeError, mesLocal } from "core";
+import { fechaLocal, mensajeError, mesLocal, semanaDeFecha, semanaInicial } from "core";
 import ErrorTexto from "../../components/ErrorTexto";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,7 +11,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   StyleSheet,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -25,6 +24,7 @@ import {
   enRangoSemana,
   agruparPorCategoriaODetalle,
   listarLugares,
+  filasDetalleGasto,
   ETIQUETA_BILLETERA,
   type Gasto,
   type Lugar,
@@ -39,6 +39,8 @@ import SelectorMes from "../../components/SelectorMes";
 import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
 import { abrirEnMapas } from "../../lib/ubicacion";
+import { avisar, confirmar } from "../../lib/dialogo";
+import IslaDetalle, { type AccionIsla } from "../../components/IslaDetalle";
 
 function mesActual() {
   return mesLocal(); // zona horaria del teléfono, no UTC
@@ -55,9 +57,24 @@ export default function GastosScreen() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [lugares, setLugares] = useState<Lugar[]>([]);
-  const [semanaActiva, setSemanaActiva] = useState(1);
+  // Se abre en la semana de hoy (el 16 es la semana 3; desde el 22, la 4).
+  const [semanaActiva, setSemanaActiva] = useState(() => semanaInicial(mesActual()));
+  const [detalle, setDetalle] = useState<Gasto | null>(null);
+  const diaVisto = useRef(fechaLocal());
+
+  function cambiarMes(nuevo: string) {
+    setMes(nuevo);
+    setSemanaActiva(semanaInicial(nuevo));
+  }
 
   const cargar = useCallback(() => {
+    // Si la app quedó abierta y cambió el día, vuelve al mes y la semana de hoy.
+    const hoy = fechaLocal();
+    if (hoy !== diaVisto.current) {
+      diaVisto.current = hoy;
+      setMes(hoy.slice(0, 7));
+      setSemanaActiva(semanaDeFecha(hoy));
+    }
     setCargando(true);
     setError(null);
     Promise.all([listarGastos(), listarCategorias(), listarCuentas()])
@@ -100,20 +117,42 @@ export default function GastosScreen() {
     return categorias.find((c) => c.id === id);
   }
 
-  function confirmarEliminar(gasto: Gasto) {
-    Alert.alert("Eliminar gasto", `¿Eliminar "${gasto.descripcion}"?`, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        // Si la base no lo permite (p. ej. un diferido con abonos) o no hay
-        // red, se avisa: antes fallaba en silencio y parecía borrado.
-        onPress: () =>
-          eliminarGasto(gasto.id)
-            .then(cargar)
-            .catch((err) => Alert.alert("No se pudo eliminar", mensajeError(err))),
-      },
-    ]);
+  async function confirmarEliminar(gasto: Gasto) {
+    // `confirmar` también funciona en la versión web (Alert.alert ahí no hace nada).
+    if (!(await confirmar("Eliminar gasto", `¿Eliminar "${gasto.descripcion}"?`, "Eliminar"))) return;
+    // Si la base no lo permite (p. ej. un diferido con abonos) o no hay
+    // red, se avisa: antes fallaba en silencio y parecía borrado.
+    eliminarGasto(gasto.id)
+      .then(() => {
+        setDetalle(null);
+        cargar();
+      })
+      .catch((err) => avisar("No se pudo eliminar", mensajeError(err)));
+  }
+
+  function accionesDe(g: Gasto): AccionIsla[] {
+    // «Abrir en Mapas» va en el mismo mapa de la isla.
+    const acciones: AccionIsla[] = [];
+    if (g.lugarId) {
+      const lugarId = g.lugarId;
+      acciones.push({
+        titulo: "Ver lugar",
+        icono: "location-outline",
+        onPress: () => {
+          setDetalle(null);
+          router.push({ pathname: "/lugar/[id]", params: { id: lugarId } });
+        },
+      });
+    }
+    acciones.push({ titulo: "Eliminar", icono: "trash-outline", peligro: true, onPress: () => confirmarEliminar(g) });
+    return acciones;
+  }
+
+  /** Dónde se pagó: la ubicación guardada o, si se eligió un lugar a mano, la de ese lugar. */
+  function ubicacionDe(g: Gasto) {
+    if (g.ubicacion) return g.ubicacion;
+    const lugar = g.lugarId ? lugares.find((l) => l.id === g.lugarId) : undefined;
+    return lugar ? { latitud: lugar.latitud, longitud: lugar.longitud } : undefined;
   }
 
   if (cargando)
@@ -175,7 +214,7 @@ export default function GastosScreen() {
           </BlurFade>
           {error && <ErrorTexto>{error}</ErrorTexto>}
           <View style={styles.encabezado}>
-            <SelectorMes mes={mes} onCambiar={setMes} />
+            <SelectorMes mes={mes} onCambiar={cambiarMes} />
             <Boton
               titulo="+ Nuevo"
               variante="primario"
@@ -284,7 +323,10 @@ export default function GastosScreen() {
                   return (
                     <View key={g.id} style={styles.filaGastoContenedor}>
                       <Pressable
-                        accessible={false}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${g.descripcion}, $${g.monto.toFixed(2)}`}
+                        accessibilityHint="Muestra el id, la fecha, la hora, el lugar y los demás datos."
+                        onPress={() => setDetalle(g)}
                         onLongPress={() => confirmarEliminar(g)}
                         style={({ pressed }) => [
                           styles.filaGasto,
@@ -352,6 +394,28 @@ export default function GastosScreen() {
           </Tarjeta>
         </ScrollView>
       </KeyboardAvoidingView>
+      {detalle && (
+        <IslaDetalle
+          visible
+          onCerrar={() => setDetalle(null)}
+          icono="receipt-outline"
+          colorIcono={categoriaDe(detalle.categoriaId)?.color}
+          titulo={detalle.descripcion}
+          monto={`$${detalle.monto.toFixed(2)}`}
+          filas={filasDetalleGasto(detalle, {
+            categoria: categoriaDe(detalle.categoriaId),
+            cuenta: cuentaDe(detalle.cuentaId),
+            lugar: detalle.lugarId ? lugares.find((l) => l.id === detalle.lugarId) : undefined,
+          })}
+          acciones={accionesDe(detalle)}
+          ubicacion={ubicacionDe(detalle)}
+          onAbrirMapa={() => {
+            const u = ubicacionDe(detalle);
+            if (u) abrirEnMapas(u).catch(() => undefined);
+          }}
+          sinUbicacion={detalle.billetera ? "Este pago no tiene ubicación guardada." : undefined}
+        />
+      )}
     </SafeAreaView>
   );
 }

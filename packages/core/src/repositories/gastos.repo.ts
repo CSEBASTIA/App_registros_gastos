@@ -26,6 +26,8 @@ function filaAGasto(row: GastoRow): Gasto {
     ubicacion: ubicacionDeFila(row),
     lugarId: row.lugar_id ?? undefined,
     fecha: row.fecha,
+    // Sin la migración de hora del pago la columna no existe.
+    pagadoEn: row.pagado_en ?? undefined,
     createdAt: row.created_at,
   };
 }

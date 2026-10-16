@@ -11,7 +11,6 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   StyleSheet,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
@@ -25,6 +24,7 @@ import {
   enRangoSemana,
   ultimosMeses,
   etiquetaMes,
+  filasDetalleIngreso,
   type Ingreso,
   type Categoria,
   type Cuenta,
@@ -36,6 +36,8 @@ import EstadoVacio from "../../components/EstadoVacio";
 import SelectorMes from "../../components/SelectorMes";
 import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
+import { avisar, confirmar } from "../../lib/dialogo";
+import IslaDetalle from "../../components/IslaDetalle";
 
 function mesActual() {
   return mesLocal(); // zona horaria del teléfono, no UTC
@@ -53,6 +55,7 @@ export default function IngresosScreen() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [periodo, setPeriodo] = useState<"semana" | "mes">("semana");
+  const [detalle, setDetalle] = useState<Ingreso | null>(null);
 
   const cargar = useCallback(() => {
     setCargando(true);
@@ -93,18 +96,15 @@ export default function IngresosScreen() {
     return id ? categorias.find((c) => c.id === id) : undefined;
   }
 
-  function confirmarEliminar(ingreso: Ingreso) {
-    Alert.alert("Eliminar ingreso", `¿Eliminar "${ingreso.descripcion}"?`, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: () =>
-          eliminarIngreso(ingreso.id)
-            .then(cargar)
-            .catch((err) => Alert.alert("No se pudo eliminar", mensajeError(err))),
-      },
-    ]);
+  async function confirmarEliminar(ingreso: Ingreso) {
+    // `confirmar` también funciona en la versión web (Alert.alert ahí no hace nada).
+    if (!(await confirmar("Eliminar ingreso", `¿Eliminar "${ingreso.descripcion}"?`, "Eliminar"))) return;
+    eliminarIngreso(ingreso.id)
+      .then(() => {
+        setDetalle(null);
+        cargar();
+      })
+      .catch((err) => avisar("No se pudo eliminar", mensajeError(err)));
   }
 
   if (cargando)
@@ -207,7 +207,10 @@ export default function IngresosScreen() {
                   return (
                     <View key={i.id} style={styles.filaContenedor}>
                       <Pressable
-                        accessible={false}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${i.descripcion}, $${i.monto.toFixed(2)}`}
+                        accessibilityHint="Muestra el id, la fecha, la hora y los demás datos."
+                        onPress={() => setDetalle(i)}
                         onLongPress={() => confirmarEliminar(i)}
                         style={({ pressed }) => [
                           styles.fila,
@@ -257,6 +260,21 @@ export default function IngresosScreen() {
           </Tarjeta>
         </ScrollView>
       </KeyboardAvoidingView>
+      {detalle && (
+        <IslaDetalle
+          visible
+          onCerrar={() => setDetalle(null)}
+          icono="trending-up-outline"
+          colorIcono={COLOR_INGRESOS}
+          titulo={detalle.descripcion}
+          monto={`$${detalle.monto.toFixed(2)}`}
+          filas={filasDetalleIngreso(detalle, {
+            categoria: categoriaDe(detalle.categoriaId),
+            cuenta: cuentaDe(detalle.cuentaId),
+          })}
+          acciones={[{ titulo: "Eliminar", icono: "trash-outline", peligro: true, onPress: () => confirmarEliminar(detalle) }]}
+        />
+      )}
     </SafeAreaView>
   );
 }

@@ -57,6 +57,7 @@ export type Database = {
           longitud: number | null;
           precision_m: number | null;
           lugar_id: string | null;
+          pagado_en: string | null;
           usuario_id: string;
         };
         Insert: {
@@ -77,6 +78,7 @@ export type Database = {
           longitud?: number | null;
           precision_m?: number | null;
           lugar_id?: string | null;
+          pagado_en?: string | null;
           usuario_id?: string;
         };
         Update: {
@@ -97,6 +99,7 @@ export type Database = {
           longitud?: number | null;
           precision_m?: number | null;
           lugar_id?: string | null;
+          pagado_en?: string | null;
           usuario_id?: string;
         };
         Relationships: [];
@@ -252,6 +255,7 @@ export type Database = {
           precision_m: number | null;
           tarjeta_final: string | null;
           clave_captura_id: string | null;
+          pagado_en: string | null;
           usuario_id: string;
         };
         Insert: {
@@ -274,6 +278,7 @@ export type Database = {
           precision_m?: number | null;
           tarjeta_final?: string | null;
           clave_captura_id?: string | null;
+          pagado_en?: string | null;
           usuario_id?: string;
         };
         Update: {
@@ -296,6 +301,7 @@ export type Database = {
           precision_m?: number | null;
           tarjeta_final?: string | null;
           clave_captura_id?: string | null;
+          pagado_en?: string | null;
           usuario_id?: string;
         };
         Relationships: [];

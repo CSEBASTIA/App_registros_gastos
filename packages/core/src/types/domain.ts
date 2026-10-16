@@ -58,6 +58,8 @@ export interface Gasto {
   /** Lo asigna la base a partir de la ubicación; también se puede elegir a mano. */
   lugarId?: string;
   fecha: string;
+  /** Hora real del pago, si se conoce (avisos de Apple Pay o Google Wallet confirmados). */
+  pagadoEn?: string;
   createdAt: string;
 }
 
@@ -122,6 +124,8 @@ export interface TransaccionDetectada {
   ubicacion?: Ubicacion;
   /** Últimos 3-4 dígitos de la tarjeta, para reconocer la cuenta. */
   tarjetaFinal?: string;
+  /** Hora de la notificación de Google Wallet (si llegó tarde, la del pago). Sin ella, el pago es `createdAt`. */
+  pagadoEn?: string;
   estado: EstadoTransaccionDetectada;
   createdAt: string;
 }

@@ -19,6 +19,7 @@ import {
   parsearMonto,
   ETIQUETA_BANCO,
   ETIQUETA_ORIGEN_TRANSACCION,
+  filasDetalleAviso,
   type TransaccionDetectada,
   type Categoria,
   type Cuenta,
@@ -33,6 +34,7 @@ import { spacing, useTheme, font, type Colors } from "../lib/theme";
 import { BlurFade } from "../components/Motion";
 import { Ionicons } from "@expo/vector-icons";
 import { abrirEnMapas } from "../lib/ubicacion";
+import IslaDetalle from "../components/IslaDetalle";
 
 export default function BandejaScreen() {
   const { color } = useTheme();
@@ -157,6 +159,7 @@ function ItemBandeja({
   const [cuentaId, setCuentaId] = useState(item.cuentaId ?? "");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  const [verDetalle, setVerDetalle] = useState(false);
 
   const categoriasDelTipo = categorias.filter((c) => c.tipo === item.tipo);
 
@@ -210,6 +213,26 @@ function ItemBandeja({
         </View>
         <Text style={styles.fecha}>{item.fecha}</Text>
       </View>
+      <Boton titulo="Ver detalles (id, hora, lugar)" onPress={() => setVerDetalle(true)} />
+      {verDetalle && (
+        <IslaDetalle
+          visible
+          onCerrar={() => setVerDetalle(false)}
+          icono={item.origen === "correo" ? "mail-outline" : "phone-portrait-outline"}
+          titulo={item.comercio ?? item.descripcion}
+          monto={`$${item.monto.toFixed(2)}`}
+          filas={filasDetalleAviso(item, { cuenta: cuentas.find((c) => c.id === item.cuentaId) })}
+          ubicacion={item.ubicacion}
+          onAbrirMapa={() => item.ubicacion && abrirEnMapas(item.ubicacion).catch(() => undefined)}
+          sinUbicacion={
+            item.origen === "google_wallet"
+              ? "Los pagos con Google Wallet llegan sin ubicación: con la app cerrada, el teléfono no puede leerla."
+              : item.origen === "apple_pay"
+                ? "Este pago llegó sin ubicación (el atajo no la incluyó)."
+                : undefined
+          }
+        />
+      )}
       {item.comercio && (
         <Text style={styles.asunto} numberOfLines={2}>
           {item.comercio}

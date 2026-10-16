@@ -351,3 +351,13 @@ Migración `20261016180000_captura_google_wallet`. **Pantalla hecha** en el tel�
 - `p_cuando`: milisegundos de la notificación; si llega tarde (hasta 3 días), el aviso queda con la fecha del pago.
 - Core: `configuracionGoogleWallet(url, clavePublica)` y `PAQUETE_GOOGLE_WALLET`.
 - Módulo JS `capturaGoogleWallet` (null fuera del APK de Android): `estado()` → `{conectado, prefijo, permiso, pendientes, ultimo}`, `conectar(url, apikey, clave)`, `desconectar()`, `abrirPermiso()` y `reintentar()`. La clave se guarda solo en el almacenamiento privado del teléfono y nunca vuelve a JS.
+
+## Isla de detalle de transacciones (16-oct)
+
+**Pantallas hechas** en el teléfono: `components/IslaDetalle.tsx`, que se abre al tocar un gasto (Gastos), un ingreso (Ingresos) o «Ver detalles» en un aviso de la bandeja.
+- Core: `filasDetalleGasto(gasto, {categoria, cuenta, lugar})`, `filasDetalleIngreso(ingreso, {categoria, cuenta})` y `filasDetalleAviso(aviso, {cuenta})` devuelven `FilaDetalle[]` (`{clave, etiqueta, valor, mono?}`), solo con los datos que existen. El tercer parámetro opcional `{zona}` fija la zona horaria (por defecto, la del teléfono).
+- Además: `fechaLarga("2026-10-16")` → «viernes, 16 de octubre de 2026», `fechaHora(createdAt)` → «16 oct 2026, 14:32» y `textoUbicacion(u)` → «-0.1807, -78.4678 (±12 m)».
+- «Registrado» es el `created_at` del gasto: la hora en que se guardó. En un aviso de Apple Pay o Google Wallet, la bandeja muestra la «Hora del pago» (`created_at` del aviso).
+- **Mapa:** si hay ubicación (la del gasto o, si no, la del lugar elegido), la isla muestra `components/MapaUbicacion.tsx`, con 3×3 teselas de OpenStreetMap y el alfiler; tocarlo abre Mapas. Core: `mapaEstatico(u)` → `{teselas, puntoX, puntoY, radioPrecisionPx}`, más `posicionEnTeselas`, `metrosPorPixel` y `ATRIBUCION_MAPA` (obligatoria en pantalla). Las teselas se piden solo al abrir el detalle: el servidor de mapas ve la zona aproximada.
+- **Hora del pago** (migración `20261016220000_hora_del_pago`): `Gasto.pagadoEn?` y `TransaccionDetectada.pagadoEn?`. Al confirmar un aviso de Apple Pay o Google Wallet, el gasto guarda `coalesce(aviso.pagado_en, aviso.created_at)`. Google Wallet guarda en el aviso la hora de la notificación (`p_cuando`). La isla muestra «Hora del pago» antes de «Registrado».
+- **Semana de hoy en Gastos:** `semanaDeFecha(fecha)` (1-7 → 1, 8-14 → 2, 15-21 → 3, desde el 22 → 4) y `semanaInicial(mes, hoy?)` (la de hoy en el mes actual; en otro mes, la 1).

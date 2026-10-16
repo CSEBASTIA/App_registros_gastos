@@ -15,9 +15,14 @@ export * from "./lib/estadoCuenta";
 export * from "./lib/correoBancario";
 export * from "./lib/sincronizacionCorreo";
 export * from "./lib/fetchConTimeout";
+export * from "./lib/ubicacion";
+export * from "./lib/ubicacionDispositivo";
+export * from "./lib/corteTarjeta";
+export * from "./lib/recordatorios";
 export { FILAS_POR_PAGINA, type RangoFechas } from "./lib/paginacion";
 export * from "./schemas/limites";
 export * from "./schemas/gasto.schema";
+export * from "./schemas/ubicacion.schema";
 export * from "./schemas/presupuesto.schema";
 export * from "./schemas/cuenta.schema";
 export * from "./schemas/ingreso.schema";
@@ -37,12 +42,13 @@ export {
 } from "./repositories/categorias.repo";
 export {
   listarGastos,
+  listarGastosDeLugar,
   actualizarGasto,
   eliminarGasto,
   type CambiosGasto,
 } from "./repositories/gastos.repo";
 export { listarPresupuestos, eliminarPresupuesto } from "./repositories/presupuestos.repo";
-export { listarCuentas, eliminarCuenta } from "./repositories/cuentas.repo";
+export { listarCuentas, eliminarCuenta, actualizarFechasTarjeta } from "./repositories/cuentas.repo";
 export { listarIngresos, actualizarIngreso, eliminarIngreso } from "./repositories/ingresos.repo";
 export { listarPagosTarjeta } from "./repositories/pagosTarjeta.repo";
 export {
@@ -68,6 +74,30 @@ export {
   type TransaccionDetectadaInsert,
   type DatosConfirmacion,
 } from "./repositories/transaccionesDetectadas.repo";
+export {
+  listarLugares,
+  borrarMisUbicaciones,
+  resumenPorLugar,
+  resumenPorComercio,
+  renombrarLugar,
+  eliminarLugar,
+  fusionarLugares,
+  validarRangoResumen,
+  DIAS_MAXIMOS_RESUMEN,
+  type UbicacionesBorradas,
+  type ResumenLugar,
+  type ResumenComercio,
+} from "./repositories/lugares.repo";
+export {
+  crearClaveCaptura,
+  listarClavesCaptura,
+  revocarClaveCaptura,
+  configuracionAtajo,
+  configuracionGoogleWallet,
+  PAQUETE_GOOGLE_WALLET,
+  MAXIMO_CLAVES_CAPTURA,
+  type ClaveCaptura,
+} from "./repositories/clavesCaptura.repo";
 export { eliminarMiCuenta, CONFIRMACION_ELIMINAR_CUENTA } from "./repositories/cuentaUsuario.repo";
 export { totalesPorMes, type TotalMes } from "./repositories/totales.repo";
 export {

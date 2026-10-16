@@ -72,5 +72,6 @@ Lo que se configura fuera del código: en los paneles de Supabase, Vercel y Goog
 | Información financiera → Otra información financiera (gastos, ingresos, saldos, deudas) | Sí | Funcionalidad de la app |
 | Fotos y videos / Archivos y documentos (facturas) | No | Funcionalidad de la app |
 | Correos electrónicos (asunto, monto, fecha y banco de los avisos bancarios) | No | Funcionalidad de la app. **Solo si "Correo" está activo en producción**; mientras no tenga la verificación de Google, conviene ocultarlo y no declararlo |
+| Ubicación → Ubicación precisa (desde la versión 1.1.0) | No | Funcionalidad de la app: el lugar de cada pago y el resumen por lugar. Solo si el usuario activa «Guardar la ubicación de mis pagos», solo con la app abierta (el permiso en segundo plano está bloqueado), redondeada a unos 11 m y borrable. Google la cuenta como "precisa" porque es más fina que 3 km² |
 
-La app no recopila ubicación, contactos, identificadores del dispositivo ni datos de uso, y no usa analítica ni publicidad. Si eso cambia, hay que actualizar este formulario y la política de privacidad.
+La app no recopila contactos, identificadores del dispositivo ni datos de uso, y no usa analítica ni publicidad. La ubicación solo se recopila si el usuario la activa (fila anterior). Si eso cambia, hay que actualizar este formulario y la política de privacidad.

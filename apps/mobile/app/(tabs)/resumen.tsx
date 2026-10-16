@@ -12,6 +12,7 @@ import {
   Text,
   ScrollView,
   StyleSheet,
+  Pressable,
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,7 +26,10 @@ import {
   calcularEndeudamiento,
   generarRecomendaciones,
   formatMonto,
+  listarLugares,
+  sumarMontos,
   type Gasto,
+  type Lugar,
   type Ingreso,
   type Categoria,
   type Cuenta,
@@ -65,6 +69,7 @@ export default function ResumenScreen() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
+  const [lugares, setLugares] = useState<Lugar[]>([]);
 
   const cargar = useCallback(() => {
     let activo = true;
@@ -96,6 +101,8 @@ export default function ResumenScreen() {
         setCategorias(c);
         setCuentas(cu);
         setDeudas(d);
+        // Aparte: sin la migración de lugares, el resto del resumen sigue funcionando.
+        listarLugares().then((l) => activo && setLugares(l)).catch(() => activo && setLugares([]));
       } catch (err) {
         if (activo) setError(mensajeError(err));
       } finally {
@@ -118,7 +125,18 @@ export default function ResumenScreen() {
     categorias,
     cuentas,
     endeudamiento,
+    lugares,
   });
+
+  // «Dónde más pagas»: los 3 lugares con más gasto este mes.
+  const dondeMasPagas = lugares
+    .map((l) => {
+      const delLugar = gastosDelMes.filter((g) => g.lugarId === l.id);
+      return { lugar: l, pagos: delLugar.length, total: sumarMontos(delLugar.map((g) => g.monto)) };
+    })
+    .filter((x) => x.total > 0)
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 3);
 
   const semana = construirSemana(gastos);
   const actividad = construirActividad(
@@ -374,6 +392,30 @@ export default function ResumenScreen() {
             </View>
             <BarraProgreso porcentaje={endeudamiento.porcentaje} />
           </Tarjeta>
+
+          {dondeMasPagas.length > 0 && (
+            <Tarjeta>
+              <Text style={styles.tituloCard}>Dónde más pagas</Text>
+              {dondeMasPagas.map((x) => (
+                <Pressable
+                  key={x.lugar.id}
+                  accessibilityRole="button"
+                  onPress={() => router.push({ pathname: "/lugar/[id]", params: { id: x.lugar.id, mes } })}
+                  style={({ pressed }) => [{ flexDirection: "row", alignItems: "center", gap: spacing(3), paddingVertical: spacing(1.5) }, pressed && { opacity: 0.7 }]}
+                >
+                  <Ionicons name="location-outline" size={18} color={color.primary} />
+                  <Text style={{ flex: 1, fontFamily: font.semibold, fontSize: 14, color: color.text }} numberOfLines={1}>
+                    {x.lugar.nombre}
+                  </Text>
+                  <Text style={{ fontFamily: font.body, fontSize: 12, color: color.textMuted }}>
+                    {x.pagos} {x.pagos === 1 ? "pago" : "pagos"}
+                  </Text>
+                  <Text style={{ fontFamily: font.mono, fontSize: 14, color: color.text }}>${x.total.toFixed(2)}</Text>
+                </Pressable>
+              ))}
+              <Boton titulo="Ver todos los lugares" onPress={() => router.push("/lugares")} />
+            </Tarjeta>
+          )}
 
           <Tarjeta>
             <Text style={styles.tituloCard}>Recomendaciones</Text>

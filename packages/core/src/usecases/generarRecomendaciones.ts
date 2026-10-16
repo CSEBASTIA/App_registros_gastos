@@ -1,4 +1,4 @@
-import type { Categoria, Cuenta, Gasto, Ingreso, Presupuesto } from "../types/domain";
+import type { Categoria, Cuenta, Gasto, Ingreso, Lugar, Presupuesto } from "../types/domain";
 import type { Endeudamiento } from "./calcularEndeudamiento";
 import { estadoPresupuestos } from "./estadoPresupuestos";
 import { sumarMontos } from "../lib/montos";
@@ -34,6 +34,32 @@ export interface ParametrosRecomendaciones {
   endeudamiento: Endeudamiento;
   /** Opcional: límites por categoría; avisa al 80 % y alerta al pasarse. */
   presupuestos?: Presupuesto[];
+  /** Opcional: los lugares del usuario, para avisar si en uno el gasto sube mucho respecto al mes pasado. */
+  lugares?: Lugar[];
+}
+
+/** Lugar donde más se gastó este mes, si ya supera en 30 % o más a todo el mes pasado (y son al menos $20). */
+function recomendacionLugar(mes: string, gastos: Gasto[], lugares: Lugar[]): Recomendacion | undefined {
+  if (lugares.length === 0) return undefined;
+  const [mesPasado] = mesesAnteriores(mes, 1);
+  const totalDe = (lugarId: string, m: string) =>
+    sumarMontos(gastos.filter((g) => g.lugarId === lugarId && g.fecha.startsWith(m)).map((g) => g.monto));
+
+  let mayor: { lugar: Lugar; total: number } | undefined;
+  for (const lugar of lugares) {
+    const total = totalDe(lugar.id, mes);
+    if (total > 0 && (!mayor || total > mayor.total)) mayor = { lugar, total };
+  }
+  if (!mayor || mayor.total < 20) return undefined;
+
+  const anterior = totalDe(mayor.lugar.id, mesPasado);
+  // Sin datos del mes pasado no hay contra qué comparar: no se inventa un aumento.
+  if (anterior <= 0 || mayor.total < anterior * 1.3) return undefined;
+  const incremento = ((mayor.total - anterior) / anterior) * 100;
+  return {
+    severidad: "info",
+    mensaje: `Este mes llevas $${mayor.total.toFixed(2)} en "${mayor.lugar.nombre}", un ${incremento.toFixed(0)}% más que en todo el mes pasado.`,
+  };
 }
 
 /**
@@ -42,7 +68,7 @@ export interface ParametrosRecomendaciones {
  * tarjetas y nivel de endeudamiento.
  */
 export function generarRecomendaciones(params: ParametrosRecomendaciones): Recomendacion[] {
-  const { mes, gastos, ingresos, categorias, cuentas, endeudamiento, presupuestos = [] } = params;
+  const { mes, gastos, ingresos, categorias, cuentas, endeudamiento, presupuestos = [], lugares = [] } = params;
   const recomendaciones: Recomendacion[] = [];
 
   const gastosDelMes = gastos.filter((g) => g.fecha.startsWith(mes));
@@ -100,6 +126,10 @@ export function generarRecomendaciones(params: ParametrosRecomendaciones): Recom
       });
     }
   }
+
+  // Lugar donde el gasto se disparó respecto al mes pasado.
+  const porLugar = recomendacionLugar(mes, gastos, lugares);
+  if (porLugar) recomendaciones.push(porLugar);
 
   // Cupo de tarjetas casi agotado.
   for (const cuenta of cuentas) {

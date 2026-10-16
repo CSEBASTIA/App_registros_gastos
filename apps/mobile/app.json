@@ -3,7 +3,7 @@
     "name": "fintrack",
     "slug": "gastos-app",
     "scheme": "gastosapp",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/brand/fintrack-app-icon.png",
     "splash": {
@@ -26,7 +26,8 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/fintrack-mark.png",
         "backgroundColor": "#17191c"
-      }
+      },
+      "blockedPermissions": ["android.permission.ACCESS_BACKGROUND_LOCATION"]
     },
     "ios": {
       "bundleIdentifier": "com.csebastia.gastosapp"
@@ -34,7 +35,18 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "FinTrack usa tu ubicación solo al registrar un pago, si activas «Guardar la ubicación de mis pagos», para mostrarte cuánto gastas en cada lugar.",
+          "locationAlwaysAndWhenInUsePermission": "FinTrack usa tu ubicación solo mientras la app está abierta, al registrar un pago. Nunca en segundo plano.",
+          "locationAlwaysPermission": "FinTrack usa tu ubicación solo mientras la app está abierta, al registrar un pago. Nunca en segundo plano.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
     ],
     "extra": {
       "router": {

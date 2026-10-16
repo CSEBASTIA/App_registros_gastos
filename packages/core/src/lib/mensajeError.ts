@@ -45,6 +45,13 @@ function mensajeDePostgres(codigo: string | undefined): string | undefined {
       return "Ese registro ya existe.";
     case "57014":
       return "La operación tardó demasiado. Inténtalo de nuevo.";
+    // Función, tabla o columna que no existe: falta aplicar una migración en Supabase.
+    case "PGRST202":
+    case "PGRST205":
+    case "PGRST204":
+    case "42703":
+    case "42883":
+      return "Esta función todavía no está disponible: falta actualizar la base de datos.";
     default:
       return undefined;
   }

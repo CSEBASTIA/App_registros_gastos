@@ -21,10 +21,17 @@ import {
   ETIQUETA_METODO_PAGO,
   OPCIONES_METODO_PAGO,
   OPCIONES_MESES_DIFERIDO,
+  ETIQUETA_BILLETERA,
+  OPCIONES_BILLETERA,
+  MENSAJE_SIN_UBICACION,
+  billeteraCompatible,
+  type Billetera,
   type Categoria,
   type Cuenta,
   type MetodoPago,
 } from "core";
+import { guardarUbicacionActiva, ubicacionParaNuevoGasto } from "../../lib/ubicacion";
+import { avisar } from "../../lib/dialogo";
 import Campo from "../../components/Campo";
 import Boton from "../../components/Boton";
 import ErrorTexto from "../../components/ErrorTexto";
@@ -53,6 +60,8 @@ export default function NuevoGasto() {
   const [categoriaDetalle, setCategoriaDetalle] = useState("");
   const [cuentaId, setCuentaId] = useState("");
   const [metodoPago, setMetodoPago] = useState<MetodoPago | "">("");
+  const [billetera, setBilletera] = useState<Billetera | "">("");
+  const [conUbicacion, setConUbicacion] = useState(false);
   const [mesesDiferido, setMesesDiferido] = useState(3);
   const [tasaInteres, setTasaInteres] = useState("");
   const [fecha, setFecha] = useState(hoy());
@@ -71,8 +80,15 @@ export default function NuevoGasto() {
         })
         .catch((err) => setError(mensajeError(err)))
         .finally(() => setCargando(false));
+      guardarUbicacionActiva().then(setConUbicacion).catch(() => setConUbicacion(false));
     }, [cuentaIdInicial]),
   );
+
+  function cambiarMetodo(valor: MetodoPago | "") {
+    setMetodoPago(valor);
+    // Apple Pay y Google Wallet pagan con tarjeta: con efectivo o transferencia no aplican.
+    if (!billeteraCompatible(valor)) setBilletera("");
+  }
 
   const categoriaSeleccionada = categorias.find((c) => c.id === categoriaId);
   const esOtros = categoriaSeleccionada?.nombre === "Otros";
@@ -114,6 +130,8 @@ export default function NuevoGasto() {
     }
     setGuardando(true);
     try {
+      // Nunca lanza ni pide permiso, y espera como mucho 8 s al GPS.
+      const lugar = await ubicacionParaNuevoGasto();
       await crearGasto({
         monto: montoNumerico,
         descripcion: descripcion || categoriaSeleccionada?.nombre || "Gasto",
@@ -123,8 +141,13 @@ export default function NuevoGasto() {
         metodoPago: metodoPago || undefined,
         mesesDiferido: esDiferido ? mesesDiferido : undefined,
         tasaInteres: esDiferido && tasaInteres.trim() ? tasaNumerica : undefined,
+        billetera: billetera || undefined,
+        ubicacion: lugar.ubicacion,
         fecha,
       });
+      const aviso = lugar.motivo ? MENSAJE_SIN_UBICACION[lugar.motivo] : undefined;
+      // El gasto ya se guardó: es un aviso, no un error.
+      if (aviso) await avisar("Gasto guardado", aviso);
       router.back();
     } catch (err) {
       setError(mensajeError(err));
@@ -234,7 +257,7 @@ export default function NuevoGasto() {
         <SelectorChips
           titulo="Método de pago"
           valor={metodoPago}
-          onCambiar={(v) => setMetodoPago(v as MetodoPago)}
+          onCambiar={(v) => cambiarMetodo(v as MetodoPago | "")}
           opciones={[
             { valor: "", etiqueta: "Sin especificar" },
             ...OPCIONES_METODO_PAGO.map((m) => ({
@@ -243,6 +266,18 @@ export default function NuevoGasto() {
             })),
           ]}
         />
+
+        {billeteraCompatible(metodoPago) && (
+          <SelectorChips
+            titulo="Pagado con"
+            valor={billetera}
+            onCambiar={(v) => setBilletera(v as Billetera | "")}
+            opciones={[
+              { valor: "", etiqueta: "Tarjeta" },
+              ...OPCIONES_BILLETERA.map((b) => ({ valor: b, etiqueta: ETIQUETA_BILLETERA[b] })),
+            ]}
+          />
+        )}
 
         {esDiferido && (
           <>
@@ -291,6 +326,10 @@ export default function NuevoGasto() {
           onChangeText={setFecha}
           placeholder="2026-08-31"
         />
+
+        {conUbicacion && (
+          <Text style={styles.ayudaTexto}>Se guardará dónde haces este pago (puedes apagarlo en Más → Ubicación de mis pagos).</Text>
+        )}
 
         {error && <ErrorTexto>{error}</ErrorTexto>}
         <Boton

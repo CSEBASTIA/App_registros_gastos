@@ -7,10 +7,9 @@ import {
   Text,
   Pressable,
   ScrollView,
-  Alert,
   StyleSheet,
 } from "react-native";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
   listarRecordatorios,
@@ -19,6 +18,8 @@ import {
   marcarCompletado,
   completarRecordatorio,
   eliminarRecordatorio,
+  organizarRecordatorios,
+  textoVencimiento,
   mensajeError,
   parsearMonto,
   type Recordatorio,
@@ -35,6 +36,7 @@ import SelectorChips from "../components/SelectorChips";
 import EstadoVacio from "../components/EstadoVacio";
 import { spacing, useTheme, font, type Colors } from "../lib/theme";
 import { BlurFade } from "../components/Motion";
+import { confirmar } from "../lib/dialogo";
 
 function hoy() {
   return fechaLocal(); // zona horaria del teléfono, no UTC
@@ -54,6 +56,7 @@ export default function RecordatoriosScreen() {
   const [recordatorios, setRecordatorios] = useState<Recordatorio[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [verAnteriores, setVerAnteriores] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
@@ -70,18 +73,24 @@ export default function RecordatoriosScreen() {
 
   useFocusEffect(cargar);
 
-  function confirmarEliminar(r: Recordatorio) {
-    Alert.alert("Eliminar recordatorio", `¿Eliminar "${r.titulo}"?`, [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: () =>
-          eliminarRecordatorio(r.id)
-            .then(cargar)
-            .catch((err) => Alert.alert("No se pudo eliminar", mensajeError(err))),
-      },
-    ]);
+  const fechaHoy = hoy();
+  const organizados = organizarRecordatorios(recordatorios, fechaHoy);
+
+  async function confirmarEliminar(r: Recordatorio) {
+    const mensaje = r.automatico
+      ? `"${r.titulo}" se creó solo con tu compra diferida. Si lo eliminas, no vuelve a aparecer.`
+      : `¿Eliminar "${r.titulo}"?`;
+    if (!(await confirmar("Eliminar recordatorio", mensaje, "Eliminar"))) return;
+    eliminarRecordatorio(r.id)
+      .then(cargar)
+      .catch((err) => setError(mensajeError(err)));
+  }
+
+  function alternar(r: Recordatorio) {
+    // Un recurrente no queda tachado: pasa a su siguiente fecha.
+    (r.completado ? marcarCompletado(r.id, false) : completarRecordatorio(r))
+      .then(cargar)
+      .catch((err) => setError(mensajeError(err)));
   }
 
   async function crearYCerrar(
@@ -142,7 +151,8 @@ export default function RecordatoriosScreen() {
             Recordatorios
           </Text>
           <Text style={styles.screenIntro}>
-            Tené presentes tus próximos pagos.
+            Tené presentes tus próximos pagos. Las cuotas de tus compras
+            diferidas se agregan solas.
           </Text>
         </BlurFade>
         {mostrarForm ? (
@@ -165,58 +175,122 @@ export default function RecordatoriosScreen() {
           <EstadoVacio
             icono="notifications-outline"
             titulo="Todavía no hay recordatorios"
-            subtitulo="Creá uno arriba para no olvidarte de un pago."
+            subtitulo="Creá uno arriba para no olvidarte de un pago. Al comprar a cuotas, se crean solos."
           />
         ) : (
           <View style={{ gap: spacing(2.5) }}>
-            {recordatorios.map((r) => (
-              <Pressable
+            {organizados.proximos.length === 0 && (
+              <Text style={styles.screenIntro}>No tienes pagos pendientes.</Text>
+            )}
+            {organizados.proximos.map((r) => (
+              <FilaRecordatorio
                 key={r.id}
-                accessibilityRole="checkbox"
-                accessibilityLabel={r.titulo + ", " + r.fecha}
-                accessibilityState={{ checked: r.completado }}
-                android_ripple={{ color: color.primaryBg }}
-                onPress={() =>
-                  // Un recurrente no queda tachado: pasa a su siguiente fecha.
-                  (r.completado
-                    ? marcarCompletado(r.id, false)
-                    : completarRecordatorio(r)
-                  )
-                    .then(cargar)
-                    .catch((err) => setError(mensajeError(err)))
-                }
+                r={r}
+                hoy={fechaHoy}
+                cuotasDespues={organizados.cuotasDespues[r.id]}
+                onPress={() => alternar(r)}
                 onLongPress={() => confirmarEliminar(r)}
-                style={({ pressed }) => [
-                  styles.fila,
-                  pressed && { backgroundColor: color.primaryBg },
-                ]}
-              >
-                <Ionicons
-                  name={r.completado ? "checkmark-circle" : "ellipse-outline"}
-                  size={22}
-                  color={r.completado ? color.success : color.textMuted}
-                />
-                <View style={{ flex: 1 }}>
-                  <Text
-                    style={[
-                      styles.filaTitulo,
-                      r.completado && styles.filaTituloCompletado,
-                    ]}
-                  >
-                    {r.titulo}
-                  </Text>
-                  <Text style={styles.filaMeta}>
-                    {ETIQUETA_TIPO[r.tipo]} · {r.fecha}
-                    {r.monto ? ` · $${r.monto.toFixed(2)}` : ""}
-                    {r.recurrente ? ` · se repite` : ""}
-                  </Text>
-                </View>
-              </Pressable>
+              />
             ))}
+            {organizados.anteriores.length > 0 && (
+              <Boton
+                titulo={
+                  verAnteriores
+                    ? "Ocultar anteriores"
+                    : `Ver anteriores (${organizados.anteriores.length})`
+                }
+                onPress={() => setVerAnteriores((v) => !v)}
+              />
+            )}
+            {verAnteriores &&
+              organizados.anteriores.map((r) => (
+                <FilaRecordatorio
+                  key={r.id}
+                  r={r}
+                  hoy={fechaHoy}
+                  onPress={() => alternar(r)}
+                  onLongPress={() => confirmarEliminar(r)}
+                />
+              ))}
           </View>
         )}
       </ScrollView>
     </KeyboardAvoidingView>
+  );
+}
+
+function FilaRecordatorio({
+  r,
+  hoy,
+  cuotasDespues,
+  onPress,
+  onLongPress,
+}: {
+  r: Recordatorio;
+  hoy: string;
+  cuotasDespues?: number;
+  onPress: () => void;
+  onLongPress: () => void;
+}) {
+  const { color } = useTheme();
+  const styles = createStyles(color);
+  // Una cuota que pasó hace más de un mes sin registrar el pago: el plazo siguió.
+  const paso = r.automatico && !r.completado && r.fecha < hoy && cuotasDespues === undefined;
+  const vencido = !r.completado && !paso && r.fecha < hoy;
+  const cuando = r.completado ? "hecho" : paso ? "pasó sin registrar el pago" : textoVencimiento(r.fecha, hoy);
+  return (
+    <Pressable
+      accessibilityRole="checkbox"
+      accessibilityLabel={`${r.titulo}, ${r.fecha}, ${cuando}`}
+      accessibilityHint="Toca para marcarlo como hecho. Mantén presionado para eliminarlo."
+      accessibilityState={{ checked: r.completado }}
+      android_ripple={{ color: color.primaryBg }}
+      onPress={onPress}
+      onLongPress={onLongPress}
+      style={({ pressed }) => [
+        styles.fila,
+        (r.completado || paso) && { opacity: 0.7 },
+        pressed && { backgroundColor: color.primaryBg },
+      ]}
+    >
+      <Ionicons
+        name={r.completado ? "checkmark-circle" : "ellipse-outline"}
+        size={22}
+        color={r.completado ? color.success : vencido ? color.danger : color.textMuted}
+      />
+      <View style={{ flex: 1, gap: 2 }}>
+        <Text style={[styles.filaTitulo, r.completado && styles.filaTituloCompletado]}>
+          {r.titulo}
+        </Text>
+        <Text style={[styles.filaMeta, vencido && { color: color.danger }]}>
+          {ETIQUETA_TIPO[r.tipo]} · {r.fecha} · {cuando}
+          {r.monto ? ` · $${r.monto.toFixed(2)}` : ""}
+          {r.recurrente ? " · se repite" : ""}
+        </Text>
+        {r.automatico && (
+          <View style={styles.filaAutomatico}>
+            <View style={styles.chip}>
+              <Ionicons name="sync-outline" size={12} color={color.textMuted} />
+              <Text style={styles.chipTexto}>Automático · diferido</Text>
+            </View>
+            {cuotasDespues !== undefined && cuotasDespues > 0 && (
+              <Text style={styles.filaMeta}>
+                {cuotasDespues === 1 ? "queda 1 cuota más" : `quedan ${cuotasDespues} cuotas más`}
+              </Text>
+            )}
+          </View>
+        )}
+        {r.automatico && !r.completado && !paso && (
+          <Pressable
+            accessibilityRole="link"
+            onPress={() => router.push("/deudas")}
+            hitSlop={8}
+          >
+            <Text style={styles.enlace}>Registrar el pago en Deudas →</Text>
+          </Pressable>
+        )}
+      </View>
+    </Pressable>
   );
 }
 
@@ -382,5 +456,29 @@ const createStyles = (color: Colors) =>
       fontSize: 13,
       color: color.textMuted,
       marginTop: 2,
+    },
+    filaAutomatico: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      alignItems: "center",
+      gap: spacing(2),
+      marginTop: spacing(1),
+    },
+    chip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: color.surface2,
+      borderRadius: 999,
+      paddingHorizontal: spacing(2),
+      paddingVertical: 2,
+    },
+    chipTexto: { fontFamily: font.body, fontSize: 12, color: color.textMuted },
+    enlace: {
+      fontFamily: font.semibold,
+      fontSize: 13,
+      color: color.text,
+      textDecorationLine: "underline",
+      marginTop: spacing(1),
     },
   });

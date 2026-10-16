@@ -11,6 +11,32 @@ export interface Categoria {
 
 export type MetodoPago = "efectivo" | "debito" | "credito" | "transferencia" | "diferido" | "otro";
 
+/**
+ * "Pagado con": la billetera digital que hizo el pago. No es un método de
+ * pago: Apple Pay y Google Wallet pagan con una tarjeta de débito o crédito,
+ * que sigue en `metodoPago`.
+ */
+export type Billetera = "apple_pay" | "google_wallet" | "otra";
+
+/** Dónde se hizo un pago. La base la guarda redondeada a 4 decimales (~11 m). */
+export interface Ubicacion {
+  latitud: number;
+  longitud: number;
+  /** Precisión que reportó el GPS, en metros. Con más de 200 m no se asigna lugar. */
+  precisionM?: number;
+}
+
+/** Un sitio donde el usuario paga: la base asigna a cada gasto con ubicación el lugar propio más cercano. */
+export interface Lugar {
+  id: string;
+  nombre: string;
+  latitud: number;
+  longitud: number;
+  /** Un gasto a menos de esta distancia (20-500 m) pertenece a este lugar. */
+  radioM: number;
+  createdAt: string;
+}
+
 export interface Gasto {
   id: string;
   monto: number;
@@ -26,6 +52,11 @@ export interface Gasto {
   tasaInteres?: number;
   /** Ruta del archivo (PDF o imagen) dentro del bucket privado "facturas", ej. "<usuario_id>/<archivo>". */
   facturaPath?: string;
+  /** Solo con método débito, crédito o diferido (o sin método). */
+  billetera?: Billetera;
+  ubicacion?: Ubicacion;
+  /** Lo asigna la base a partir de la ubicación; también se puede elegir a mano. */
+  lugarId?: string;
   fecha: string;
   createdAt: string;
 }
@@ -38,7 +69,10 @@ export interface Presupuesto {
 }
 
 export type TipoCuenta = "debito" | "credito" | "efectivo" | "ahorro";
-export type Banco = "banco_guayaquil" | "pichincha" | "produbanco" | "diners_club" | "banco_pacifico" | "banco_austro" | "otro";
+export type Banco =
+  | "banco_guayaquil" | "pichincha" | "produbanco" | "diners_club" | "banco_pacifico" | "banco_austro" | "otro"
+  // Casas comerciales y créditos directos: siempre tipo "credito" (con cupo).
+  | "comandato" | "artefacta" | "marcimex" | "la_ganga" | "japon" | "de_prati" | "creditos_economicos" | "otra_casa_comercial";
 export type Marca = "amex" | "visa" | "mastercard" | "diners" | "otro";
 
 export interface Cuenta {
@@ -53,6 +87,10 @@ export interface Cuenta {
   cupoTotal?: number;
   /** Últimos 3-4 dígitos de la cuenta/tarjeta — para distinguir cuál cuenta es cuando hay más de una del mismo banco al leer un correo bancario. */
   identificador?: string;
+  /** Solo crédito: día del mes en que corta el estado de cuenta (1-31; en meses cortos, el último día). */
+  diaCorte?: number;
+  /** Solo crédito: día máximo de pago (1-31). */
+  diaPago?: number;
   /** Saldo usable: para crédito es el cupo disponible, para el resto es el saldo. */
   disponible: number;
   createdAt: string;
@@ -60,8 +98,10 @@ export interface Cuenta {
 
 export type TipoTransaccionDetectada = "gasto" | "ingreso";
 export type EstadoTransaccionDetectada = "pendiente" | "confirmado" | "descartado";
+/** De dónde llegó el aviso a la bandeja. Los de billetera son siempre gastos. */
+export type OrigenTransaccion = "correo" | "apple_pay" | "google_wallet";
 
-/** Un gasto/ingreso que la app detectó sola leyendo un correo bancario, pendiente de revisión antes de guardarse. */
+/** Un gasto/ingreso que la app detectó sola (correo bancario o billetera), pendiente de revisión antes de guardarse. */
 export interface TransaccionDetectada {
   id: string;
   /** Id del mensaje en el proveedor de correo — evita procesar el mismo aviso dos veces. */
@@ -76,6 +116,12 @@ export interface TransaccionDetectada {
   categoriaId?: string;
   fecha: string;
   correoAsunto?: string;
+  origen: OrigenTransaccion;
+  /** Nombre del comercio que dio la billetera. */
+  comercio?: string;
+  ubicacion?: Ubicacion;
+  /** Últimos 3-4 dígitos de la tarjeta, para reconocer la cuenta. */
+  tarjetaFinal?: string;
   estado: EstadoTransaccionDetectada;
   createdAt: string;
 }
@@ -135,6 +181,8 @@ export interface Recordatorio {
   frecuencia?: Frecuencia;
   completado: boolean;
   deudaId?: string;
+  /** Lo creó la base para una cuota de un diferido (se cierra al pagarla y se borra con el diferido). */
+  automatico?: boolean;
   createdAt: string;
 }
 

@@ -1,8 +1,11 @@
 import { getSupabaseClient } from "../client";
-import type { Gasto } from "../types/domain";
+import { z } from "zod";
+import type { Billetera, Gasto, Ubicacion } from "../types/domain";
 import type { Database } from "../types/database";
 import { cambiosGastoSchema } from "../schemas/gasto.schema";
+import { billeteraCompatible } from "../schemas/ubicacion.schema";
 import { traerTodasLasFilas, validarRango, type RangoFechas } from "../lib/paginacion";
+import { filaDeUbicacion, ubicacionDeFila } from "../lib/ubicacion";
 
 type GastoRow = Database["public"]["Tables"]["gastos"]["Row"];
 
@@ -19,6 +22,9 @@ function filaAGasto(row: GastoRow): Gasto {
     mesesDiferido: row.meses_diferido ?? undefined,
     tasaInteres: row.tasa_interes !== null ? Number(row.tasa_interes) : undefined,
     facturaPath: row.factura_path ?? undefined,
+    billetera: (row.billetera as Gasto["billetera"]) ?? undefined,
+    ubicacion: ubicacionDeFila(row),
+    lugarId: row.lugar_id ?? undefined,
     fecha: row.fecha,
     createdAt: row.created_at,
   };
@@ -29,9 +35,19 @@ function filaAGasto(row: GastoRow): Gasto {
  * filas de Supabase). Con `rango`, solo ese periodo: descarga mucho menos.
  */
 export async function listarGastos(rango: RangoFechas = {}): Promise<Gasto[]> {
+  return listarGastosFiltrados(rango);
+}
+
+/** Los pagos de un lugar (detalle del resumen por lugar), los más recientes primero. */
+export async function listarGastosDeLugar(lugarId: string, rango: RangoFechas = {}): Promise<Gasto[]> {
+  return listarGastosFiltrados(rango, z.string().uuid("Lugar no válido.").parse(lugarId));
+}
+
+async function listarGastosFiltrados(rango: RangoFechas, lugarId?: string): Promise<Gasto[]> {
   const { desde, hasta } = validarRango(rango);
   const filas = await traerTodasLasFilas<GastoRow>((inicio, fin) => {
     let consulta = getSupabaseClient().from("gastos").select("*");
+    if (lugarId) consulta = consulta.eq("lugar_id", lugarId);
     if (desde) consulta = consulta.gte("fecha", desde);
     if (hasta) consulta = consulta.lte("fecha", hasta);
     return consulta
@@ -59,6 +75,10 @@ export async function crearGasto(
       // Solo si se indicó: así crear gastos funciona también en una base sin
       // la migración 20261015170000 (que agrega la columna).
       ...(gasto.tasaInteres !== undefined ? { tasa_interes: gasto.tasaInteres } : {}),
+      // Igual con la migración de billeteras y ubicación (20261016120000).
+      ...(gasto.billetera !== undefined ? { billetera: gasto.billetera } : {}),
+      ...(gasto.ubicacion !== undefined ? filaDeUbicacion(gasto.ubicacion) : {}),
+      ...(gasto.lugarId !== undefined ? { lugar_id: gasto.lugarId } : {}),
       factura_path: gasto.facturaPath ?? null,
       fecha: gasto.fecha,
     })
@@ -71,7 +91,14 @@ export async function crearGasto(
 
 export type CambiosGasto = Partial<
   Pick<Gasto, "monto" | "descripcion" | "categoriaId" | "categoriaDetalle" | "cuentaId" | "metodoPago" | "fecha">
->;
+> & {
+  /** `""` quita la billetera. */
+  billetera?: Billetera | "";
+  /** `null` quita la ubicación y el lugar; un valor nuevo recalcula el lugar. */
+  ubicacion?: Ubicacion | null;
+  /** Elegir el lugar a mano; `""` lo quita. */
+  lugarId?: string;
+};
 
 /** Valida solo lo que se envía: antes la edición llegaba a la base sin pasar por zod. */
 export async function actualizarGasto(id: string, cambiosSinValidar: CambiosGasto): Promise<Gasto> {
@@ -85,6 +112,13 @@ export async function actualizarGasto(id: string, cambiosSinValidar: CambiosGast
       ...(cambios.categoriaDetalle !== undefined ? { categoria_detalle: cambios.categoriaDetalle || null } : {}),
       ...(cambios.cuentaId !== undefined ? { cuenta_id: cambios.cuentaId || null } : {}),
       ...(cambios.metodoPago !== undefined ? { metodo_pago: cambios.metodoPago || null } : {}),
+      ...(cambios.billetera !== undefined ? { billetera: cambios.billetera || null } : {}),
+      // Pasar a efectivo o transferencia quita la billetera, en vez de chocar con la base.
+      ...(cambios.billetera === undefined && cambios.metodoPago !== undefined && !billeteraCompatible(cambios.metodoPago)
+        ? { billetera: null }
+        : {}),
+      ...(cambios.ubicacion !== undefined ? filaDeUbicacion(cambios.ubicacion) : {}),
+      ...(cambios.lugarId !== undefined ? { lugar_id: cambios.lugarId || null } : {}),
       ...(cambios.fecha !== undefined ? { fecha: cambios.fecha } : {}),
     })
     .eq("id", id)

@@ -2,6 +2,7 @@ import { getSupabaseClient } from "../client";
 import type { Cuenta } from "../types/domain";
 import type { Database } from "../types/database";
 import { repararTexto } from "../lib/repararTexto";
+import { fechasTarjetaSchema } from "../schemas/cuenta.schema";
 
 type CuentaRow = Database["public"]["Tables"]["cuentas"]["Row"];
 
@@ -15,6 +16,8 @@ function filaACuenta(row: CuentaRow): Cuenta {
     estilo: row.estilo ?? undefined,
     cupoTotal: row.cupo_total !== null ? Number(row.cupo_total) : undefined,
     identificador: row.identificador ?? undefined,
+    diaCorte: row.dia_corte ?? undefined,
+    diaPago: row.dia_pago ?? undefined,
     disponible: Number(row.disponible),
     createdAt: row.created_at,
   };
@@ -42,6 +45,10 @@ export async function crearCuenta(cuenta: Omit<Cuenta, "id" | "createdAt">): Pro
       cupo_total: cuenta.cupoTotal ?? null,
       identificador: cuenta.identificador ?? null,
       disponible: cuenta.disponible,
+      // Solo si se indicó: así crear cuentas funciona también en una base sin
+      // la migración de casas comerciales y corte (que agrega las columnas).
+      ...(cuenta.diaCorte !== undefined ? { dia_corte: cuenta.diaCorte } : {}),
+      ...(cuenta.diaPago !== undefined ? { dia_pago: cuenta.diaPago } : {}),
     })
     .select()
     .single();
@@ -53,4 +60,23 @@ export async function crearCuenta(cuenta: Omit<Cuenta, "id" | "createdAt">): Pro
 export async function eliminarCuenta(id: string): Promise<void> {
   const { error } = await getSupabaseClient().from("cuentas").delete().eq("id", id);
   if (error) throw error;
+}
+
+/** Cambia el día de corte y el de pago de una tarjeta (`null` los quita). La base exige que sea de crédito. */
+export async function actualizarFechasTarjeta(
+  id: string,
+  fechas: { diaCorte?: number | null; diaPago?: number | null }
+): Promise<Cuenta> {
+  const f = fechasTarjetaSchema.parse(fechas);
+  const { data, error } = await getSupabaseClient()
+    .from("cuentas")
+    .update({
+      ...(f.diaCorte !== undefined ? { dia_corte: f.diaCorte } : {}),
+      ...(f.diaPago !== undefined ? { dia_pago: f.diaPago } : {}),
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return filaACuenta(data);
 }

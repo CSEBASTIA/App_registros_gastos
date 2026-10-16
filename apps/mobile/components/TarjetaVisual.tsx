@@ -9,6 +9,11 @@ import {
   GRADIENTE_BANCO,
   TEXTO_CUENTA_BANCO,
   formatMonto,
+  cicloTarjeta,
+  esCasaComercial,
+  fechaLocal,
+  inicialesDeEntidad,
+  textoDias,
 } from "core";
 import { logoDeBanco } from "../lib/logosBanco";
 import BarraProgreso from "./BarraProgreso";
@@ -21,6 +26,13 @@ const ICONO_TIPO: Record<Cuenta["tipo"], keyof typeof Ionicons.glyphMap> = {
   ahorro: "wallet-outline",
   efectivo: "cash-outline",
 };
+
+/** "Corta en 4 días · paga hasta el 2026-11-05", o nada si no tiene fecha de corte. */
+function lineaCorte(cuenta: Cuenta): string | undefined {
+  if (cuenta.tipo !== "credito" || !cuenta.diaCorte) return undefined;
+  const c = cicloTarjeta(cuenta.diaCorte, fechaLocal(), cuenta.diaPago);
+  return `Corta ${textoDias(c.diasHastaCorte)}` + (c.pago ? ` · paga hasta el ${c.pago.slice(8)}/${c.pago.slice(5, 7)}` : "");
+}
 
 const ETIQUETA_TIPO: Record<Cuenta["tipo"], string> = {
   credito: "Tarjeta de crédito",
@@ -46,6 +58,8 @@ export default function TarjetaVisual({
   const esCredito = cuenta.tipo === "credito";
   const imagen = imagenDe(cuenta.estilo);
   const producto = productoDe(cuenta.estilo);
+  const corte = compacta ? undefined : lineaCorte(cuenta);
+  const tipoTexto = cuenta.tipo === "credito" && esCasaComercial(cuenta.banco) ? "Crédito directo" : ETIQUETA_TIPO[cuenta.tipo];
   const usoPorcentaje = cuenta.cupoTotal ? ((cuenta.cupoTotal - cuenta.disponible) / cuenta.cupoTotal) * 100 : undefined;
 
   const contenido = esCredito && imagen ? (
@@ -58,7 +72,8 @@ export default function TarjetaVisual({
         <Text style={[styles.nombreImagen, { color: color.text }]} numberOfLines={1}>{cuenta.nombre}</Text>
         {!compacta && (
           <>
-            <Text style={[styles.tipoImagen, { color: color.textMuted }]} numberOfLines={1}>{producto?.nombre ?? ETIQUETA_TIPO[cuenta.tipo]}</Text>
+            <Text style={[styles.tipoImagen, { color: color.textMuted }]} numberOfLines={1}>{producto?.nombre ?? tipoTexto}</Text>
+            {corte && <Text style={[styles.tipoImagen, { color: color.textMuted }]}>{corte}</Text>}
             {cuenta.cupoTotal ? (
               <View style={{ gap: spacing(1.5) }}>
                 <View style={styles.cupoLinea}>
@@ -85,7 +100,12 @@ export default function TarjetaVisual({
         {logo ? (
           <Image source={logo} style={styles.logo} resizeMode="contain" />
         ) : (
-          <Text style={styles.bancoTexto}>{ETIQUETA_BANCO[cuenta.banco]}</Text>
+          <View style={styles.entidad}>
+            <View style={styles.inicial} accessibilityElementsHidden importantForAccessibility="no">
+              <Text style={styles.inicialTexto}>{inicialesDeEntidad(cuenta.banco)}</Text>
+            </View>
+            <Text style={styles.bancoTexto} numberOfLines={1}>{ETIQUETA_BANCO[cuenta.banco]}</Text>
+          </View>
         )}
         <Ionicons name="wifi-outline" size={16} color="rgba(255,255,255,0.85)" style={{ transform: [{ rotate: "90deg" }] }} />
       </View>
@@ -93,7 +113,8 @@ export default function TarjetaVisual({
       <Text style={styles.nombre} numberOfLines={1}>
         {cuenta.nombre}
       </Text>
-      {!compacta && <Text style={styles.tipo}>{ETIQUETA_TIPO[cuenta.tipo]}</Text>}
+      {!compacta && <Text style={styles.tipo}>{tipoTexto}</Text>}
+      {corte && <Text style={styles.tipo}>{corte}</Text>}
 
       {!compacta &&
         (cuenta.cupoTotal ? (
@@ -123,9 +144,20 @@ export default function TarjetaVisual({
         { backgroundColor: COLOR_CUENTA_BANCO[cuenta.banco] },
       ]}
     >
-      <Text style={[styles.bancoTexto, { color: TEXTO_CUENTA_BANCO[cuenta.banco] }]}>
-        {ETIQUETA_BANCO[cuenta.banco]}
-      </Text>
+      <View style={styles.entidad}>
+        {logo ? (
+          <View style={styles.logoPastilla}>
+            <Image source={logo} style={styles.logoPequeno} resizeMode="contain" accessibilityIgnoresInvertColors />
+          </View>
+        ) : (
+          <View style={[styles.inicial, { borderColor: `${TEXTO_CUENTA_BANCO[cuenta.banco]}80` }]}>
+            <Text style={[styles.inicialTexto, { color: TEXTO_CUENTA_BANCO[cuenta.banco] }]}>{inicialesDeEntidad(cuenta.banco)}</Text>
+          </View>
+        )}
+        <Text style={[styles.bancoTexto, { color: TEXTO_CUENTA_BANCO[cuenta.banco] }]} numberOfLines={1}>
+          {ETIQUETA_BANCO[cuenta.banco]}
+        </Text>
+      </View>
       <View style={styles.cuentaCuerpo}>
         <View style={[styles.iconoRedondo, { borderColor: `${TEXTO_CUENTA_BANCO[cuenta.banco]}b3` }]}>
           <Ionicons name={ICONO_TIPO[cuenta.tipo]} size={18} color={TEXTO_CUENTA_BANCO[cuenta.banco]} />
@@ -152,7 +184,7 @@ export default function TarjetaVisual({
   const accessibleLabel = [
     cuenta.nombre,
     ETIQUETA_BANCO[cuenta.banco],
-    ETIQUETA_TIPO[cuenta.tipo],
+    tipoTexto,
     cuenta.cupoTotal
       ? `Disponible ${formatMonto(cuenta.disponible)} de ${formatMonto(cuenta.cupoTotal)}`
       : `Saldo ${formatMonto(cuenta.disponible)}`,
@@ -190,6 +222,11 @@ const styles = StyleSheet.create({
   encabezado: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   bancoTexto: { fontFamily: font.body, fontSize: 12, fontWeight: "700", color: "#fff", letterSpacing: 0.4, textTransform: "uppercase" },
   logo: { height: 20, width: 90 },
+  logoPastilla: { backgroundColor: "#ffffff", borderRadius: radius.sm, paddingHorizontal: 6, paddingVertical: 3 },
+  logoPequeno: { height: 16, width: 64 },
+  entidad: { flexDirection: "row", alignItems: "center", gap: spacing(2), flexShrink: 1 },
+  inicial: { width: 28, height: 28, borderRadius: radius.pill, backgroundColor: "rgba(255,255,255,0.22)", borderWidth: 1, borderColor: "rgba(255,255,255,0.5)", alignItems: "center", justifyContent: "center" },
+  inicialTexto: { fontFamily: font.semibold, fontSize: 12, color: "#fff" },
   nombre: { fontFamily: font.body, fontSize: 16, fontWeight: "700", color: "#fff" },
   tipo: { fontFamily: font.body, fontSize: 12, color: "rgba(255,255,255,0.85)" },
   saldo: { fontFamily: font.mono, fontSize: 20, fontWeight: "700", color: "#fff", marginTop: spacing(2) },

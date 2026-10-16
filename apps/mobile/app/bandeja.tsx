@@ -18,6 +18,7 @@ import {
   mensajeError,
   parsearMonto,
   ETIQUETA_BANCO,
+  ETIQUETA_ORIGEN_TRANSACCION,
   type TransaccionDetectada,
   type Categoria,
   type Cuenta,
@@ -30,6 +31,8 @@ import SelectorChips from "../components/SelectorChips";
 import EstadoVacio from "../components/EstadoVacio";
 import { spacing, useTheme, font, type Colors } from "../lib/theme";
 import { BlurFade } from "../components/Motion";
+import { Ionicons } from "@expo/vector-icons";
+import { abrirEnMapas } from "../lib/ubicacion";
 
 export default function BandejaScreen() {
   const { color } = useTheme();
@@ -117,7 +120,7 @@ export default function BandejaScreen() {
           <EstadoVacio
             icono="checkmark-done-outline"
             titulo="No hay nada pendiente de revisar"
-            subtitulo="Los movimientos que la app detecte en tu correo van a aparecer acá."
+            subtitulo="Los movimientos que la app detecte en tu correo o en tus pagos con Apple Pay van a aparecer aquí."
           />
         ) : (
           items.map((item) => (
@@ -194,11 +197,29 @@ function ItemBandeja({
   return (
     <Tarjeta>
       <View style={styles.encabezado}>
-        <Text style={styles.tipo}>
-          {item.tipo === "gasto" ? "Gasto detectado" : "Ingreso detectado"}
-        </Text>
+        <View style={{ flexDirection: "row", alignItems: "center", gap: spacing(1.5), flexShrink: 1 }}>
+          <Ionicons
+            name={item.origen === "correo" ? "mail-outline" : "phone-portrait-outline"}
+            size={16}
+            color={color.primary}
+            accessibilityLabel={ETIQUETA_ORIGEN_TRANSACCION[item.origen]}
+          />
+          <Text style={styles.tipo}>
+            {item.tipo === "gasto" ? "Gasto detectado" : "Ingreso detectado"} · {ETIQUETA_ORIGEN_TRANSACCION[item.origen]}
+          </Text>
+        </View>
         <Text style={styles.fecha}>{item.fecha}</Text>
       </View>
+      {item.comercio && (
+        <Text style={styles.asunto} numberOfLines={2}>
+          {item.comercio}
+          {item.banco ? ` · ${ETIQUETA_BANCO[item.banco]}` : ""}
+          {item.tarjetaFinal ? ` · ••${item.tarjetaFinal}` : ""}
+        </Text>
+      )}
+      {item.ubicacion && (
+        <Boton titulo="Abrir en Mapas" onPress={() => abrirEnMapas(item.ubicacion!).catch(() => undefined)} />
+      )}
       {item.correoAsunto && (
         <Text style={styles.asunto} numberOfLines={2}>
           “{item.correoAsunto}”{" "}

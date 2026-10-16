@@ -16,6 +16,8 @@ function filaARecordatorio(row: RecordatorioRow): Recordatorio {
     frecuencia: (row.frecuencia as Recordatorio["frecuencia"]) ?? undefined,
     completado: row.completado,
     deudaId: row.deuda_id ?? undefined,
+    // Sin la migración de recordatorios de diferidos la columna no existe.
+    automatico: row.automatico === true,
     createdAt: row.created_at,
   };
 }

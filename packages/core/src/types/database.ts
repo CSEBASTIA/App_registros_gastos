@@ -52,6 +52,11 @@ export type Database = {
           tasa_interes: number | null;
           fecha: string;
           created_at: string;
+          billetera: string | null;
+          latitud: number | null;
+          longitud: number | null;
+          precision_m: number | null;
+          lugar_id: string | null;
           usuario_id: string;
         };
         Insert: {
@@ -67,6 +72,11 @@ export type Database = {
           tasa_interes?: number | null;
           fecha?: string;
           created_at?: string;
+          billetera?: string | null;
+          latitud?: number | null;
+          longitud?: number | null;
+          precision_m?: number | null;
+          lugar_id?: string | null;
           usuario_id?: string;
         };
         Update: {
@@ -82,8 +92,56 @@ export type Database = {
           tasa_interes?: number | null;
           fecha?: string;
           created_at?: string;
+          billetera?: string | null;
+          latitud?: number | null;
+          longitud?: number | null;
+          precision_m?: number | null;
+          lugar_id?: string | null;
           usuario_id?: string;
         };
+        Relationships: [];
+      };
+      lugares: {
+        Row: {
+          id: string;
+          nombre: string;
+          latitud: number;
+          longitud: number;
+          radio_m: number;
+          created_at: string;
+          usuario_id: string;
+        };
+        Insert: {
+          id?: string;
+          nombre: string;
+          latitud: number;
+          longitud: number;
+          radio_m?: number;
+          created_at?: string;
+          usuario_id?: string;
+        };
+        Update: {
+          id?: string;
+          nombre?: string;
+          latitud?: number;
+          longitud?: number;
+          radio_m?: number;
+          created_at?: string;
+          usuario_id?: string;
+        };
+        Relationships: [];
+      };
+      claves_captura: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          nombre: string;
+          prefijo: string;
+          created_at: string;
+          ultimo_uso: string | null;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       presupuestos: {
@@ -120,6 +178,8 @@ export type Database = {
           estilo: string | null;
           cupo_total: number | null;
           identificador: string | null;
+          dia_corte: number | null;
+          dia_pago: number | null;
           disponible: number;
           created_at: string;
           usuario_id: string;
@@ -133,6 +193,8 @@ export type Database = {
           estilo?: string | null;
           cupo_total?: number | null;
           identificador?: string | null;
+          dia_corte?: number | null;
+          dia_pago?: number | null;
           disponible?: number;
           created_at?: string;
           usuario_id?: string;
@@ -146,6 +208,8 @@ export type Database = {
           estilo?: string | null;
           cupo_total?: number | null;
           identificador?: string | null;
+          dia_corte?: number | null;
+          dia_pago?: number | null;
           disponible?: number;
           created_at?: string;
           usuario_id?: string;
@@ -166,6 +230,13 @@ export type Database = {
           correo_asunto: string | null;
           estado: string;
           created_at: string;
+          origen: string;
+          comercio: string | null;
+          latitud: number | null;
+          longitud: number | null;
+          precision_m: number | null;
+          tarjeta_final: string | null;
+          clave_captura_id: string | null;
           usuario_id: string;
         };
         Insert: {
@@ -181,6 +252,13 @@ export type Database = {
           correo_asunto?: string | null;
           estado?: string;
           created_at?: string;
+          origen?: string;
+          comercio?: string | null;
+          latitud?: number | null;
+          longitud?: number | null;
+          precision_m?: number | null;
+          tarjeta_final?: string | null;
+          clave_captura_id?: string | null;
           usuario_id?: string;
         };
         Update: {
@@ -196,6 +274,13 @@ export type Database = {
           correo_asunto?: string | null;
           estado?: string;
           created_at?: string;
+          origen?: string;
+          comercio?: string | null;
+          latitud?: number | null;
+          longitud?: number | null;
+          precision_m?: number | null;
+          tarjeta_final?: string | null;
+          clave_captura_id?: string | null;
           usuario_id?: string;
         };
         Relationships: [];
@@ -331,6 +416,7 @@ export type Database = {
           frecuencia: string | null;
           completado: boolean;
           deuda_id: string | null;
+          automatico: boolean;
           created_at: string;
           usuario_id: string;
         };
@@ -344,6 +430,7 @@ export type Database = {
           frecuencia?: string | null;
           completado?: boolean;
           deuda_id?: string | null;
+          automatico?: boolean;
           created_at?: string;
           usuario_id?: string;
         };
@@ -357,6 +444,7 @@ export type Database = {
           frecuencia?: string | null;
           completado?: boolean;
           deuda_id?: string | null;
+          automatico?: boolean;
           created_at?: string;
           usuario_id?: string;
         };
@@ -407,6 +495,49 @@ export type Database = {
       totales_por_mes: {
         Args: { p_desde: string; p_hasta: string };
         Returns: { mes: string; total_gastos: number; total_ingresos: number }[];
+      };
+      borrar_mis_ubicaciones: {
+        Args: Record<PropertyKey, never>;
+        Returns: { gastos: number; avisos: number; lugares: number };
+      };
+      crear_clave_captura: {
+        Args: { p_nombre: string };
+        /** La clave, que solo se ve esta vez. */
+        Returns: string;
+      };
+      resumen_por_lugar: {
+        Args: { p_desde: string; p_hasta: string };
+        Returns: {
+          lugar_id: string;
+          nombre: string;
+          latitud: number;
+          longitud: number;
+          pagos: number;
+          total: number;
+          promedio: number;
+          porcentaje: number | null;
+          primer_pago: string;
+          ultimo_pago: string;
+          categoria_id: string | null;
+          billetera: string | null;
+        }[];
+      };
+      resumen_por_comercio: {
+        Args: { p_desde: string; p_hasta: string };
+        Returns: {
+          comercio: string;
+          locales: number;
+          pagos: number;
+          total: number;
+          promedio: number;
+          ultimo_pago: string;
+          lugar_ids: string[] | null;
+        }[];
+      };
+      fusionar_lugares: {
+        Args: { p_origen: string; p_destino: string };
+        /** Cuántos pagos se movieron. */
+        Returns: number;
       };
     };
   };

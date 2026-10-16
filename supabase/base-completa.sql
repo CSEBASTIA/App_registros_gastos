@@ -1,12 +1,12 @@
 -- =====================================================================
 -- gastos-app — BASE DE DATOS COMPLETA
--- Generado por supabase/generar-base-completa.sh el 2026-10-15 con las
--- 23 migraciones de supabase/migrations + seed.sql. No editar a mano.
+-- Generado por supabase/generar-base-completa.sh el 2026-10-16 con las
+-- 30 migraciones de supabase/migrations + seed.sql. No editar a mano.
 --
 -- Cómo usarlo en Supabase (web):
 --   1. Proyecto nuevo → SQL Editor → New query.
 --   2. Pegar TODO este archivo y pulsar Run.
---   3. Debe terminar mostrando "migraciones_registradas = 23".
+--   3. Debe terminar mostrando "migraciones_registradas = 30".
 --
 -- Es para un proyecto VACÍO. Corre en una sola transacción: si algo falla
 -- (por ejemplo, si la base ya existía), se detiene sin cambiar nada.
@@ -2021,6 +2021,1299 @@ revoke all on function public.totales_por_mes(date, date) from public, anon;
 grant execute on function public.totales_por_mes(date, date) to authenticated;
 
 
+-- >>> 20261016120000_billeteras_y_ubicacion.sql
+-- Migración de billeteras y ubicación (Fase 1 del plan de billeteras).
+--
+-- 1) "Pagado con": Apple Pay y Google Wallet no son un método de pago nuevo,
+--    pagan con una tarjeta de débito o crédito. Van en una columna aparte
+--    (`billetera`) y `metodo_pago` sigue diciendo débito/crédito: los saldos,
+--    los cupos y los diferidos no cambian.
+-- 2) Ubicación de cada gasto. Las columnas numeric(6,4)/(7,4) la redondean
+--    a 4 decimales (unos 11 m): alcanza para agrupar por lugar sin guardar la
+--    posición exacta. También se guarda la precisión que dio el GPS.
+-- 3) Lugares: un gasto con ubicación se asigna al lugar propio más cercano
+--    dentro de su radio, o crea uno nuevo con el nombre del gasto.
+-- 4) Bandeja: de dónde vino el aviso (correo, Apple Pay, Google Wallet), el
+--    comercio, la ubicación y los últimos dígitos de la tarjeta. Al confirmar,
+--    todo pasa al gasto; al resolver el aviso se borra de él (minimización).
+
+-- 1) Lugares ------------------------------------------------------------
+
+create table if not exists public.lugares (
+  id uuid primary key default gen_random_uuid(),
+  usuario_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  nombre text not null check (char_length(btrim(nombre)) between 1 and 80),
+  latitud numeric(6, 4) not null check (latitud between -90 and 90),
+  longitud numeric(7, 4) not null check (longitud between -180 and 180),
+  radio_m integer not null default 80 check (radio_m between 20 and 500),
+  created_at timestamptz not null default now()
+);
+
+create index if not exists lugares_usuario_latitud_idx on public.lugares (usuario_id, latitud);
+
+alter table public.lugares enable row level security;
+revoke all on public.lugares from anon;
+
+drop policy if exists "lugares: select propio" on public.lugares;
+create policy "lugares: select propio" on public.lugares
+  for select to authenticated using (auth.uid() = usuario_id);
+drop policy if exists "lugares: insert propio" on public.lugares;
+create policy "lugares: insert propio" on public.lugares
+  for insert to authenticated with check (auth.uid() = usuario_id);
+drop policy if exists "lugares: update propio" on public.lugares;
+create policy "lugares: update propio" on public.lugares
+  for update to authenticated using (auth.uid() = usuario_id) with check (auth.uid() = usuario_id);
+drop policy if exists "lugares: delete propio" on public.lugares;
+create policy "lugares: delete propio" on public.lugares
+  for delete to authenticated using (auth.uid() = usuario_id);
+
+-- Distancia en metros entre dos puntos (fórmula de haversine). Sin PostGIS:
+-- cada usuario tiene pocos lugares y la búsqueda se acota antes por latitud.
+create or replace function public.distancia_m(lat1 numeric, lon1 numeric, lat2 numeric, lon2 numeric)
+returns double precision
+language sql
+immutable
+parallel safe
+as $$
+  select 2 * 6371000 * asin(least(1, sqrt(
+    power(sin(radians((lat2 - lat1)::double precision) / 2), 2)
+    + cos(radians(lat1::double precision)) * cos(radians(lat2::double precision))
+      * power(sin(radians((lon2 - lon1)::double precision) / 2), 2)
+  )))
+$$;
+
+-- 2) Gastos: pagado con, ubicación y lugar ------------------------------
+
+alter table public.gastos
+  add column if not exists billetera text,
+  add column if not exists latitud numeric(6, 4),
+  add column if not exists longitud numeric(7, 4),
+  add column if not exists precision_m integer,
+  add column if not exists lugar_id uuid references public.lugares(id) on delete set null;
+
+alter table public.gastos drop constraint if exists gastos_billetera_valida;
+alter table public.gastos add constraint gastos_billetera_valida
+  check (billetera is null or billetera in ('apple_pay', 'google_wallet', 'otra'));
+
+-- Una billetera paga con tarjeta: no tiene sentido con efectivo o transferencia.
+alter table public.gastos drop constraint if exists gastos_billetera_con_tarjeta;
+alter table public.gastos add constraint gastos_billetera_con_tarjeta
+  check (billetera is null or metodo_pago is null or metodo_pago in ('debito', 'credito', 'diferido'));
+
+alter table public.gastos drop constraint if exists gastos_ubicacion_valida;
+alter table public.gastos add constraint gastos_ubicacion_valida
+  check (
+    (latitud is null) = (longitud is null)
+    and (precision_m is null or latitud is not null)
+    and (latitud is null or latitud between -90 and 90)
+    and (longitud is null or longitud between -180 and 180)
+    and (precision_m is null or precision_m between 0 and 50000)
+  );
+
+-- Borrar un lugar pone lugar_id en NULL en sus gastos: sin índice, recorre la tabla.
+create index if not exists gastos_lugar_idx on public.gastos (lugar_id) where lugar_id is not null;
+
+-- 3) Bandeja: origen, comercio, ubicación y tarjeta ----------------------
+
+alter table public.transacciones_detectadas
+  add column if not exists origen text not null default 'correo',
+  add column if not exists comercio text,
+  add column if not exists latitud numeric(6, 4),
+  add column if not exists longitud numeric(7, 4),
+  add column if not exists precision_m integer,
+  add column if not exists tarjeta_final text;
+
+alter table public.transacciones_detectadas drop constraint if exists transacciones_detectadas_origen_valido;
+alter table public.transacciones_detectadas add constraint transacciones_detectadas_origen_valido
+  check (origen in ('correo', 'apple_pay', 'google_wallet') and (origen = 'correo' or tipo = 'gasto'));
+
+alter table public.transacciones_detectadas drop constraint if exists transacciones_detectadas_billetera_valida;
+alter table public.transacciones_detectadas add constraint transacciones_detectadas_billetera_valida
+  check (
+    (comercio is null or char_length(comercio) <= 200)
+    and (tarjeta_final is null or tarjeta_final ~ '^[0-9]{3,4}$')
+    and (latitud is null) = (longitud is null)
+    and (precision_m is null or latitud is not null)
+    and (latitud is null or latitud between -90 and 90)
+    and (longitud is null or longitud between -180 and 180)
+    and (precision_m is null or precision_m between 0 and 50000)
+  );
+
+-- 4) Referencias propias: ahora también el lugar ------------------------
+-- Igual que la versión de 20261013120000, con la rama de `lugar_id`.
+
+create or replace function public.validar_referencias_propias()
+returns trigger
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  fila jsonb := to_jsonb(new);
+  anterior jsonb := case when tg_op = 'UPDATE' then to_jsonb(old) else '{}'::jsonb end;
+  -- Con sesión de usuario manda auth.uid(); con service_role (sin JWT de
+  -- usuario) se usa el dueño declarado en la fila.
+  dueno uuid := coalesce(auth.uid(), new.usuario_id);
+  columna text;
+  ref uuid;
+begin
+  foreach columna in array array['cuenta_id', 'cuenta_origen_id', 'categoria_id', 'deuda_id', 'gasto_id', 'lugar_id'] loop
+    continue when not (fila ? columna);
+    ref := nullif(fila ->> columna, '')::uuid;
+    continue when ref is null;
+    -- En un UPDATE solo se valida lo que cambió: no se rompen filas viejas.
+    continue when tg_op = 'UPDATE' and (anterior ->> columna) is not distinct from (fila ->> columna);
+
+    if columna in ('cuenta_id', 'cuenta_origen_id') then
+      if not exists (select 1 from cuentas where id = ref and usuario_id = dueno) then
+        raise exception 'La cuenta indicada no existe o no es tuya.' using errcode = '42501';
+      end if;
+    elsif columna = 'categoria_id' then
+      if not exists (select 1 from categorias where id = ref and (usuario_id is null or usuario_id = dueno)) then
+        raise exception 'La categoría indicada no existe o no es tuya.' using errcode = '42501';
+      end if;
+    elsif columna = 'deuda_id' then
+      if not exists (select 1 from deudas where id = ref and usuario_id = dueno) then
+        raise exception 'La deuda indicada no existe o no es tuya.' using errcode = '42501';
+      end if;
+    elsif columna = 'gasto_id' then
+      if not exists (select 1 from gastos where id = ref and usuario_id = dueno) then
+        raise exception 'El gasto indicado no existe o no es tuyo.' using errcode = '42501';
+      end if;
+    elsif columna = 'lugar_id' then
+      if not exists (select 1 from lugares where id = ref and usuario_id = dueno) then
+        raise exception 'El lugar indicado no existe o no es tuyo.' using errcode = '42501';
+      end if;
+    end if;
+  end loop;
+  return new;
+end;
+$$;
+
+-- 5) Asignar el lugar de un gasto ---------------------------------------
+-- `security invoker`: busca y crea lugares con los permisos de quien guarda
+-- el gasto, así RLS impide tocar lugares ajenos aunque la fila diga otro dueño.
+
+create or replace function public.asignar_lugar_gasto()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_lugar uuid;
+  -- 500 m (el radio máximo) en grados de latitud; en longitud se corrige por
+  -- la latitud. No contempla el antimeridiano (±180°), que no cruza Ecuador.
+  v_dlat numeric := 0.0046;
+  v_dlon numeric;
+begin
+  if tg_op = 'UPDATE' then
+    if new.latitud is not distinct from old.latitud and new.longitud is not distinct from old.longitud then
+      return new;
+    end if;
+    -- Cambió la ubicación y no se eligió otro lugar a mano: se recalcula.
+    if new.lugar_id is not distinct from old.lugar_id then
+      new.lugar_id := null;
+    end if;
+  end if;
+
+  if new.lugar_id is not null or new.latitud is null then
+    return new;
+  end if;
+  -- Ubicación incompleta o imposible: los CHECK de gastos corren después de
+  -- los triggers BEFORE, así que se deja pasar para que ellos la rechacen.
+  if new.longitud is null or abs(new.latitud) > 90 or abs(new.longitud) > 180 then
+    return new;
+  end if;
+  -- GPS impreciso: mejor sin lugar que en el lugar equivocado.
+  if new.precision_m is not null and new.precision_m > 200 then
+    return new;
+  end if;
+
+  v_dlon := v_dlat / greatest(cos(radians(new.latitud::double precision)), 0.01)::numeric;
+
+  select l.id into v_lugar
+  from lugares l
+  where l.usuario_id = new.usuario_id
+    and l.latitud between new.latitud - v_dlat and new.latitud + v_dlat
+    and l.longitud between new.longitud - v_dlon and new.longitud + v_dlon
+    and distancia_m(l.latitud, l.longitud, new.latitud, new.longitud) <= l.radio_m
+  order by distancia_m(l.latitud, l.longitud, new.latitud, new.longitud), l.created_at
+  limit 1;
+
+  if v_lugar is null then
+    insert into lugares (usuario_id, nombre, latitud, longitud)
+    values (
+      new.usuario_id,
+      coalesce(nullif(left(btrim(new.descripcion), 80), ''), 'Lugar sin nombre'),
+      new.latitud,
+      new.longitud
+    )
+    returning id into v_lugar;
+  end if;
+
+  new.lugar_id := v_lugar;
+  return new;
+end;
+$$;
+
+-- "trg_05_": corre después de validar referencias (trg_00) y el cupo (trg_03).
+drop trigger if exists trg_05_asignar_lugar on public.gastos;
+create trigger trg_05_asignar_lugar
+  before insert or update of latitud, longitud on public.gastos
+  for each row execute function public.asignar_lugar_gasto();
+
+-- 6) Aviso resuelto: no vuelve atrás y se olvidan sus datos sensibles ------
+-- Antes cada llamada borraba el asunto por su cuenta; ahora lo hace la base
+-- para cualquier camino (confirmar, descartar o un UPDATE directo).
+
+create or replace function public.proteger_estado_aviso()
+returns trigger
+language plpgsql
+set search_path = public, pg_temp
+as $$
+begin
+  if old.estado <> 'pendiente' and new.estado is distinct from old.estado then
+    raise exception 'Este aviso ya fue %: no se puede cambiar.', old.estado using errcode = '22023';
+  end if;
+  if new.estado <> 'pendiente' then
+    new.correo_asunto := null;
+    new.comercio := null;
+    new.latitud := null;
+    new.longitud := null;
+    new.precision_m := null;
+    new.tarjeta_final := null;
+  end if;
+  return new;
+end;
+$$;
+
+-- 7) Confirmar un aviso pasa la billetera y la ubicación al gasto ----------
+-- Misma firma que antes: la app ya instalada sigue confirmando igual.
+
+create or replace function public.confirmar_transaccion_detectada(
+  p_id uuid,
+  p_monto numeric,
+  p_descripcion text,
+  p_categoria_id uuid default null,
+  p_cuenta_id uuid default null
+)
+returns uuid
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_aviso transacciones_detectadas;
+  v_id uuid;
+  v_billetera text;
+  v_metodo text;
+begin
+  select * into v_aviso from transacciones_detectadas where id = p_id for update;
+  if not found then
+    raise exception 'El movimiento detectado no existe o no es tuyo.' using errcode = '42501';
+  end if;
+
+  -- Idempotente: si ya se confirmó (p. ej. la respuesta anterior se perdió
+  -- por la red), no se crea otro gasto. Devuelve null.
+  if v_aviso.estado = 'confirmado' then
+    return null;
+  end if;
+  if v_aviso.estado = 'descartado' then
+    raise exception 'Este movimiento ya fue descartado.' using errcode = '22023';
+  end if;
+
+  if v_aviso.tipo = 'gasto' then
+    if p_categoria_id is null then
+      raise exception 'Elegí una categoría antes de confirmar.' using errcode = '22023';
+    end if;
+    -- Pago con billetera: "pagado con" sale del origen y el método, del tipo
+    -- de la tarjeta elegida (RLS hace que solo se lean cuentas propias).
+    if v_aviso.origen in ('apple_pay', 'google_wallet') then
+      v_billetera := v_aviso.origen;
+      if p_cuenta_id is not null then
+        select case tipo when 'credito' then 'credito' when 'efectivo' then null else 'debito' end
+        into v_metodo
+        from cuentas where id = p_cuenta_id;
+      end if;
+    end if;
+    insert into gastos (monto, descripcion, categoria_id, cuenta_id, fecha,
+                        metodo_pago, billetera, latitud, longitud, precision_m)
+    values (p_monto, p_descripcion, p_categoria_id, p_cuenta_id, v_aviso.fecha,
+            v_metodo, v_billetera, v_aviso.latitud, v_aviso.longitud, v_aviso.precision_m)
+    returning id into v_id;
+  else
+    insert into ingresos (monto, descripcion, categoria_id, cuenta_id, fecha)
+    values (p_monto, p_descripcion, p_categoria_id, p_cuenta_id, v_aviso.fecha)
+    returning id into v_id;
+  end if;
+
+  -- El trigger proteger_estado_aviso borra asunto, comercio, ubicación y tarjeta.
+  update transacciones_detectadas set estado = 'confirmado' where id = p_id;
+
+  return v_id;
+end;
+$$;
+
+revoke execute on function public.confirmar_transaccion_detectada(uuid, numeric, text, uuid, uuid) from public, anon;
+grant execute on function public.confirmar_transaccion_detectada(uuid, numeric, text, uuid, uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- >>> 20261016130000_borrar_ubicaciones.sql
+-- Migración de borrar ubicaciones (Fase 2 del plan de billeteras).
+--
+-- "Borrar todas mis ubicaciones": la Ley Orgánica de Protección de Datos
+-- Personales da derecho a eliminar un dato personal sin borrar la cuenta.
+-- En un solo paso (una transacción): quita la ubicación y el lugar de todos
+-- los gastos, la ubicación de los avisos de la bandeja y borra los lugares.
+-- Los gastos y sus montos no cambian: los saldos quedan igual.
+--
+-- `security invoker`: corre con los permisos de quien llama; RLS limita cada
+-- UPDATE/DELETE a sus filas, y además se filtra por auth.uid() explícitamente.
+
+create or replace function public.borrar_mis_ubicaciones()
+returns jsonb
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_usuario uuid := auth.uid();
+  v_gastos int;
+  v_avisos int;
+  v_lugares int;
+begin
+  if v_usuario is null then
+    raise exception 'Necesitas iniciar sesión.' using errcode = '42501';
+  end if;
+
+  update gastos
+  set latitud = null, longitud = null, precision_m = null, lugar_id = null
+  where usuario_id = v_usuario and (latitud is not null or lugar_id is not null);
+  get diagnostics v_gastos = row_count;
+
+  update transacciones_detectadas
+  set latitud = null, longitud = null, precision_m = null
+  where usuario_id = v_usuario and latitud is not null;
+  get diagnostics v_avisos = row_count;
+
+  delete from lugares where usuario_id = v_usuario;
+  get diagnostics v_lugares = row_count;
+
+  return jsonb_build_object('gastos', v_gastos, 'avisos', v_avisos, 'lugares', v_lugares);
+end;
+$$;
+
+revoke execute on function public.borrar_mis_ubicaciones() from public, anon;
+grant execute on function public.borrar_mis_ubicaciones() to authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- >>> 20261016140000_captura_apple_pay.sql
+-- Migración de captura con Apple Pay (Fase 3 del plan de billeteras).
+--
+-- La automatización «Transacción» de Atajos (iOS 17+) se ejecuta al pagar con
+-- Wallet y llama por HTTPS a `registrar_pago_billetera` con la clave pública
+-- de Supabase (rol anon). Lo que autoriza es la **clave de captura** del
+-- usuario, no la clave pública:
+--   * es larga y aleatoria (244 bits), se muestra una sola vez y la base
+--     guarda solo su huella SHA-256 (ni el dueño puede volver a leerla);
+--   * con ella solo se deja un aviso PENDIENTE en la bandeja: no se lee nada
+--     ni se crea ningún gasto. Lo peor que puede hacer quien la robe es
+--     llenar la bandeja de avisos falsos, con un límite por hora y por día;
+--   * se revoca borrándola (hasta 5 por usuario, una por dispositivo).
+-- La fecha la pone el servidor (hora de Ecuador): el atajo corre al pagar.
+
+-- 1) Claves de captura --------------------------------------------------
+
+create table if not exists public.claves_captura (
+  id uuid primary key default gen_random_uuid(),
+  usuario_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
+  nombre text not null check (char_length(btrim(nombre)) between 1 and 40),
+  huella text not null unique check (huella ~ '^[0-9a-f]{64}$'),
+  -- Primeros 6 caracteres de la clave, para reconocerla en la lista.
+  prefijo text not null check (prefijo ~ '^[0-9a-f]{6}$'),
+  created_at timestamptz not null default now(),
+  ultimo_uso timestamptz
+);
+
+create index if not exists claves_captura_usuario_idx on public.claves_captura (usuario_id);
+
+alter table public.claves_captura enable row level security;
+-- Sin INSERT ni UPDATE directos (solo la función crea claves) y sin poder
+-- leer la huella: solo los datos para la lista y borrar (= revocar).
+revoke all on public.claves_captura from anon, authenticated;
+grant select (id, usuario_id, nombre, prefijo, created_at, ultimo_uso) on public.claves_captura to authenticated;
+grant delete on public.claves_captura to authenticated;
+
+drop policy if exists "claves_captura: select propio" on public.claves_captura;
+create policy "claves_captura: select propio" on public.claves_captura
+  for select to authenticated using (auth.uid() = usuario_id);
+drop policy if exists "claves_captura: delete propio" on public.claves_captura;
+create policy "claves_captura: delete propio" on public.claves_captura
+  for delete to authenticated using (auth.uid() = usuario_id);
+
+-- Cada aviso captado recuerda con qué clave llegó (para el límite de uso).
+alter table public.transacciones_detectadas
+  add column if not exists clave_captura_id uuid references public.claves_captura(id) on delete set null;
+create index if not exists transacciones_detectadas_clave_idx
+  on public.transacciones_detectadas (clave_captura_id, created_at) where clave_captura_id is not null;
+
+create or replace function public.crear_clave_captura(p_nombre text)
+returns text
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_usuario uuid := auth.uid();
+  v_nombre text := btrim(regexp_replace(coalesce(p_nombre, ''), '[[:cntrl:]]', '', 'g'));
+  v_clave text;
+begin
+  if v_usuario is null then
+    raise exception 'Necesitas iniciar sesión.' using errcode = '42501';
+  end if;
+  if char_length(v_nombre) not between 1 and 40 then
+    raise exception 'Ponle un nombre de 1 a 40 caracteres, por ejemplo «Mi iPhone».' using errcode = '22023';
+  end if;
+  -- Dos pedidos a la vez no pueden pasar juntos el tope de 5.
+  perform pg_advisory_xact_lock(hashtext('claves_captura:' || v_usuario::text));
+  if (select count(*) from claves_captura where usuario_id = v_usuario) >= 5 then
+    raise exception 'Ya tienes 5 claves: revoca una antes de crear otra.' using errcode = '22023';
+  end if;
+
+  -- Dos UUID v4 = 244 bits del generador seguro de Postgres (sin pgcrypto).
+  v_clave := 'ft_' || replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', '');
+  insert into claves_captura (usuario_id, nombre, huella, prefijo)
+  values (v_usuario, v_nombre, encode(sha256(convert_to(v_clave, 'UTF8')), 'hex'), substr(v_clave, 4, 6));
+  -- La única vez que la clave sale de la base.
+  return v_clave;
+end;
+$$;
+
+revoke all on function public.crear_clave_captura(text) from public, anon;
+grant execute on function public.crear_clave_captura(text) to authenticated;
+
+-- 2) Leer el monto como lo manda el iPhone -------------------------------
+-- Mismas reglas que `interpretarNumero` de core: "12,50", "12.50", "$12.50",
+-- "US$ 1.234,56", "1,234.56". El último separador es de miles solo si lo
+-- siguen 3 dígitos y lo anterior es una agrupación válida. NULL si no es un
+-- monto positivo (también si viene negativo o con otra moneda).
+
+create or replace function public.interpretar_monto_texto(p_texto text)
+returns numeric
+language plpgsql
+immutable
+set search_path = public, pg_temp
+as $$
+declare
+  v_limpio text;
+  v_ultimo int;
+  v_antes text;
+  v_despues text;
+  v_entero text;
+begin
+  if p_texto is null or char_length(p_texto) > 40 then
+    return null;
+  end if;
+  v_limpio := translate(lower(p_texto), chr(160) || chr(8239), '  ');
+  v_limpio := regexp_replace(v_limpio, '(usd|us\$|us|\$|[[:space:]])', '', 'g');
+  if v_limpio !~ '^[0-9][0-9.,]*$' or v_limpio ~ '[.,]{2}' or v_limpio ~ '[.,]$' then
+    return null;
+  end if;
+
+  v_ultimo := strpos(reverse(translate(v_limpio, ',', '.')), '.');
+  if v_ultimo = 0 then
+    return round(v_limpio::numeric, 2);
+  end if;
+  v_ultimo := char_length(v_limpio) - v_ultimo + 1;
+  v_antes := substr(v_limpio, 1, v_ultimo - 1);
+  v_despues := substr(v_limpio, v_ultimo + 1);
+  v_entero := regexp_replace(v_antes, '[.,]', '', 'g');
+  if char_length(v_despues) = 3 and v_antes ~ '^[1-9][0-9]{0,2}([.,][0-9]{3})*$' then
+    return round((v_entero || v_despues)::numeric, 2);
+  end if;
+  return round((v_entero || '.' || v_despues)::numeric, 2);
+end;
+$$;
+
+-- Coordenada como número o como texto con coma ("-0,1807"). NULL si no sirve.
+create or replace function public.interpretar_coordenada(p_texto text)
+returns numeric
+language sql
+immutable
+set search_path = public, pg_temp
+as $$
+  select case
+    when btrim(replace(p_texto, ',', '.')) ~ '^-?[0-9]{1,3}(\.[0-9]{1,12})?$'
+      then btrim(replace(p_texto, ',', '.'))::numeric
+  end
+$$;
+
+-- 3) Registrar el pago que manda el atajo -------------------------------
+
+create or replace function public.registrar_pago_billetera(
+  p_clave text,
+  p_monto text,
+  p_comercio text default null,
+  p_tarjeta text default null,
+  p_latitud text default null,
+  p_longitud text default null,
+  p_precision text default null,
+  p_billetera text default 'apple_pay'
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_clave claves_captura;
+  v_monto numeric;
+  v_comercio text;
+  v_tarjeta text;
+  v_digitos text;
+  v_banco text;
+  v_cuenta uuid;
+  v_lat numeric;
+  v_lon numeric;
+  v_precision int;
+  v_fecha date := (now() at time zone 'America/Guayaquil')::date;
+begin
+  -- La clave primero, y sin decir nada más: una clave mal escrita, inventada
+  -- o revocada reciben el mismo error. Se mira el formato antes de calcular
+  -- la huella para no gastar trabajo en textos enormes.
+  if p_clave is null or p_clave !~ '^ft_[0-9a-f]{64}$' then
+    raise exception 'Clave no válida.' using errcode = '28000';
+  end if;
+  select * into v_clave from claves_captura
+  where huella = encode(sha256(convert_to(p_clave, 'UTF8')), 'hex')
+  for update; -- dos llamadas a la vez con la misma clave cuentan bien el límite
+  if not found then
+    raise exception 'Clave no válida.' using errcode = '28000';
+  end if;
+
+  if p_billetera is null or p_billetera not in ('apple_pay', 'google_wallet') then
+    raise exception 'Billetera no válida.' using errcode = '22023';
+  end if;
+
+  v_monto := interpretar_monto_texto(p_monto);
+  if v_monto is null or v_monto < 0.01 or v_monto > 9999999999.99 then
+    raise exception 'Monto no válido: %', left(coalesce(p_monto, ''), 40) using errcode = '22023';
+  end if;
+
+  -- Límite de uso por clave (solo cuenta avisos de su dueño).
+  if (select count(*) from transacciones_detectadas
+      where clave_captura_id = v_clave.id and usuario_id = v_clave.usuario_id
+        and created_at > now() - interval '1 hour') >= 30
+     or (select count(*) from transacciones_detectadas
+      where clave_captura_id = v_clave.id and usuario_id = v_clave.usuario_id
+        and created_at > now() - interval '1 day') >= 200 then
+    raise exception 'Demasiados avisos con esta clave: prueba más tarde.' using errcode = 'PT429';
+  end if;
+
+  -- Textos de terceros: sin caracteres de control, espacios normales y recortados.
+  v_comercio := nullif(left(btrim(regexp_replace(regexp_replace(left(coalesce(p_comercio, ''), 500), '[[:cntrl:]]', ' ', 'g'), '\s+', ' ', 'g')), 200), '');
+  v_tarjeta := left(coalesce(p_tarjeta, ''), 200);
+
+  -- El mismo pago dos veces (el atajo se repitió): un solo aviso.
+  if exists (
+    select 1 from transacciones_detectadas
+    where clave_captura_id = v_clave.id and usuario_id = v_clave.usuario_id
+      and monto = v_monto and comercio is not distinct from v_comercio
+      and created_at > now() - interval '2 minutes'
+  ) then
+    return jsonb_build_object('estado', 'repetido', 'monto', v_monto);
+  end if;
+
+  -- ¿Con qué tarjeta? Por el banco que aparece en su nombre y, si hay varias
+  -- de ese banco, por los últimos dígitos. Si es ambiguo, se elige al revisar.
+  v_digitos := substring(v_tarjeta from '([0-9]{3,4})[^0-9]*$');
+  v_banco := case
+    when v_tarjeta ~* 'produbanco' then 'produbanco'
+    when v_tarjeta ~* 'guayaquil' then 'banco_guayaquil'
+    when v_tarjeta ~* 'pichincha' then 'pichincha'
+    when v_tarjeta ~* 'diners' then 'diners_club'
+    when v_tarjeta ~* 'pac[ií]fico' then 'banco_pacifico'
+    when v_tarjeta ~* 'austro' then 'banco_austro'
+  end;
+  if v_banco is not null then
+    select case when count(*) = 1 then (array_agg(id))[1] end into v_cuenta
+    from cuentas where usuario_id = v_clave.usuario_id and banco = v_banco and tipo <> 'efectivo';
+    if v_cuenta is null and v_digitos is not null then
+      select case when count(*) = 1 then (array_agg(id))[1] end into v_cuenta
+      from cuentas where usuario_id = v_clave.usuario_id and banco = v_banco and tipo <> 'efectivo'
+        and identificador = v_digitos;
+    end if;
+  elsif v_digitos is not null then
+    select case when count(*) = 1 then (array_agg(id))[1] end into v_cuenta
+    from cuentas where usuario_id = v_clave.usuario_id and tipo <> 'efectivo' and identificador = v_digitos;
+  end if;
+
+  -- Ubicación opcional: si viene mal, el aviso llega igual sin ella. Una
+  -- precisión ilegible o de más de 50 km también la descarta: sin saber el
+  -- margen, la base la tomaría por exacta y la asignaría a un lugar.
+  v_lat := interpretar_coordenada(p_latitud);
+  v_lon := interpretar_coordenada(p_longitud);
+  if nullif(btrim(coalesce(p_precision, '')), '') is not null then
+    v_precision := case
+      when btrim(replace(p_precision, ',', '.')) ~ '^[0-9]{1,9}(\.[0-9]{1,6})?$'
+        and btrim(replace(p_precision, ',', '.'))::numeric <= 50000
+        then round(btrim(replace(p_precision, ',', '.'))::numeric)::int
+    end;
+    if v_precision is null then
+      v_lat := null;
+    end if;
+  end if;
+  if v_lat is null or v_lon is null or abs(v_lat) > 90 or abs(v_lon) > 180 then
+    v_lat := null;
+    v_lon := null;
+    v_precision := null;
+  end if;
+
+  insert into transacciones_detectadas (
+    usuario_id, mensaje_id, tipo, monto, descripcion, banco, cuenta_id, fecha,
+    origen, comercio, latitud, longitud, precision_m, tarjeta_final, clave_captura_id
+  ) values (
+    v_clave.usuario_id, p_billetera || ':' || gen_random_uuid(), 'gasto', v_monto,
+    coalesce(v_comercio, case p_billetera when 'apple_pay' then 'Pago con Apple Pay' else 'Pago con Google Wallet' end),
+    v_banco, v_cuenta, v_fecha,
+    p_billetera, v_comercio, v_lat, v_lon, v_precision, v_digitos, v_clave.id
+  );
+
+  update claves_captura set ultimo_uso = now() where id = v_clave.id;
+
+  -- No se devuelve nada del usuario: solo que llegó y el monto que se leyó.
+  return jsonb_build_object('estado', 'recibido', 'monto', v_monto);
+end;
+$$;
+
+-- Solo `anon`, que es como llama el atajo (con la clave pública). Desde la
+-- app, con sesión, no hace falta: así una sesión ajena tampoco puede usarla.
+revoke all on function public.registrar_pago_billetera(text, text, text, text, text, text, text, text) from public, authenticated;
+grant execute on function public.registrar_pago_billetera(text, text, text, text, text, text, text, text) to anon;
+revoke all on function public.interpretar_monto_texto(text) from public, anon, authenticated;
+revoke all on function public.interpretar_coordenada(text) from public, anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- >>> 20261016150000_resumen_por_lugar.sql
+-- Migración de resumen por lugar (Fase 5 del plan de billeteras).
+--
+-- 1) resumen_por_lugar: cuánto pagaste en cada lugar, cuántas veces y cuándo.
+-- 2) resumen_por_comercio: junta los lugares con el MISMO nombre (sin mirar
+--    mayúsculas ni espacios). Para juntar dos sucursales basta con ponerles el
+--    mismo nombre: cada una conserva su ubicación.
+-- 3) fusionar_lugares: pasa los pagos de un lugar a otro y borra el primero,
+--    en un solo paso.
+-- Renombrar y borrar un lugar no necesitan función: son un UPDATE/DELETE
+-- normales, limitados por RLS (migración de billeteras y ubicación).
+--
+-- Todas son `security invoker`: corren con los permisos de quien llama y RLS
+-- filtra lo propio; además se filtra por auth.uid() explícitamente. El rango
+-- de fechas se limita a 2 años para que nadie pida una consulta enorme. Usan
+-- el índice existente gastos (usuario_id, fecha).
+
+create or replace function public.resumen_por_lugar(p_desde date, p_hasta date)
+returns table (
+  lugar_id uuid,
+  nombre text,
+  latitud numeric,
+  longitud numeric,
+  pagos integer,
+  total numeric,
+  promedio numeric,
+  -- Parte del total pagado en lugares durante el rango, en %.
+  porcentaje numeric,
+  primer_pago date,
+  ultimo_pago date,
+  -- La más frecuente; con empate, cualquiera de las empatadas.
+  categoria_id uuid,
+  -- La más usada; null si ningún pago fue con billetera.
+  billetera text
+)
+language plpgsql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+#variable_conflict use_column
+declare
+  v_usuario uuid := auth.uid();
+begin
+  if v_usuario is null then
+    raise exception 'Necesitas iniciar sesión.' using errcode = '42501';
+  end if;
+  if p_desde is null or p_hasta is null then
+    raise exception 'Indica el rango de fechas.' using errcode = '22023';
+  end if;
+  if p_hasta < p_desde then
+    raise exception 'La fecha final es anterior a la inicial.' using errcode = '22023';
+  end if;
+  if p_hasta - p_desde > 731 then
+    raise exception 'El rango máximo es de 2 años.' using errcode = '22023';
+  end if;
+
+  return query
+  select
+    l.id,
+    l.nombre,
+    l.latitud,
+    l.longitud,
+    count(*)::integer,
+    sum(g.monto),
+    round(avg(g.monto), 2),
+    round(100 * sum(g.monto) / nullif(sum(sum(g.monto)) over (), 0), 1),
+    min(g.fecha),
+    max(g.fecha),
+    mode() within group (order by g.categoria_id),
+    mode() within group (order by g.billetera)
+  from gastos g
+  join lugares l on l.id = g.lugar_id
+  where g.usuario_id = v_usuario
+    and l.usuario_id = v_usuario
+    and g.fecha between p_desde and p_hasta
+  group by l.id
+  order by sum(g.monto) desc, max(g.fecha) desc, l.id;
+end;
+$$;
+
+create or replace function public.resumen_por_comercio(p_desde date, p_hasta date)
+returns table (
+  comercio text,
+  locales integer,
+  pagos integer,
+  total numeric,
+  promedio numeric,
+  ultimo_pago date,
+  lugar_ids uuid[]
+)
+language plpgsql
+stable
+security invoker
+set search_path = public, pg_temp
+as $$
+#variable_conflict use_column
+declare
+  v_usuario uuid := auth.uid();
+begin
+  if v_usuario is null then
+    raise exception 'Necesitas iniciar sesión.' using errcode = '42501';
+  end if;
+  if p_desde is null or p_hasta is null then
+    raise exception 'Indica el rango de fechas.' using errcode = '22023';
+  end if;
+  if p_hasta < p_desde then
+    raise exception 'La fecha final es anterior a la inicial.' using errcode = '22023';
+  end if;
+  if p_hasta - p_desde > 731 then
+    raise exception 'El rango máximo es de 2 años.' using errcode = '22023';
+  end if;
+
+  return query
+  select
+    -- El nombre tal como está escrito en el lugar con más pagos.
+    mode() within group (order by l.nombre),
+    count(distinct l.id)::integer,
+    count(*)::integer,
+    sum(g.monto),
+    round(avg(g.monto), 2),
+    max(g.fecha),
+    array_agg(distinct l.id)
+  from gastos g
+  join lugares l on l.id = g.lugar_id
+  where g.usuario_id = v_usuario
+    and l.usuario_id = v_usuario
+    and g.fecha between p_desde and p_hasta
+  group by lower(regexp_replace(btrim(l.nombre), '\s+', ' ', 'g'))
+  order by sum(g.monto) desc, max(g.fecha) desc;
+end;
+$$;
+
+create or replace function public.fusionar_lugares(p_origen uuid, p_destino uuid)
+returns integer
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_usuario uuid := auth.uid();
+  v_propios int;
+  v_movidos int;
+begin
+  if v_usuario is null then
+    raise exception 'Necesitas iniciar sesión.' using errcode = '42501';
+  end if;
+  if p_origen is null or p_destino is null or p_origen = p_destino then
+    raise exception 'Elige dos lugares distintos.' using errcode = '22023';
+  end if;
+
+  -- Bloquea los dos lugares, siempre en el mismo orden (sin interbloqueos).
+  perform 1 from lugares
+  where id in (p_origen, p_destino) and usuario_id = v_usuario
+  order by id
+  for update;
+  select count(*) into v_propios from lugares where id in (p_origen, p_destino) and usuario_id = v_usuario;
+  if v_propios <> 2 then
+    raise exception 'El lugar indicado no existe o no es tuyo.' using errcode = '42501';
+  end if;
+
+  update gastos set lugar_id = p_destino where lugar_id = p_origen and usuario_id = v_usuario;
+  get diagnostics v_movidos = row_count;
+  delete from lugares where id = p_origen and usuario_id = v_usuario;
+  return v_movidos;
+end;
+$$;
+
+revoke all on function public.resumen_por_lugar(date, date) from public, anon;
+revoke all on function public.resumen_por_comercio(date, date) from public, anon;
+revoke all on function public.fusionar_lugares(uuid, uuid) from public, anon;
+grant execute on function public.resumen_por_lugar(date, date) to authenticated;
+grant execute on function public.resumen_por_comercio(date, date) to authenticated;
+grant execute on function public.fusionar_lugares(uuid, uuid) to authenticated;
+
+notify pgrst, 'reload schema';
+
+
+-- >>> 20261016160000_casas_comerciales_y_corte.sql
+-- Migración de casas comerciales y fecha de corte (fases A y B del plan de
+-- cuentas, avisos y resumen).
+--
+-- 1) Casas comerciales y créditos directos (Comandato, Artefacta, Marcimex,
+--    La Ganga, Japón, De Prati, Créditos Económicos u otra): se guardan como
+--    una tarjeta de crédito (`tipo = 'credito'`, con cupo). Así las compras a
+--    cuotas usan el diferido que ya existe, con su deuda, su cupo y su interés.
+-- 2) Día de corte y día máximo de pago de una tarjeta (1-31; en meses más
+--    cortos, el último día). Solo para crédito.
+
+alter table public.cuentas drop constraint if exists cuentas_banco_check;
+alter table public.cuentas
+  add constraint cuentas_banco_check
+  check (banco in (
+    'banco_guayaquil',
+    'pichincha',
+    'produbanco',
+    'diners_club',
+    'banco_pacifico',
+    'banco_austro',
+    'otro',
+    'comandato',
+    'artefacta',
+    'marcimex',
+    'la_ganga',
+    'japon',
+    'de_prati',
+    'creditos_economicos',
+    'otra_casa_comercial'
+  ));
+
+-- Una casa comercial da crédito: no hay "cuenta de ahorros de Comandato".
+alter table public.cuentas drop constraint if exists cuentas_casa_comercial_es_credito;
+alter table public.cuentas
+  add constraint cuentas_casa_comercial_es_credito
+  check (
+    tipo = 'credito'
+    or banco not in ('comandato', 'artefacta', 'marcimex', 'la_ganga', 'japon', 'de_prati', 'creditos_economicos', 'otra_casa_comercial')
+  );
+
+alter table public.cuentas
+  add column if not exists dia_corte smallint,
+  add column if not exists dia_pago smallint;
+
+alter table public.cuentas drop constraint if exists cuentas_fechas_tarjeta_validas;
+alter table public.cuentas
+  add constraint cuentas_fechas_tarjeta_validas
+  check (
+    (dia_corte is null or dia_corte between 1 and 31)
+    and (dia_pago is null or dia_pago between 1 and 31)
+    and (tipo = 'credito' or (dia_corte is null and dia_pago is null))
+  );
+
+notify pgrst, 'reload schema';
+
+
+-- >>> 20261016170000_recordatorios_diferidos.sql
+-- Migración de recordatorios de diferidos (fase C del plan de cuentas,
+-- avisos y resumen).
+--
+-- Al comprar a cuotas (un gasto diferido), la base ya crea su deuda. Ahora
+-- también crea un recordatorio por cada cuota, el mismo día de la compra de
+-- cada mes (un 31 en un mes corto cae el último día), con el monto de la
+-- cuota. Ejemplo: $130 a 3 meses el 10 de octubre → 10/10, 10/11 y 10/12,
+-- de $43,34, $43,34 y $43,32.
+--
+-- 1) `recordatorios.automatico` marca los que creó la base. Siempre van
+--    atados a su deuda.
+-- 2) Al registrar un abono, los recordatorios de las cuotas ya pagadas se
+--    marcan como hechos. Al saldar la deuda, se cierran todos.
+-- 3) Al borrar el diferido (o su deuda), se borran sus recordatorios
+--    automáticos. Los que creó el usuario y apuntaban a esa deuda se quedan,
+--    sin deuda (antes, esa referencia impedía borrar la deuda).
+-- 4) Los diferidos que ya existían reciben sus recordatorios, con las cuotas
+--    ya pagadas marcadas como hechas.
+--
+-- Las fechas siguen la misma regla que `registrar_abono_deuda` usa para el
+-- próximo pago, así que la cuota k cierra justo cuando el abono la paga.
+-- Sin SQL dinámico.
+
+alter table public.recordatorios add column if not exists automatico boolean not null default false;
+
+alter table public.recordatorios drop constraint if exists recordatorios_automatico_con_deuda;
+alter table public.recordatorios
+  add constraint recordatorios_automatico_con_deuda
+  check (not automatico or deuda_id is not null);
+
+alter table public.recordatorios drop constraint if exists recordatorios_deuda_id_fkey;
+alter table public.recordatorios
+  add constraint recordatorios_deuda_id_fkey
+  foreign key (deuda_id) references public.deudas(id) on delete set null;
+
+-- 1) Crear los recordatorios al nacer la deuda de un diferido ---------
+
+create or replace function public.crear_recordatorios_de_diferido()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_meses int;
+begin
+  if new.gasto_id is null or new.tipo <> 'diferido' then
+    return null;
+  end if;
+  select meses_diferido into v_meses from public.gastos
+  where id = new.gasto_id and usuario_id = new.usuario_id;
+  if v_meses is null or v_meses < 1 then
+    return null;
+  end if;
+
+  insert into public.recordatorios (usuario_id, titulo, tipo, monto, fecha, recurrente, completado, deuda_id, automatico)
+  select
+    new.usuario_id,
+    left(format('Cuota %s de %s · %s', k + 1, v_meses, new.nombre), 120),
+    'tarjeta',
+    -- Sin interés, la última cuota lleva el redondeo: 130 / 3 = 43,34 + 43,34 + 43,32.
+    case when k = v_meses - 1 and coalesce(new.tasa_interes, 0) = 0
+      then greatest(new.monto_total - new.cuota_mensual * (v_meses - 1), 0.01)
+      else new.cuota_mensual
+    end,
+    least(m.inicio + (extract(day from new.fecha_inicio)::int - 1),
+      (m.inicio + interval '1 month' - interval '1 day')::date),
+    false,
+    false,
+    new.id,
+    true
+  -- Tope de 60 cuotas: la app permite hasta 24.
+  from generate_series(0, least(v_meses, 60) - 1) as k
+  cross join lateral (
+    select (date_trunc('month', new.fecha_inicio) + make_interval(months => k))::date as inicio
+  ) as m;
+  return null;
+end;
+$$;
+
+drop trigger if exists trg_crear_recordatorios_de_diferido on public.deudas;
+create trigger trg_crear_recordatorios_de_diferido
+  after insert on public.deudas
+  for each row when (new.gasto_id is not null)
+  execute function public.crear_recordatorios_de_diferido();
+
+-- 2) Cerrar los de las cuotas pagadas ---------------------------------
+
+create or replace function public.cerrar_recordatorios_de_diferido()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+begin
+  -- Solo se cierran, nunca se reabren: si el usuario marcó uno como hecho,
+  -- se respeta.
+  update public.recordatorios set completado = true
+  where deuda_id = new.id
+    and automatico
+    and not completado
+    and (new.saldo_pendiente <= 0 or (new.proximo_pago is not null and fecha < new.proximo_pago));
+  return null;
+end;
+$$;
+
+drop trigger if exists trg_cerrar_recordatorios_de_diferido on public.deudas;
+create trigger trg_cerrar_recordatorios_de_diferido
+  after update of saldo_pendiente, proximo_pago on public.deudas
+  for each row when (new.gasto_id is not null)
+  execute function public.cerrar_recordatorios_de_diferido();
+
+-- 3) Borrarlos con su deuda -------------------------------------------
+
+create or replace function public.borrar_recordatorios_de_diferido()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+begin
+  delete from public.recordatorios where deuda_id = old.id and automatico;
+  return old;
+end;
+$$;
+
+-- BEFORE: así ya no existen cuando la FK suelta los recordatorios manuales.
+-- Corre después de trg_proteger_borrado_deuda (orden alfabético), que impide
+-- borrar un diferido con abonos.
+drop trigger if exists trg_quitar_recordatorios_de_diferido on public.deudas;
+create trigger trg_quitar_recordatorios_de_diferido
+  before delete on public.deudas
+  for each row
+  execute function public.borrar_recordatorios_de_diferido();
+
+-- Un recordatorio no cambia de automático a manual ni al revés.
+create or replace function public.proteger_recordatorio_automatico()
+returns trigger
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+begin
+  if new.automatico is distinct from old.automatico then
+    raise exception 'Un recordatorio automático no se puede convertir en manual (ni al revés).'
+      using errcode = '22023';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_proteger_recordatorio_automatico on public.recordatorios;
+create trigger trg_proteger_recordatorio_automatico
+  before update of automatico on public.recordatorios
+  for each row
+  execute function public.proteger_recordatorio_automatico();
+
+-- 4) Diferidos que ya existían ----------------------------------------
+-- Función de mantenimiento: solo la puede correr el dueño de la base (no se
+-- expone por la API). Crea los recordatorios que le falten a cada diferido y
+-- devuelve cuántos creó. Volver a correrla no duplica nada.
+
+create or replace function public.crear_recordatorios_faltantes_de_diferidos()
+returns integer
+language plpgsql
+security invoker
+set search_path = public, pg_temp
+as $$
+declare
+  v_creados integer;
+begin
+  insert into public.recordatorios (usuario_id, titulo, tipo, monto, fecha, recurrente, completado, deuda_id, automatico)
+  select
+    d.usuario_id,
+    left(format('Cuota %s de %s · %s', k + 1, g.meses_diferido, d.nombre), 120),
+    'tarjeta',
+    case when k = g.meses_diferido - 1 and coalesce(d.tasa_interes, 0) = 0
+      then greatest(d.monto_total - d.cuota_mensual * (g.meses_diferido - 1), 0.01)
+      else d.cuota_mensual
+    end,
+    f.fecha,
+    false,
+    d.saldo_pendiente <= 0 or (d.proximo_pago is not null and f.fecha < d.proximo_pago),
+    d.id,
+    true
+  from public.deudas d
+  join public.gastos g on g.id = d.gasto_id and g.usuario_id = d.usuario_id
+  cross join lateral generate_series(0, least(g.meses_diferido, 60) - 1) as k
+  cross join lateral (
+    select least(m.inicio + (extract(day from d.fecha_inicio)::int - 1),
+      (m.inicio + interval '1 month' - interval '1 day')::date) as fecha
+    from (select (date_trunc('month', d.fecha_inicio) + make_interval(months => k))::date as inicio) as m
+  ) as f
+  where d.tipo = 'diferido'
+    and g.meses_diferido > 0
+    and not exists (select 1 from public.recordatorios r where r.deuda_id = d.id and r.automatico);
+  get diagnostics v_creados = row_count;
+  return v_creados;
+end;
+$$;
+
+revoke execute on function public.crear_recordatorios_faltantes_de_diferidos() from public, anon, authenticated;
+
+select public.crear_recordatorios_faltantes_de_diferidos();
+
+notify pgrst, 'reload schema';
+
+
+-- >>> 20261016180000_captura_google_wallet.sql
+-- Migración de captura de Google Wallet (fase 4 del plan de billeteras).
+--
+-- En Android, la app lee la notificación que Google Wallet muestra al pagar
+-- (solo la de esa app) y la envía con la clave de captura, igual que el
+-- atajo de Apple Pay. La base lee el título y el texto y crea el aviso en la
+-- bandeja, usando `registrar_pago_billetera` (misma clave, límites de uso,
+-- detección de repetidos y de tarjeta).
+--
+-- La lectura del texto vive aquí y no en el teléfono: si Google cambia el
+-- formato de sus notificaciones, se corrige con una actualización de la base,
+-- sin publicar otra versión de la app. Sirve también para MacroDroid o
+-- Tasker, que pueden enviar el título y el texto de la notificación.
+--
+-- Avisos que no son un pago (sin monto) o que son un pago rechazado o un
+-- reembolso se ignoran: no llegan a la bandeja.
+-- Sin SQL dinámico.
+
+-- 1) Leer el aviso -----------------------------------------------------
+-- Devuelve {monto, comercio, tarjeta, ignorar}. `monto` es el texto del
+-- número (lo interpreta `interpretar_monto_texto`).
+
+create or replace function public.leer_aviso_google_wallet(p_titulo text, p_texto text)
+returns jsonb
+language plpgsql
+immutable
+set search_path = public, pg_temp
+as $$
+declare
+  v_titulo text;
+  v_texto text;
+  v_todo text;
+  v_pago text;
+  v_monto text;
+  v_comercio text;
+  v_final text;
+  v_banco text;
+  v_m text[];
+begin
+  -- Textos de terceros: sin caracteres de control, espacios normales, acotados.
+  v_titulo := btrim(regexp_replace(regexp_replace(left(coalesce(p_titulo, ''), 500),
+    '[[:cntrl:]' || chr(160) || chr(8239) || ']', ' ', 'g'), '\s+', ' ', 'g'));
+  v_texto := btrim(regexp_replace(regexp_replace(left(coalesce(p_texto, ''), 500),
+    '[[:cntrl:]' || chr(160) || chr(8239) || ']', ' ', 'g'), '\s+', ' ', 'g'));
+  -- Salto de línea como separador: no se confunde con los puntos de "•••• 1234".
+  v_todo := v_titulo || chr(10) || v_texto;
+  -- Lo que sigue a "con"/"with" es el medio de pago: ahí se buscan el banco y
+  -- los últimos dígitos (no en el comercio, que puede llamarse "… Guayaquil").
+  v_pago := coalesce(substring(v_texto from '(?:^|\s)(?:con|with)\s+(.*)$'), v_texto);
+
+  if v_todo ~* '(rechaz|declin|no se (pudo|complet|proces)|reembols|refund|devoluci|revers)' then
+    return jsonb_build_object('ignorar', true);
+  end if;
+
+  -- Monto: "$12.50", "US$ 12,50", "USD 12.50" o "12,50 USD", primero en el texto.
+  v_m := regexp_match(v_texto, '(us\$|usd|\$)\s?([0-9][0-9.,]*)', 'i');
+  if v_m is null then
+    v_m := regexp_match(v_texto, '()([0-9][0-9.,]*)\s?(usd|us\$|d[oó]lares)', 'i');
+  end if;
+  if v_m is null then
+    v_m := regexp_match(v_titulo, '(us\$|usd|\$)\s?([0-9][0-9.,]*)', 'i');
+  end if;
+  v_monto := rtrim(v_m[2], '.,');
+  if v_monto is null or v_monto = '' then
+    return jsonb_build_object('ignorar', true);
+  end if;
+
+  -- Comercio: el título, salvo que sea genérico o traiga el monto; entonces,
+  -- lo que sigue a "en"/"at" en el texto, hasta "con"/"with"/"el".
+  if v_titulo <> ''
+     and v_titulo !~* '^(google ?wallet|wallet|google ?pay|g ?pay|pago|pagos|compra|pagaste|transacci[oó]n|nuevo pago|pago realizado|compra realizada)\W*$'
+     and v_titulo !~* '(us\$|usd|\$)\s?[0-9]' then
+    v_comercio := v_titulo;
+  else
+    v_comercio := substring(v_texto from '(?:^|\s)(?:en|at)\s+(.*)$');
+    v_comercio := regexp_replace(v_comercio, '\s+(con|with|el|on|por|usando|using|mediante)\s+.*$', '', 'i');
+    v_comercio := nullif(btrim(v_comercio, ' .,;:·-'), '');
+  end if;
+
+  -- Tarjeta: "•••• 1234", "**1234", "terminada en 1234" o "ending in 1234",
+  -- y el banco si aparece.
+  v_final := coalesce(
+    substring(v_pago from '[•·∙●*]+\s?([0-9]{4})'),
+    (regexp_match(v_pago, 'termina(?:da)?\s+en\s+([0-9]{4})', 'i'))[1],
+    (regexp_match(v_pago, 'ending\s+in\s+([0-9]{4})', 'i'))[1]
+  );
+  v_banco := (regexp_match(v_pago,'(produbanco|guayaquil|pichincha|diners|pac[ií]fico|austro)', 'i'))[1];
+
+  return jsonb_build_object(
+    'ignorar', false,
+    'monto', v_monto,
+    'comercio', left(v_comercio, 200),
+    'tarjeta', nullif(concat_ws(' ', v_banco, v_final), '')
+  );
+end;
+$$;
+
+-- 2) Registrar el aviso ------------------------------------------------
+-- p_cuando: hora de la notificación (milisegundos desde 1970, como la da
+-- Android). Si el teléfono estaba sin internet y la envía después, la fecha
+-- del aviso es la del pago. Se acepta hasta 3 días atrás.
+
+create or replace function public.registrar_aviso_billetera(
+  p_clave text,
+  p_titulo text default null,
+  p_texto text default null,
+  p_paquete text default 'com.google.android.apps.walletnfcrel',
+  p_cuando text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_clave claves_captura;
+  v_aviso jsonb;
+  v_resultado jsonb;
+  v_cuando timestamptz;
+begin
+  -- La clave primero, con el mismo error que el atajo de Apple Pay.
+  if p_clave is null or p_clave !~ '^ft_[0-9a-f]{64}$' then
+    raise exception 'Clave no válida.' using errcode = '28000';
+  end if;
+  select * into v_clave from claves_captura
+  where huella = encode(sha256(convert_to(p_clave, 'UTF8')), 'hex');
+  if not found then
+    raise exception 'Clave no válida.' using errcode = '28000';
+  end if;
+
+  -- Solo Google Wallet, por ahora.
+  if p_paquete is distinct from 'com.google.android.apps.walletnfcrel' then
+    raise exception 'Aplicación no admitida.' using errcode = '22023';
+  end if;
+
+  v_aviso := leer_aviso_google_wallet(p_titulo, p_texto);
+  if (v_aviso ->> 'ignorar')::boolean then
+    return jsonb_build_object('estado', 'ignorado');
+  end if;
+
+  v_resultado := registrar_pago_billetera(
+    p_clave, v_aviso ->> 'monto', v_aviso ->> 'comercio', v_aviso ->> 'tarjeta',
+    null, null, null, 'google_wallet'
+  );
+
+  -- Fecha del pago si la notificación llegó tarde. La fila recién creada es
+  -- la de esta transacción: su created_at es exactamente now().
+  if v_resultado ->> 'estado' = 'recibido' and btrim(coalesce(p_cuando, '')) ~ '^[0-9]{13}$' then
+    v_cuando := to_timestamp(btrim(p_cuando)::numeric / 1000);
+    if v_cuando between now() - interval '3 days' and now() + interval '10 minutes' then
+      update transacciones_detectadas
+      set fecha = (v_cuando at time zone 'America/Guayaquil')::date
+      where clave_captura_id = v_clave.id and usuario_id = v_clave.usuario_id
+        and origen = 'google_wallet' and created_at = now();
+    end if;
+  end if;
+
+  return v_resultado;
+end;
+$$;
+
+-- Como el atajo: solo `anon` (la app de Android llama con la clave pública).
+revoke all on function public.registrar_aviso_billetera(text, text, text, text, text) from public, authenticated;
+grant execute on function public.registrar_aviso_billetera(text, text, text, text, text) to anon;
+revoke all on function public.leer_aviso_google_wallet(text, text) from public, anon, authenticated;
+
+notify pgrst, 'reload schema';
+
+
 -- >>> seed.sql (categorías globales)
 -- Categorías globales de gasto. Se puede correr más de una vez sin duplicar
 -- (va también dentro de base-completa.sql).
@@ -2065,7 +3358,14 @@ insert into supabase_migrations.schema_migrations (version, name) values
   ('20261015170000', 'diferidos_cupo_interes'),
   ('20261015180000', 'proteger_tasa_diferido'),
   ('20261015190000', 'eliminar_cuenta'),
-  ('20261015200000', 'rendimiento')
+  ('20261015200000', 'rendimiento'),
+  ('20261016120000', 'billeteras_y_ubicacion'),
+  ('20261016130000', 'borrar_ubicaciones'),
+  ('20261016140000', 'captura_apple_pay'),
+  ('20261016150000', 'resumen_por_lugar'),
+  ('20261016160000', 'casas_comerciales_y_corte'),
+  ('20261016170000', 'recordatorios_diferidos'),
+  ('20261016180000', 'captura_google_wallet')
 on conflict (version) do nothing;
 
 commit;

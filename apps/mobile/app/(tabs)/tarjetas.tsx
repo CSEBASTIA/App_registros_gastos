@@ -17,6 +17,7 @@ import {
   mensajeError,
   parsearMonto,
   OPCIONES_BANCO,
+  OPCIONES_CASA_COMERCIAL,
   OPCIONES_MARCA,
   ETIQUETA_BANCO,
   ETIQUETA_MARCA,
@@ -176,9 +177,39 @@ function NuevaTarjeta({
   const [usarCatalogo, setUsarCatalogo] = useState(true);
   const [cupoTotal, setCupoTotal] = useState("");
   const [identificador, setIdentificador] = useState("");
+  const [clase, setClase] = useState<"banco" | "casa">("banco");
+  const [diaCorte, setDiaCorte] = useState("");
+  const [diaPago, setDiaPago] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
-  const grupos = gruposDelCatalogo(banco);
+  const grupos = clase === "casa" ? [] : gruposDelCatalogo(banco);
+
+  function cambiarClase(valor: string) {
+    if (valor === "casa") {
+      setClase("casa");
+      seleccionarCasa(OPCIONES_CASA_COMERCIAL[0]);
+    } else {
+      setClase("banco");
+      seleccionarBanco("banco_guayaquil");
+    }
+  }
+
+  // Casa comercial o crédito directo: una tarjeta de crédito sin catálogo ni marca.
+  function seleccionarCasa(valor: string) {
+    const casa = valor as Banco;
+    setBanco(casa);
+    setEstilo(undefined);
+    setUsarCatalogo(false);
+    setMarca("otro");
+    setNombre(casa === "otra_casa_comercial" ? "" : `${ETIQUETA_BANCO[casa]} crédito directo`);
+  }
+
+  /** "" = no indicado; un número de 1 a 31; NaN = inválido. */
+  function leerDia(texto: string): number | undefined {
+    if (!texto.trim()) return undefined;
+    const n = Number(texto.trim());
+    return Number.isInteger(n) && n >= 1 && n <= 31 ? n : NaN;
+  }
   const tarjetaElegida = productoDe(estilo);
 
   function seleccionarProducto(producto: ProductoTarjeta) {
@@ -209,7 +240,13 @@ function NuevaTarjeta({
       return;
     }
     if (!(parsearMonto(cupoTotal) > 0)) {
-      setError("Una tarjeta de crédito necesita un cupo total.");
+      setError(clase === "casa" ? "Escribe el cupo que te aprobó la casa comercial." : "Una tarjeta de crédito necesita un cupo total.");
+      return;
+    }
+    const corte = leerDia(diaCorte);
+    const pago = leerDia(diaPago);
+    if (Number.isNaN(corte) || Number.isNaN(pago)) {
+      setError("El día de corte y el de pago van de 1 a 31.");
       return;
     }
     setError(null);
@@ -224,12 +261,16 @@ function NuevaTarjeta({
         cupoTotal: parsearMonto(cupoTotal),
         disponible: parsearMonto(cupoTotal),
         identificador: identificador.trim() || undefined,
+        diaCorte: corte,
+        diaPago: pago,
       });
       setNombre("");
       setEstilo(undefined);
       setUsarCatalogo(true);
       setCupoTotal("");
       setIdentificador("");
+      setDiaCorte("");
+      setDiaPago("");
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -240,13 +281,38 @@ function NuevaTarjeta({
   return (
     <Tarjeta>
       <View style={styles.encabezado}>
-        <Text style={styles.tituloCard}>Nueva tarjeta de crédito</Text>
+        <Text style={styles.tituloCard}>{clase === "casa" ? "Nuevo crédito directo" : "Nueva tarjeta de crédito"}</Text>
         <Boton titulo="Cancelar" onPress={onCancelar} />
       </View>
-      <Campo etiqueta="Nombre" placeholder="Visa Clásica" value={nombre} onChangeText={setNombre} />
-      <Campo etiqueta="Cupo total" keyboardType="decimal-pad" value={cupoTotal} onChangeText={setCupoTotal} />
-      <Campo etiqueta="Últimos dígitos (opcional)" placeholder="1234" keyboardType="number-pad" maxLength={4} value={identificador} onChangeText={setIdentificador} />
       <SelectorChips
+        titulo="¿De dónde es el crédito?"
+        valor={clase}
+        onCambiar={cambiarClase}
+        opciones={[
+          { valor: "banco", etiqueta: "Tarjeta de banco" },
+          { valor: "casa", etiqueta: "Casa comercial o crédito directo" },
+        ]}
+      />
+      {clase === "casa" && (
+        <SelectorChips
+          titulo="Casa comercial"
+          valor={banco}
+          onCambiar={seleccionarCasa}
+          opciones={OPCIONES_CASA_COMERCIAL.map((b) => ({ valor: b, etiqueta: ETIQUETA_BANCO[b], color: GRADIENTE_BANCO[b][0] }))}
+        />
+      )}
+      <Campo etiqueta="Nombre" placeholder={clase === "casa" ? "Crédito Comandato" : "Visa Clásica"} value={nombre} onChangeText={setNombre} />
+      <Campo etiqueta={clase === "casa" ? "Cupo aprobado" : "Cupo total"} keyboardType="decimal-pad" value={cupoTotal} onChangeText={setCupoTotal} />
+      <View style={{ flexDirection: "row", gap: spacing(3) }}>
+        <View style={{ flex: 1 }}>
+          <Campo etiqueta="Día de corte (opcional)" placeholder="15" keyboardType="number-pad" maxLength={2} value={diaCorte} onChangeText={setDiaCorte} />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Campo etiqueta="Día de pago (opcional)" placeholder="30" keyboardType="number-pad" maxLength={2} value={diaPago} onChangeText={setDiaPago} />
+        </View>
+      </View>
+      <Campo etiqueta="Últimos dígitos (opcional)" placeholder="1234" keyboardType="number-pad" maxLength={4} value={identificador} onChangeText={setIdentificador} />
+      {clase === "banco" && <SelectorChips
         titulo="Banco"
         valor={banco}
         onCambiar={seleccionarBanco}
@@ -255,8 +321,22 @@ function NuevaTarjeta({
           etiqueta: ETIQUETA_BANCO[b],
           color: GRADIENTE_BANCO[b][0],
         }))}
-      />
-      {grupos.length > 0 && usarCatalogo ? (
+      />}
+      {clase === "casa" ? (
+        <TarjetaVisual
+          cuenta={{
+            id: "vista-previa",
+            nombre: nombre || ETIQUETA_BANCO[banco],
+            tipo: "credito",
+            banco,
+            cupoTotal: parsearMonto(cupoTotal) > 0 ? parsearMonto(cupoTotal) : 1,
+            disponible: parsearMonto(cupoTotal) > 0 ? parsearMonto(cupoTotal) : 1,
+            diaCorte: leerDia(diaCorte) || undefined,
+            diaPago: leerDia(diaPago) || undefined,
+            createdAt: "",
+          }}
+        />
+      ) : grupos.length > 0 && usarCatalogo ? (
         <View style={{ gap: spacing(3) }}>
           <Text style={styles.etiquetaCatalogo}>Tarjetas de {ETIQUETA_BANCO[banco]}</Text>
           {grupos.map((grupo) => (

@@ -192,3 +192,127 @@ Pendiente para los agentes de interfaz (paso 1):
    - El texto técnico del error, solo con `__DEV__`.
    - Sin esto, un fallo al dibujar una pantalla deja la app en blanco.
 7. **Textos**: en `registro.tsx` y `correo.tsx` todavía hay voseo ("iniciá", "entrá", "revisá"). El resto de la app usa tú.
+
+## Billeteras y ubicación — Fase 1 (16-oct)
+
+Plan completo: `docs/plan-billeteras-y-ubicacion.docx`. Migración `20261016120000_billeteras_y_ubicacion` ("Migración de billeteras y ubicación"). **No hay pantallas que hacer en esta fase**: esto es lo que la Fase 2 va a usar.
+
+### Datos nuevos en core
+- `Gasto.billetera?: "apple_pay" | "google_wallet" | "otra"` ("pagado con"). **No es un método de pago**: el método sigue siendo débito o crédito. Solo es válida con `metodoPago` débito, crédito, diferido o sin método; zod y la base rechazan Apple Pay con efectivo o transferencia.
+- `Gasto.ubicacion?: { latitud, longitud, precisionM? }` y `Gasto.lugarId?`. La base redondea a 4 decimales (~11 m) y asigna el lugar sola: el más cercano dentro de su radio (80 m), o crea uno nuevo con la descripción del gasto. Con `precisionM > 200` no asigna lugar.
+- `Lugar { id, nombre, latitud, longitud, radioM, createdAt }` y `listarLugares()`.
+- `TransaccionDetectada.origen: "correo" | "apple_pay" | "google_wallet"`, más `comercio?`, `ubicacion?` y `tarjetaFinal?`. Al confirmar un aviso de billetera, el gasto recibe la billetera, el método según la tarjeta elegida (crédito o débito) y la ubicación. Al confirmar o descartar, la base borra del aviso el asunto, el comercio, la ubicación y la tarjeta.
+- Etiquetas: `ETIQUETA_BILLETERA`, `OPCIONES_BILLETERA`, `ETIQUETA_ORIGEN_TRANSACCION`. Ayudantes: `billeteraCompatible(metodo)`, `ubicacionSchema`, `ubicacionSegura(valor)`.
+
+### Cómo se usa
+- Crear: `crearGasto({ ..., metodoPago: "credito", billetera: "apple_pay", ubicacion })`. Sin billetera ni ubicación no se envían las columnas nuevas: sigue funcionando con una base que todavía no tiene la migración.
+- Editar: `actualizarGasto(id, { billetera: "" })` la quita; `{ ubicacion: null }` quita la ubicación y el lugar; `{ lugarId }` elige el lugar a mano. Cambiar el método a efectivo o transferencia quita la billetera sola.
+- El selector "Pagado con" solo se muestra si `billeteraCompatible(metodoPago)`.
+- **Antes de mostrar billetera o ubicación en pantalla, la migración tiene que estar aplicada en Supabase web**: si no, `crearGasto` con `billetera` falla con "columna no existe".
+
+## Billeteras y ubicación — Fase 2 (16-oct): registrar a mano
+
+Migración `20261016130000_borrar_ubicaciones` ("Migración de borrar ubicaciones"). La app del teléfono pasa a la **versión 1.1.0**: `expo-location` es nativo, así que hace falta una APK nueva (EAS Update no alcanza). En `app.json` el permiso en segundo plano queda bloqueado.
+
+### Lógica lista (probada)
+- **Teléfono y su versión web** (`apps/mobile/lib/ubicacion.ts`): `guardarUbicacionActiva()`, `cambiarGuardarUbicacion(activar)`, `ubicacionParaNuevoGasto()` y `abrirEnMapas(ubicacion)`.
+- **Web de escritorio** (`apps/desktop/src/lib/ubicacion.ts`): las mismas, pero con `enlaceMapaWeb(ubicacion)` en lugar de `abrirEnMapas`. Solo funciona con HTTPS o en localhost.
+- `ubicacionParaNuevoGasto()` **nunca lanza ni pide permiso** y espera como mucho 8 s. Devuelve `{ ubicacion }` o `{ motivo }`. Para el aviso, usar `MENSAJE_SIN_UBICACION[motivo]`; si es `undefined` (preferencia apagada), no se muestra nada.
+- La preferencia «Guardar la ubicación de mis pagos» está **apagada por defecto** y es **de cada usuario**: otra persona que inicie sesión en el mismo teléfono no la hereda.
+- Encenderla pide el permiso del sistema en ese momento. Si se niega, devuelve `{ activa: false, motivo: "sin_permiso" }` y queda apagada.
+- `borrarMisUbicaciones()` (core) quita la ubicación y el lugar de todos los gastos y la ubicación de los avisos, y borra los lugares, en un solo paso. Devuelve `{ gastos, avisos, lugares }`. Los gastos y los saldos no cambian.
+
+### Pantallas a construir (dueño: Agente 3), con los componentes y el estilo actuales
+1. **Nuevo gasto** (`app/gasto/nuevo.tsx`, y `NuevoGasto` en `views/Gastos.tsx` de la web):
+   - Debajo del método: el selector **«Pagado con»**, con las opciones Tarjeta (sin billetera) + `OPCIONES_BILLETERA` y las etiquetas de `ETIQUETA_BILLETERA`. Mostrarlo solo si `billeteraCompatible(metodoPago)`. Si el método cambia a uno incompatible, limpiar la elección.
+   - Al guardar, **antes** de `crearGasto`: `const r = await ubicacionParaNuevoGasto();`. Después: `crearGasto({ ...lo de hoy, billetera: billetera || undefined, ubicacion: r.ubicacion })`.
+   - Mientras espera el GPS, el botón dice "Guardando…" (como hoy).
+   - Si `r.motivo` tiene mensaje, mostrarlo después de guardar como aviso suave (el gasto ya se guardó), no como error.
+2. **Detalle o fila del gasto**:
+   - Si `gasto.billetera`: una etiqueta pequeña con `ETIQUETA_BILLETERA[gasto.billetera]`.
+   - Si `gasto.lugarId`: el nombre del lugar (de `listarLugares()`, por id).
+   - Si `gasto.ubicacion`: el botón **«Abrir en Mapas»**, con `abrirEnMapas(gasto.ubicacion)` en el teléfono o un `<a target="_blank" rel="noopener">` a `enlaceMapaWeb(...)` en la web.
+3. **Más → «Ubicación de mis pagos»** (pantalla nueva, por ejemplo `app/ubicacion.tsx`):
+   - Un interruptor con `guardarUbicacionActiva()` / `cambiarGuardarUbicacion(valor)`.
+   - Antes de encender, el texto: "Guardaremos dónde haces cada pago para mostrarte cuánto gastas en cada lugar. Solo al registrar un pago, con la app abierta, nunca en segundo plano. Puedes borrarla cuando quieras."
+   - Con `sin_permiso`: "Sin permiso de ubicación. Puedes darlo en los ajustes del teléfono."
+   - El botón **«Borrar todas mis ubicaciones»**, con confirmación ("Tus gastos no se borran"). Llama a `borrarMisUbicaciones()` y muestra "Listo: N gastos quedaron sin ubicación".
+   - Enlace a la política de privacidad, igual que en Más.
+4. **No pedir el permiso de ubicación al abrir la app ni al abrir el formulario**: solo al encender la preferencia.
+
+## Billeteras y ubicación — Fase 3 (16-oct): captura de Apple Pay
+
+Migración `20261016140000_captura_apple_pay` ("Migración de captura con Apple Pay"). El atajo del iPhone llama a `registrar_pago_billetera` con la clave pública y una **clave de captura**; el pago queda **pendiente** en la bandeja. Guía para el usuario: `docs/guia-atajo-apple-pay.md`.
+
+### Lógica lista (probada)
+- `crearClaveCaptura(nombre)` devuelve la clave (`ft_` + 64 caracteres). **Es la única vez que existe fuera de la base**: mostrarla, permitir copiarla y no guardarla en ningún lado.
+- `listarClavesCaptura()` devuelve `[{ id, nombre, prefijo, createdAt, ultimoUso? }]`.
+- `revocarClaveCaptura(id)` la borra; los avisos que ya llegaron se quedan.
+- Máximo `MAXIMO_CLAVES_CAPTURA` (5) por usuario.
+- `configuracionAtajo(process.env.EXPO_PUBLIC_SUPABASE_URL!, process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY!)` devuelve `{ url, metodo, encabezados, campos }` para mostrar en pantalla lo que va en el atajo.
+- Los avisos captados llegan con `origen: "apple_pay"`, `comercio`, `ubicacion?` y, si se reconoce la tarjeta, `cuentaId` y `banco`. Al confirmarlos, el gasto queda con la billetera, el método según la tarjeta (crédito o débito) y el lugar.
+
+### Pantallas a construir (dueño: Agente 3)
+1. **Más → «Conectar Apple Pay»** (pantalla nueva, por ejemplo `app/apple-pay.tsx`):
+   - Explicación corta: "Cada pago con Apple Pay llega a tu bandeja para que lo confirmes. Necesitas iOS 17 o más nuevo."
+   - Un enlace a los pasos de `docs/guia-atajo-apple-pay.md`: copiar el texto a la pantalla o a una página web.
+   - **Crear clave**: pedir un nombre ("Mi iPhone") y llamar a `crearClaveCaptura`. Mostrar la clave **una sola vez** en un `<Text selectable>`, con un botón **Compartir o copiar** (`Share.share({ message: clave })`, que no necesita librería nativa nueva) y el aviso "Guárdala ahora: no se vuelve a mostrar". Al salir de la pantalla, olvidarla del estado.
+   - Mostrar la **URL** y la **clave pública** de `configuracionAtajo(...)`, también seleccionables.
+   - **Lista** de `listarClavesCaptura()`: nombre, `ft_${prefijo}…`, creada y último uso ("nunca" si no tiene). Cada una con **Revocar**, que pide confirmación ("El atajo que la usa dejará de funcionar") y llama a `revocarClaveCaptura(id)`.
+   - Con 5 claves, deshabilitar «Crear clave» y decir "Revoca una para crear otra".
+2. **Bandeja** (`app/bandeja.tsx`):
+   - Mostrar de dónde vino cada aviso con `ETIQUETA_ORIGEN_TRANSACCION[t.origen]` y un ícono (correo o billetera), y `t.comercio` si lo tiene.
+   - Si tiene `t.ubicacion`, el botón «Abrir en Mapas» (`abrirEnMapas(t.ubicacion)`).
+   - Si `t.cuentaId` falta, la cuenta se elige al confirmar, como hoy.
+3. **Errores**: `mensajeError(err)`. Los mensajes de la base ya están en español ("Ya tienes 5 claves: revoca una antes de crear otra.").
+
+## Billeteras y ubicación — Fase 5 (16-oct): resumen por lugar
+
+Migración `20261016150000_resumen_por_lugar` ("Migración de resumen por lugar").
+
+### Lógica lista (probada)
+- `resumenPorLugar(desde, hasta)` devuelve, del lugar que más suma al que menos: `[{ lugarId, nombre, latitud, longitud, pagos, total, promedio, porcentaje, primerPago, ultimoPago, categoriaId?, billetera? }]`. Los gastos sin lugar no cuentan.
+- `resumenPorComercio(desde, hasta)` junta los lugares que **se llaman igual** (sin mirar mayúsculas ni espacios) y devuelve `[{ comercio, locales, pagos, total, promedio, ultimoPago, lugarIds }]`. Para juntar sucursales, basta con ponerles el mismo nombre.
+- El rango es de **2 años como máximo** y se valida antes de ir a la red (`validarRangoResumen`).
+- `listarGastosDeLugar(lugarId, { desde, hasta })` da los pagos de un lugar, los más recientes primero.
+- `renombrarLugar(id, nombre)` acepta de 1 a 80 caracteres.
+- `eliminarLugar(id)`: sus gastos se quedan, sin lugar.
+- `fusionarLugares(origenId, destinoId)` pasa los pagos y borra el origen en un solo paso. Devuelve cuántos pagos movió.
+- `generarRecomendaciones({ ..., lugares })`: si se le pasa `listarLugares()`, avisa cuando el lugar con más gasto del mes ya supera en 30 % o más a todo el mes pasado (con un mínimo de $20). Si no se le pasa, todo sigue igual.
+
+### Pantallas a construir (dueño: Agente 3)
+1. **Más → «Lugares»** (pantalla nueva, por ejemplo `app/lugares.tsx`):
+   - Selector de mes (por defecto, el actual) y la lista de `resumenPorLugar(primerDía, últimoDía)`.
+   - Cada fila: nombre, total, número de pagos y una barra con `porcentaje`.
+   - Un interruptor «Por comercio» cambia a `resumenPorComercio`; muestra "N locales" si son varios.
+   - Sin datos: "Todavía no hay pagos con ubicación este mes. Actívala en «Ubicación de mis pagos»."
+2. **Detalle del lugar**:
+   - Totales del resumen, «Abrir en Mapas» y la lista de `listarGastosDeLugar(id, rango)`.
+   - Acciones: **Renombrar**, **Fusionar con…** (elegir otro lugar de `listarLugares()`, con la confirmación "Los pagos de A pasan a B y A se borra") y **Borrar lugar** ("Los pagos no se borran").
+3. **Resumen** (pestaña): una tarjeta **«Dónde más pagas»** con los 3 primeros de `resumenPorLugar` del mes. Se oculta si no hay ninguno.
+4. **Recomendaciones**: pasar `lugares: await listarLugares()` a `generarRecomendaciones`.
+
+## Cuentas — fases A y B (16-oct): casas comerciales y fecha de corte
+
+Migración `20261016160000_casas_comerciales_y_corte`. **Pantallas hechas** en el teléfono (`(tabs)/tarjetas.tsx`, `tarjeta/[id].tsx`, `components/TarjetaVisual.tsx`); la web de escritorio queda pendiente.
+- `Banco` ahora incluye las casas comerciales (`OPCIONES_CASA_COMERCIAL`, `esCasaComercial`). Siempre son `tipo: "credito"`, porque así lo exigen zod y la base.
+- `inicialesDeEntidad(banco)` da las iniciales para el ícono cuando no hay logo.
+- `Cuenta.diaCorte?` y `Cuenta.diaPago?` (1 a 31, solo en crédito). `actualizarFechasTarjeta(id, { diaCorte, diaPago })`: `null` los quita.
+- `cicloTarjeta(diaCorte, hoy, diaPago?)` devuelve `{ corte, diasHastaCorte, inicio, pago?, diasHastaPago? }`. Además: `corteDeGasto(fecha, diaCorte)`, `pagoDeCorte`, `fechaDelDia` y `textoDias`.
+
+## Cuentas — fase C (16-oct): recordatorios automáticos de diferidos
+
+Migración `20261016170000_recordatorios_diferidos`. **Pantalla hecha** en el teléfono (`app/recordatorios.tsx`); la web de escritorio queda pendiente (ahí se ven como recordatorios normales).
+- La base crea un recordatorio por cuota al registrar un gasto diferido: el mismo día de la compra cada mes (recortado al último día en meses cortos), con el monto de la cuota y el título «Cuota 1 de 3 · Televisor». Nunca se crean desde la app.
+- `Recordatorio.automatico?: boolean` los distingue. La base no deja convertirlos en manuales ni crear uno automático sin deuda.
+- Al registrar abonos (`registrarAbonoDeuda`), la base marca como hechas las cuotas ya pagadas; al saldar la deuda, todas. Al borrar el diferido se borran sus recordatorios automáticos; los manuales que apuntaban a esa deuda se quedan, sin deuda.
+- `organizarRecordatorios(lista, hoy)` → `{ proximos, cuotasDespues, anteriores }`: de cada diferido muestra solo la cuota que toca y cuántas quedan; una cuota sigue a la vista hasta la fecha de la siguiente y después pasa a «anteriores» (así, al terminar el plazo, no queda nada pendiente). `textoVencimiento(fecha, hoy)` da «hoy», «mañana», «en 4 días», «venció hace 3 días».
+- Los avisos en el teléfono (notificaciones) de estos recordatorios llegan con la fase D.
+
+## Billeteras y ubicación — Fase 4 (16-oct): captura de Google Wallet
+
+Migración `20261016180000_captura_google_wallet`. **Pantalla hecha** en el teléfono (`app/google-wallet.tsx`, en *Más → Conectar Google Wallet*), con el módulo nativo `apps/mobile/modules/captura-billetera` (solo Android; requiere el APK 1.1.0). Guía: `docs/guia-google-wallet.md`.
+- RPC `registrar_aviso_billetera(p_clave, p_titulo, p_texto, p_paquete?, p_cuando?)`, solo `anon`. La base lee la notificación (`leer_aviso_google_wallet`) y usa `registrar_pago_billetera` con `google_wallet`. Responde `{estado: "recibido" | "repetido", monto}` o `{estado: "ignorado"}` (sin monto, rechazado o reembolso). Errores: 28000 clave, 22023 app no admitida o monto, PT429 límite.
+- `p_cuando`: milisegundos de la notificación; si llega tarde (hasta 3 días), el aviso queda con la fecha del pago.
+- Core: `configuracionGoogleWallet(url, clavePublica)` y `PAQUETE_GOOGLE_WALLET`.
+- Módulo JS `capturaGoogleWallet` (null fuera del APK de Android): `estado()` → `{conectado, prefijo, permiso, pendientes, ultimo}`, `conectar(url, apikey, clave)`, `desconectar()`, `abrirPermiso()` y `reintentar()`. La clave se guarda solo en el almacenamiento privado del teléfono y nunca vuelve a JS.

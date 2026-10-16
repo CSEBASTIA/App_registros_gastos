@@ -1,10 +1,14 @@
 import { getSupabaseClient } from "../client";
-import type { TransaccionDetectada } from "../types/domain";
+import type { OrigenTransaccion, TransaccionDetectada } from "../types/domain";
 import type { Database } from "../types/database";
 import { z } from "zod";
 import { LIMITES, fechaIso, montoPositivo, textoRequerido } from "../schemas/limites";
+import { ubicacionSegura } from "../schemas/ubicacion.schema";
+import { filaDeUbicacion, ubicacionDeFila } from "../lib/ubicacion";
 
 type Row = Database["public"]["Tables"]["transacciones_detectadas"]["Row"];
+
+const TARJETA_FINAL = /^[0-9]{3,4}$/;
 
 function filaATransaccion(row: Row): TransaccionDetectada {
   return {
@@ -18,6 +22,11 @@ function filaATransaccion(row: Row): TransaccionDetectada {
     categoriaId: row.categoria_id ?? undefined,
     fecha: row.fecha,
     correoAsunto: row.correo_asunto ?? undefined,
+    // Una base sin la migración de billeteras no trae `origen`: todo es correo.
+    origen: (row.origen as OrigenTransaccion | undefined) ?? "correo",
+    comercio: row.comercio ?? undefined,
+    ubicacion: ubicacionDeFila(row),
+    tarjetaFinal: row.tarjeta_final ?? undefined,
     estado: row.estado as TransaccionDetectada["estado"],
     createdAt: row.created_at,
   };
@@ -34,9 +43,16 @@ export async function listarTransaccionesPendientes(): Promise<TransaccionDetect
   return (data ?? []).map(filaATransaccion);
 }
 
-export type TransaccionDetectadaInsert = Omit<TransaccionDetectada, "id" | "createdAt" | "estado">;
+/** `origen` es opcional: si falta, el aviso es del correo (como hasta ahora). */
+export type TransaccionDetectadaInsert = Omit<TransaccionDetectada, "id" | "createdAt" | "estado" | "origen"> & {
+  origen?: OrigenTransaccion;
+};
 
-/** ¿Se puede guardar este aviso? Monto y fecha reales y un id de mensaje. */
+/**
+ * ¿Se puede guardar este aviso? Monto y fecha reales y un id de mensaje. Un
+ * aviso de billetera es siempre un gasto. (Ubicación, comercio y tarjeta no
+ * deciden: si vienen mal, el aviso se guarda sin ellos.)
+ */
 export function avisoGuardable(t: TransaccionDetectadaInsert): boolean {
   return (
     !!t.mensajeId &&
@@ -44,8 +60,14 @@ export function avisoGuardable(t: TransaccionDetectadaInsert): boolean {
     Number.isFinite(t.monto) &&
     t.monto >= 0.01 &&
     t.monto <= LIMITES.monto &&
-    fechaIso().safeParse(t.fecha).success
+    fechaIso().safeParse(t.fecha).success &&
+    (t.origen === undefined || t.origen === "correo" || t.tipo === "gasto")
   );
+}
+
+/** ¿Trae algo que solo existe con la migración de billeteras? */
+function usaCamposDeBilletera(t: TransaccionDetectadaInsert): boolean {
+  return (t.origen !== undefined && t.origen !== "correo") || !!t.comercio || !!t.ubicacion || !!t.tarjetaFinal;
 }
 
 /**
@@ -61,6 +83,11 @@ export async function insertarTransaccionesDetectadas(
   const validos = items.filter(avisoGuardable);
   const descartados = items.length - validos.length;
   if (validos.length === 0) return { enviados: 0, descartados };
+  // Las columnas nuevas solo se envían si algún aviso las usa: así la
+  // sincronización del correo sigue funcionando en una base sin la migración.
+  // Si se envían, van en TODAS las filas: en un lote, una columna que falta
+  // en una fila llega como null (y `origen` no admite null).
+  const conBilletera = validos.some(usaCamposDeBilletera);
   const { error } = await getSupabaseClient()
     .from("transacciones_detectadas")
     .upsert(
@@ -76,6 +103,14 @@ export async function insertarTransaccionesDetectadas(
         categoria_id: t.categoriaId ?? null,
         fecha: t.fecha,
         correo_asunto: t.correoAsunto?.slice(0, LIMITES.asunto) ?? null,
+        ...(conBilletera
+          ? {
+              origen: t.origen ?? "correo",
+              comercio: t.comercio?.trim().slice(0, LIMITES.descripcion) || null,
+              ...filaDeUbicacion(ubicacionSegura(t.ubicacion) ?? null),
+              tarjeta_final: t.tarjetaFinal && TARJETA_FINAL.test(t.tarjetaFinal) ? t.tarjetaFinal : null,
+            }
+          : {}),
       })),
       { onConflict: "usuario_id,mensaje_id", ignoreDuplicates: true }
     );

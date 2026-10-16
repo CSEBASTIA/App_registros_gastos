@@ -24,7 +24,10 @@ import {
   semanasDelMes,
   enRangoSemana,
   agruparPorCategoriaODetalle,
+  listarLugares,
+  ETIQUETA_BILLETERA,
   type Gasto,
+  type Lugar,
   type Categoria,
   type Cuenta,
 } from "core";
@@ -35,6 +38,7 @@ import EstadoVacio from "../../components/EstadoVacio";
 import SelectorMes from "../../components/SelectorMes";
 import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
+import { abrirEnMapas } from "../../lib/ubicacion";
 
 function mesActual() {
   return mesLocal(); // zona horaria del teléfono, no UTC
@@ -50,6 +54,7 @@ export default function GastosScreen() {
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
+  const [lugares, setLugares] = useState<Lugar[]>([]);
   const [semanaActiva, setSemanaActiva] = useState(1);
 
   const cargar = useCallback(() => {
@@ -63,6 +68,8 @@ export default function GastosScreen() {
       })
       .catch((err) => setError(mensajeError(err)))
       .finally(() => setCargando(false));
+    // Aparte: una base sin la migración de lugares no debe dejar la pantalla en blanco.
+    listarLugares().then(setLugares).catch(() => setLugares([]));
   }, []);
 
   useFocusEffect(cargar);
@@ -297,11 +304,29 @@ export default function GastosScreen() {
                             {cuentaDe(g.cuentaId)?.nombre ?? "Sin cuenta"} ·{" "}
                             {g.fecha}
                           </Text>
+                          {(g.billetera || g.lugarId) && (
+                            <Text style={styles.gastoMeta} numberOfLines={1}>
+                              {g.billetera ? ETIQUETA_BILLETERA[g.billetera] : ""}
+                              {g.billetera && g.lugarId ? " · " : ""}
+                              {g.lugarId ? lugares.find((l) => l.id === g.lugarId)?.nombre ?? "" : ""}
+                            </Text>
+                          )}
                         </View>
                         <Text style={styles.gastoMonto}>
                           ${g.monto.toFixed(2)}
                         </Text>
                       </Pressable>
+                      {g.ubicacion && (
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Abrir en Mapas dónde pagaste ${g.descripcion}`}
+                          hitSlop={4}
+                          onPress={() => abrirEnMapas(g.ubicacion!).catch(() => undefined)}
+                          style={({ pressed }) => [styles.botonEliminar, pressed && { backgroundColor: color.primaryBg }]}
+                        >
+                          <Ionicons name="location-outline" size={18} color={color.primary} />
+                        </Pressable>
+                      )}
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel={`Eliminar gasto ${g.descripcion}`}

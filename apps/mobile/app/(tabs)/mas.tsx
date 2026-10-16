@@ -53,6 +53,30 @@ const ITEMS: {
     icono: "pricetag-outline",
   },
   {
+    titulo: "Lugares",
+    subtitulo: "Cuánto pagas en cada sitio",
+    ruta: "/lugares",
+    icono: "location-outline",
+  },
+  {
+    titulo: "Ubicación de mis pagos",
+    subtitulo: "Activarla, apagarla o borrarla",
+    ruta: "/ubicacion",
+    icono: "navigate-outline",
+  },
+  {
+    titulo: "Conectar Apple Pay",
+    subtitulo: "Tus pagos del iPhone llegan solos a la bandeja",
+    ruta: "/apple-pay",
+    icono: "phone-portrait-outline",
+  },
+  {
+    titulo: "Conectar Google Wallet",
+    subtitulo: "En Android, tus pagos llegan solos a la bandeja",
+    ruta: "/google-wallet",
+    icono: "wallet-outline",
+  },
+  {
     titulo: "Correo (beta)",
     subtitulo: "Opcional: detectar avisos bancarios de Gmail u Outlook",
     ruta: "/correo",
@@ -121,7 +145,7 @@ export default function Mas() {
             <View style={{ flex: 1 }}>
               <Text style={styles.filaTitulo}>Bandeja de revisión</Text>
               <Text style={styles.filaSubtitulo}>
-                Movimientos detectados en tu correo, sin confirmar
+                Movimientos detectados (correo y billeteras), sin confirmar
               </Text>
             </View>
             {pendientes > 0 && (

@@ -1,0 +1,22 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <application>
+    <!--
+      Lee solo las notificaciones de Google Wallet (el servicio ignora las
+      demás). Android pide al usuario que lo active a mano en
+      Ajustes → Notificaciones → Acceso a notificaciones; la app no puede
+      activarlo sola. El permiso BIND_NOTIFICATION_LISTENER_SERVICE hace que
+      solo el sistema pueda conectarse a este servicio.
+    -->
+    <service
+      android:name="expo.modules.capturabilletera.AvisosBilleteraService"
+      android:label="FinTrack: pagos con Google Wallet"
+      android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
+      android:exported="true">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+    </service>
+  </application>
+</manifest>

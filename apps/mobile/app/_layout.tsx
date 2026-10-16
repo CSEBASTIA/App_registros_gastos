@@ -103,6 +103,11 @@ function ThemedLayout() {
       <Stack.Screen name="correo" options={{ title: "Correo" }} />
       <Stack.Screen name="bandeja" options={{ title: "Bandeja de revisión" }} />
       <Stack.Screen name="presupuestos" options={{ title: "Presupuestos" }} />
+      <Stack.Screen name="ubicacion" options={{ title: "Ubicación de mis pagos" }} />
+      <Stack.Screen name="apple-pay" options={{ title: "Conectar Apple Pay" }} />
+      <Stack.Screen name="google-wallet" options={{ title: "Conectar Google Wallet" }} />
+      <Stack.Screen name="lugares" options={{ title: "Lugares" }} />
+      <Stack.Screen name="lugar/[id]" options={{ title: "Lugar" }} />
     </Stack>
     </Animated.View>
   );

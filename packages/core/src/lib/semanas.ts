@@ -109,3 +109,10 @@ export function ultimosMeses(mesIso: string, cantidad = 6): string[] {
   }
   return resultado;
 }
+
+/** Primer y último día de un mes "YYYY-MM" (para pedir el resumen de ese mes). */
+export function rangoDelMes(mesIso: string): { desde: string; hasta: string } {
+  const [anioStr, mesStr] = mesIso.split("-");
+  const ultimoDia = new Date(Date.UTC(Number(anioStr), Number(mesStr), 0)).getUTCDate();
+  return { desde: `${mesIso}-01`, hasta: `${mesIso}-${String(ultimoDia).padStart(2, "0")}` };
+}

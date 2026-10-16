@@ -132,7 +132,16 @@ export default function GastosScreen() {
 
   function accionesDe(g: Gasto): AccionIsla[] {
     // «Abrir en Mapas» va en el mismo mapa de la isla.
-    const acciones: AccionIsla[] = [];
+    const acciones: AccionIsla[] = [
+      {
+        titulo: "Editar",
+        icono: "create-outline",
+        onPress: () => {
+          setDetalle(null);
+          router.push({ pathname: "/gasto/editar", params: { id: g.id } });
+        },
+      },
+    ];
     if (g.lugarId) {
       const lugarId = g.lugarId;
       acciones.push({
@@ -219,7 +228,7 @@ export default function GastosScreen() {
               titulo="+ Nuevo"
               variante="primario"
               onPress={() =>
-                router.push({ pathname: "/gasto/nuevo", params: { mes } })
+                router.push({ pathname: "/gasto/nuevo", params: { mes, semana: String(semanaActiva) } })
               }
             />
           </View>

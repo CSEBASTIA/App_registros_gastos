@@ -131,6 +131,13 @@ export async function actualizarGasto(id: string, cambiosSinValidar: CambiosGast
   return filaAGasto(data);
 }
 
+/** Un gasto por id (para la pantalla de edición). Con RLS, solo los propios. */
+export async function obtenerGasto(id: string): Promise<Gasto> {
+  const { data, error } = await getSupabaseClient().from("gastos").select("*").eq("id", id).single();
+  if (error) throw error;
+  return filaAGasto(data);
+}
+
 export async function eliminarGasto(id: string): Promise<void> {
   const { error } = await getSupabaseClient().from("gastos").delete().eq("id", id);
   if (error) throw error;

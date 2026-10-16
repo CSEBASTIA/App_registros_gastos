@@ -170,7 +170,7 @@ export default function IngresosScreen() {
             <Boton
               titulo="+ Nuevo"
               variante="primario"
-              onPress={() => router.push("/ingreso/nuevo")}
+              onPress={() => router.push({ pathname: "/ingreso/nuevo", params: { mes } })}
             />
           </View>
 
@@ -272,7 +272,17 @@ export default function IngresosScreen() {
             categoria: categoriaDe(detalle.categoriaId),
             cuenta: cuentaDe(detalle.cuentaId),
           })}
-          acciones={[{ titulo: "Eliminar", icono: "trash-outline", peligro: true, onPress: () => confirmarEliminar(detalle) }]}
+          acciones={[
+            {
+              titulo: "Editar",
+              icono: "create-outline",
+              onPress: () => {
+                setDetalle(null);
+                router.push({ pathname: "/ingreso/editar", params: { id: detalle.id } });
+              },
+            },
+            { titulo: "Eliminar", icono: "trash-outline", peligro: true, onPress: () => confirmarEliminar(detalle) },
+          ]}
         />
       )}
     </SafeAreaView>

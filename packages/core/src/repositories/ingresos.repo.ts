@@ -79,6 +79,13 @@ export async function actualizarIngreso(id: string, cambios: CambiosIngreso): Pr
   return filaAIngreso(data);
 }
 
+/** Un ingreso por id (para la pantalla de edición). Con RLS, solo los propios. */
+export async function obtenerIngreso(id: string): Promise<Ingreso> {
+  const { data, error } = await getSupabaseClient().from("ingresos").select("*").eq("id", id).single();
+  if (error) throw error;
+  return filaAIngreso(data);
+}
+
 export async function eliminarIngreso(id: string): Promise<void> {
   const { error } = await getSupabaseClient().from("ingresos").delete().eq("id", id);
   if (error) throw error;

@@ -16,6 +16,8 @@ import {
   mensajeError,
   parsearMonto,
   fechaLocal,
+  fechaLarga,
+  fechaPropuesta,
   type Categoria,
   type Cuenta,
 } from "core";
@@ -34,8 +36,10 @@ export default function NuevoIngreso() {
   const { color } = useTheme();
   const styles = createStyles(color);
   const router = useRouter();
-  const { cuentaId: cuentaIdInicial } = useLocalSearchParams<{
+  const { cuentaId: cuentaIdInicial, mes: mesVisto } = useLocalSearchParams<{
     cuentaId?: string;
+    /** El mes que se estaba viendo en Ingresos ("2026-09"). */
+    mes?: string;
   }>();
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
@@ -45,7 +49,9 @@ export default function NuevoIngreso() {
   const [categoriaId, setCategoriaId] = useState("");
   const [categoriaDetalle, setCategoriaDetalle] = useState("");
   const [cuentaId, setCuentaId] = useState("");
-  const [fecha, setFecha] = useState(hoy());
+  // Si se abrió desde otro mes, la fecha cae en ese mes (no hoy).
+  const [fecha, setFecha] = useState(() => fechaPropuesta(mesVisto, hoy()));
+  const fechaNoEsHoy = fecha !== hoy();
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -144,6 +150,13 @@ export default function NuevoIngreso() {
             Completá los datos de tu movimiento.
           </Text>
         </BlurFade>
+        {fechaNoEsHoy && (
+          <View style={styles.ayuda} accessibilityLiveRegion="polite">
+            <Text style={styles.ayudaTexto}>
+              Se guardará con fecha {fechaLarga(fecha)}, del mes que estabas viendo. Puedes cambiarla abajo.
+            </Text>
+          </View>
+        )}
         <Campo
           etiqueta="Monto"
           keyboardType="decimal-pad"
@@ -225,4 +238,6 @@ const createStyles = (color: Colors) =>
       color: color.textMuted,
     },
     contenedor: { flex: 1, backgroundColor: color.bg },
+    ayuda: { backgroundColor: color.surface2, borderRadius: 8, padding: spacing(3) },
+    ayudaTexto: { fontFamily: font.body, fontSize: 12, color: color.textMuted, lineHeight: 18 },
   });

@@ -39,6 +39,24 @@ export function semanaInicial(mes: string, hoy: string = fechaLocal()): number {
   return hoy.startsWith(mes) ? semanaDeFecha(hoy) : 1;
 }
 
+/**
+ * La fecha que propone «+ Nuevo» según el mes (y la semana) que se estaba
+ * viendo: hoy si cae en ese período; si el período ya pasó, su último día;
+ * si todavía no llega, su primer día. Un mes inválido da hoy.
+ */
+export function fechaPropuesta(mes: string | undefined, hoy: string = fechaLocal(), semana?: number): string {
+  if (!mes || !/^\d{4}-(0[1-9]|1[0-2])$/.test(mes)) return hoy;
+  const semanas = semanasDelMes(mes);
+  const rango = semana && semana >= 1 && semana <= 4
+    ? semanas[semana - 1]
+    : { numero: 0, desde: 1, hasta: semanas[3].hasta };
+  const dia = (n: number) => `${mes}-${String(n).padStart(2, "0")}`;
+  const inicio = dia(rango.desde);
+  const fin = dia(rango.hasta);
+  if (hoy >= inicio && hoy <= fin) return hoy;
+  return fin < hoy ? fin : inicio;
+}
+
 export function enRangoSemana(fechaIso: string, rango: RangoSemana): boolean {
   const dia = diaDelMes(fechaIso);
   return dia >= rango.desde && dia <= rango.hasta;

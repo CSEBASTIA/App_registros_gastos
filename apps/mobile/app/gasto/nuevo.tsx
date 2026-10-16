@@ -18,6 +18,8 @@ import {
   calcularDiferido,
   sumarMeses,
   fechaLocal,
+  fechaLarga,
+  fechaPropuesta,
   ETIQUETA_METODO_PAGO,
   OPCIONES_METODO_PAGO,
   OPCIONES_MESES_DIFERIDO,
@@ -48,8 +50,11 @@ export default function NuevoGasto() {
   const { color } = useTheme();
   const styles = createStyles(color);
   const router = useRouter();
-  const { cuentaId: cuentaIdInicial } = useLocalSearchParams<{
+  const { cuentaId: cuentaIdInicial, mes: mesVisto, semana: semanaVista } = useLocalSearchParams<{
     cuentaId?: string;
+    /** El mes y la semana que se estaban viendo en Gastos ("2026-09", "2"). */
+    mes?: string;
+    semana?: string;
   }>();
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
@@ -64,7 +69,11 @@ export default function NuevoGasto() {
   const [conUbicacion, setConUbicacion] = useState(false);
   const [mesesDiferido, setMesesDiferido] = useState(3);
   const [tasaInteres, setTasaInteres] = useState("");
-  const [fecha, setFecha] = useState(hoy());
+  // Si se abrió desde otro mes o semana, la fecha cae en ese período (no hoy).
+  const [fecha, setFecha] = useState(() =>
+    fechaPropuesta(mesVisto, hoy(), semanaVista ? Number(semanaVista) : undefined),
+  );
+  const fechaNoEsHoy = fecha !== hoy();
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -209,6 +218,13 @@ export default function NuevoGasto() {
             Completá los datos de tu movimiento.
           </Text>
         </BlurFade>
+        {fechaNoEsHoy && (
+          <View style={styles.ayuda} accessibilityLiveRegion="polite">
+            <Text style={styles.ayudaTexto}>
+              Se guardará con fecha {fechaLarga(fecha)}, del período que estabas viendo. Puedes cambiarla abajo.
+            </Text>
+          </View>
+        )}
         <Campo
           etiqueta="Monto"
           keyboardType="decimal-pad"

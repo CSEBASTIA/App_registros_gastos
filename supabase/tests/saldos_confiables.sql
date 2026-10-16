@@ -96,9 +96,11 @@ exception when invalid_parameter_value then
 end $$;
 
 do $$ declare d text; begin
-  update gastos set descripcion = 'Laptop nueva', fecha = '2026-10-10' where id = 'e4000000-0000-4000-8000-000000000002';
+  -- La fecha de un diferido ya no se edita (20261016230000_diferido_fecha_fija):
+  -- lo prueba editar_movimientos.sql (E03).
+  update gastos set descripcion = 'Laptop nueva' where id = 'e4000000-0000-4000-8000-000000000002';
   select descripcion into d from gastos where id = 'e4000000-0000-4000-8000-000000000002';
-  insert into resultados values ('D2 sí se edita la descripción y la fecha de un diferido', d = 'Laptop nueva', d);
+  insert into resultados values ('D2 sí se edita la descripción de un diferido', d = 'Laptop nueva', d);
 end $$;
 
 do $$ begin

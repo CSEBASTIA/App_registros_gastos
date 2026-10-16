@@ -21,6 +21,7 @@ export * from "./lib/corteTarjeta";
 export * from "./lib/recordatorios";
 export * from "./lib/detalleTransaccion";
 export * from "./lib/mapaEstatico";
+export * from "./lib/edicionMovimiento";
 export * from "./lib/legal";
 export { FILAS_POR_PAGINA, type RangoFechas } from "./lib/paginacion";
 export * from "./schemas/limites";
@@ -47,12 +48,14 @@ export {
   listarGastos,
   listarGastosDeLugar,
   actualizarGasto,
+  obtenerGasto,
   eliminarGasto,
   type CambiosGasto,
 } from "./repositories/gastos.repo";
 export { listarPresupuestos, eliminarPresupuesto } from "./repositories/presupuestos.repo";
 export { listarCuentas, eliminarCuenta, actualizarFechasTarjeta } from "./repositories/cuentas.repo";
 export { listarIngresos, actualizarIngreso, eliminarIngreso } from "./repositories/ingresos.repo";
+export { obtenerIngreso } from "./repositories/ingresos.repo";
 export { listarPagosTarjeta } from "./repositories/pagosTarjeta.repo";
 export {
   listarDeudas,

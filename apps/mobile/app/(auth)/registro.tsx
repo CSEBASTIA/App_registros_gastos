@@ -10,6 +10,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
+import * as Linking from "expo-linking";
 import { mensajeError } from "core";
 import { supabase } from "../../lib/supabase";
 import Campo from "../../components/Campo";
@@ -27,27 +28,60 @@ export default function Registro() {
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
   const [cargando, setCargando] = useState(false);
+  const [reenviando, setReenviando] = useState(false);
+
+  const destinoConfirmacion = Linking.createURL("confirmacion");
 
   async function crearCuenta() {
     setError(null);
     setAviso(null);
     setCargando(true);
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    setCargando(false);
-    if (error) {
-      setError(mensajeError(error));
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { emailRedirectTo: destinoConfirmacion },
+      });
+      if (error) throw error;
+      // Activación: tras crear la cuenta se va directo a la app (el Resumen
+      // invita a registrar el primer gasto). Conectar el correo ya no es un
+      // paso del registro: es opcional y vive en Más → Correo.
+      if (data.session) {
+        router.replace("/resumen");
+        return;
+      }
+      // Con confirmación de correo activada (proyecto en la nube), signUp no
+      // deja sesión hasta que la persona confirma.
+      setAviso("Te enviamos un correo para confirmar tu cuenta. Ábrelo en este mismo teléfono.");
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setCargando(false);
+    }
+  }
+
+  async function reenviarConfirmacion() {
+    const correo = email.trim();
+    if (!correo || !correo.includes("@")) {
+      setError("Escribe un correo válido para reenviar la confirmación.");
       return;
     }
-    // Activación: tras crear la cuenta se va directo a la app (el Resumen
-    // invita a registrar el primer gasto). Conectar el correo ya no es un
-    // paso del registro: es opcional y vive en Más → Correo.
-    if (data.session) {
-      router.replace("/resumen");
-      return;
+    setError(null);
+    setAviso(null);
+    setReenviando(true);
+    try {
+      const { error } = await supabase.auth.resend({
+        type: "signup",
+        email: correo,
+        options: { emailRedirectTo: destinoConfirmacion },
+      });
+      if (error) throw error;
+      setAviso("Si tu cuenta espera confirmación, recibirás un correo nuevo. Ábrelo en este mismo teléfono.");
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setReenviando(false);
     }
-    // Con confirmación de correo activada (proyecto en la nube), signUp no
-    // deja sesión hasta que la persona confirma.
-    setAviso("Te enviamos un correo para confirmar tu cuenta. Después iniciá sesión aquí abajo.");
   }
 
   return (
@@ -104,7 +138,14 @@ export default function Registro() {
               variante="primario"
               onPress={crearCuenta}
               loading={cargando}
-              disabled={cargando}
+              disabled={cargando || reenviando}
+            />
+            <Boton
+              titulo={reenviando ? "Reenviando…" : "Reenviar correo de confirmación"}
+              variante="secundario"
+              onPress={reenviarConfirmacion}
+              loading={reenviando}
+              disabled={cargando || reenviando}
             />
           </Tarjeta>
           <Link href="/(auth)/login" style={styles.link}>

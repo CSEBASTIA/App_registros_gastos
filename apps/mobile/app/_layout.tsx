@@ -50,7 +50,7 @@ function ThemedLayout() {
     // evita devolver a login mientras cambia entre login y registro.
     if (!pathname) return;
     const ruta = pathname.replace(/\/+$/, "") || "/";
-    const enGrupoAuth = ruta === "/login" || ruta === "/registro";
+    const enGrupoAuth = ruta === "/login" || ruta === "/registro" || ruta === "/confirmacion";
     const enRaiz = ruta === "/";
     // No navegar mientras el componente devuelve null (abajo): el Stack
     // todavía no existe y expo-router lanza "Attempted to navigate before

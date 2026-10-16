@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Stack, useRouter, useSegments } from "expo-router";
+import { Stack, usePathname, useRouter } from "expo-router";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { ThemeProvider, useTheme, font } from "../lib/theme";
@@ -35,7 +35,7 @@ function ThemedLayout() {
   // undefined = todavía no sabemos si hay sesión; null = no hay sesión.
   const [session, setSession] = useState<Session | null | undefined>(undefined);
   const router = useRouter();
-  const segments = useSegments();
+  const pathname = usePathname();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session));
@@ -46,11 +46,12 @@ function ThemedLayout() {
   }, []);
 
   useEffect(() => {
-    const enGrupoAuth = segments[0] === "(auth)";
-    // segments vacío = ruta raíz "/" sin match (no hay index propio, el
-    // tab por defecto es "resumen") — pasa también en el arranque en frío
-    // con sesión ya guardada.
-    const enRaiz = segments.length === 0;
+    // Los grupos de rutas no aparecen en la URL. Comprobar la ruta visible
+    // evita devolver a login mientras cambia entre login y registro.
+    if (!pathname) return;
+    const ruta = pathname.replace(/\/+$/, "") || "/";
+    const enGrupoAuth = ruta === "/login" || ruta === "/registro";
+    const enRaiz = ruta === "/";
     // No navegar mientras el componente devuelve null (abajo): el Stack
     // todavía no existe y expo-router lanza "Attempted to navigate before
     // mounting the Root Layout component", que tumba la app al arrancar.
@@ -62,13 +63,13 @@ function ThemedLayout() {
     }
 
     if (!session && !enGrupoAuth) {
-      router.replace("/login");
+      router.replace("/(auth)/login");
     } else if (session && enRaiz) {
       router.replace("/resumen");
     } else if (session && enGrupoAuth) {
       router.replace("/resumen");
     }
-  }, [session, segments, router, ready, fontsLoaded, fontError]);
+  }, [session, pathname, router, ready, fontsLoaded, fontError]);
 
   if (session === undefined || !ready || (!fontsLoaded && !fontError)) return null;
 

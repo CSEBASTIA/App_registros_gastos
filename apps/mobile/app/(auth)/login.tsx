@@ -90,7 +90,7 @@ export default function Login() {
               disabled={cargando}
             />
           </Tarjeta>
-          <Link href="/registro" style={styles.link}>
+          <Link href="/(auth)/registro" style={styles.link}>
             ¿No tenés cuenta? Creá una
           </Link>
         </ScrollView>

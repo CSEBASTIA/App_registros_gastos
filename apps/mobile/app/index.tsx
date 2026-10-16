@@ -1,8 +1,5 @@
-import { Redirect } from "expo-router";
-
-// La ruta raíz "/" no tiene pantalla propia (el inicio es la pestaña
-// Resumen). Sin este archivo expo-router muestra "Unmatched Route" al abrir
-// la app en "/". Si no hay sesión, el _layout raíz redirige luego a /login.
+// La ruta raíz existe para que Expo Router la reconozca. El layout espera a
+// conocer la sesión antes de elegir entre login y resumen.
 export default function Inicio() {
-  return <Redirect href="/resumen" />;
+  return null;
 }

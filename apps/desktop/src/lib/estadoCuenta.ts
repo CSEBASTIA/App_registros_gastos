@@ -1,4 +1,5 @@
 import type { TextItem } from "pdfjs-dist/types/src/display/api";
+import { lineasDeTextoPdf, paginaSinTexto } from "core";
 export { parseEstadoCuenta } from "core";
 export type { TransaccionEstadoCuenta as TransaccionExtraida } from "core";
 
@@ -35,13 +36,11 @@ async function leerTextoPdf(archivo: File): Promise<string> {
     const pagina = await pdf.getPage(numPagina);
     const contenido = await pagina.getTextContent();
 
-    // pdf.js entrega fragmentos de texto sueltos con su posición (x, y), no
-    // líneas ya armadas: hay que agruparlos por coordenada Y (misma línea
-    // visual) y ordenarlos por X para reconstruir el texto en orden de lectura.
+    // Fragmentos con su posición; core los arma en líneas (lineasDeTextoPdf).
     const items = contenido.items
       .filter((it): it is TextItem => "str" in it && "transform" in it && it.str.trim().length > 0)
       .map((it) => ({ texto: it.str, x: it.transform[4], y: it.transform[5] }));
-    if (items.map((it) => it.texto).join("").trim().length < 8) {
+    if (paginaSinTexto(items)) {
       // Algunos bancos entregan el PDF como imágenes. OCR solo en esas páginas.
       const viewport = pagina.getViewport({ scale: 2 });
       const canvas = document.createElement("canvas");
@@ -56,24 +55,7 @@ async function leerTextoPdf(archivo: File): Promise<string> {
       continue;
     }
 
-    const porLinea = new Map<number, typeof items>();
-    for (const item of items) {
-      const claveY = Math.round(item.y / 2) * 2; // tolerancia de 2pt para variaciones menores de baseline
-      const grupo = porLinea.get(claveY);
-      if (grupo) grupo.push(item);
-      else porLinea.set(claveY, [item]);
-    }
-
-    const lineasPagina = [...porLinea.entries()]
-      .sort((a, b) => b[0] - a[0]) // de arriba hacia abajo (Y decreciente en coordenadas PDF)
-      .map(([, grupo]) =>
-        grupo
-          .sort((a, b) => a.x - b.x)
-          .map((it) => it.texto)
-          .join(" ")
-      );
-
-    lineas.push(...lineasPagina);
+    lineas.push(...lineasDeTextoPdf(items));
   }
 
   return lineas.join("\n");

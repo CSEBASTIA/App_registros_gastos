@@ -149,6 +149,7 @@ function ThemedLayout() {
       <Stack.Screen name="recordatorios" options={{ title: "Recordatorios" }} />
       <Stack.Screen name="categorias" options={{ title: "Categorías" }} />
       <Stack.Screen name="tarjeta/[id]" options={{ title: "Tarjeta" }} />
+      <Stack.Screen name="importar-estado" options={{ title: "Importar estado de cuenta" }} />
       <Stack.Screen name="gasto/nuevo" options={{ title: "Nuevo gasto", presentation: "modal" }} />
       <Stack.Screen name="ingreso/nuevo" options={{ title: "Nuevo ingreso", presentation: "modal" }} />
       <Stack.Screen name="correo" options={{ title: "Correo" }} />

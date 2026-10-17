@@ -61,10 +61,12 @@ export default function TarjetasScreen() {
 
   useFocusEffect(cargar);
 
-  async function crearYCerrar(input: Omit<Cuenta, "id" | "createdAt">) {
-    await crearCuenta(input);
+  async function crearYCerrar(input: Omit<Cuenta, "id" | "createdAt">, importar: boolean) {
+    const nueva = await crearCuenta(input);
     setMostrarForm(false);
-    cargar();
+    // Al volver de importar, la lista se recarga sola (useFocusEffect).
+    if (importar) router.push({ pathname: "/importar-estado", params: { cuentaId: nueva.id } });
+    else cargar();
   }
 
   if (cargando)
@@ -165,7 +167,7 @@ function NuevaTarjeta({
   onCrear,
   onCancelar,
 }: {
-  onCrear: (input: Omit<Cuenta, "id" | "createdAt">) => Promise<void>;
+  onCrear: (input: Omit<Cuenta, "id" | "createdAt">, importar: boolean) => Promise<void>;
   onCancelar: () => void;
 }) {
   const { color } = useTheme();
@@ -234,7 +236,7 @@ function NuevaTarjeta({
     }
   }
 
-  async function agregar() {
+  async function agregar(importar = false) {
     if (!nombre.trim()) {
       setError("Ponele un nombre a la tarjeta.");
       return;
@@ -252,18 +254,21 @@ function NuevaTarjeta({
     setError(null);
     setGuardando(true);
     try {
-      await onCrear({
-        nombre,
-        tipo: "credito",
-        banco,
-        marca,
-        estilo,
-        cupoTotal: parsearMonto(cupoTotal),
-        disponible: parsearMonto(cupoTotal),
-        identificador: identificador.trim() || undefined,
-        diaCorte: corte,
-        diaPago: pago,
-      });
+      await onCrear(
+        {
+          nombre,
+          tipo: "credito",
+          banco,
+          marca,
+          estilo,
+          cupoTotal: parsearMonto(cupoTotal),
+          disponible: parsearMonto(cupoTotal),
+          identificador: identificador.trim() || undefined,
+          diaCorte: corte,
+          diaPago: pago,
+        },
+        importar
+      );
       setNombre("");
       setEstilo(undefined);
       setUsarCatalogo(true);
@@ -413,10 +418,11 @@ function NuevaTarjeta({
       <Boton
         titulo={guardando ? "Guardando…" : "Agregar"}
         variante="primario"
-        onPress={agregar}
+        onPress={() => agregar()}
         loading={guardando}
         disabled={guardando}
       />
+      <Boton titulo="Agregar e importar estado de cuenta" onPress={() => agregar(true)} disabled={guardando} />
     </Tarjeta>
   );
 }

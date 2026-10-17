@@ -10,6 +10,7 @@ import {
   listarRecordatorios,
   listarPagosTarjeta,
   crearGasto,
+  importarMovimientos,
   actualizarGasto,
   eliminarGasto,
   crearIngreso,
@@ -278,12 +279,10 @@ function Dashboard({
   async function handleImportarGastos(
     inputs: Omit<Gasto, "id" | "createdAt">[],
   ) {
-    // Secuencial (no Promise.all): varias filas pueden compartir la misma
-    // cuenta, y los triggers que ajustan `cuentas.disponible` no son seguros
-    // ante inserts concurrentes sobre la misma fila.
-    for (const input of inputs) {
-      await crearGasto(input);
-    }
+    // Una sola escritura (core): se guardan todos o ninguno, y los triggers
+    // ajustan `cuentas.disponible` fila por fila dentro de esa transacción.
+    // Antes iban de a uno: si fallaba el quinto, quedaban cuatro guardados.
+    await importarMovimientos({ gastos: inputs, ingresos: [] });
     await recargar();
   }
   async function handleCrearIngreso(input: Omit<Ingreso, "id" | "createdAt">) {
@@ -295,8 +294,9 @@ function Dashboard({
     await recargar();
   }
   async function handleCrearCuenta(input: Omit<Cuenta, "id" | "createdAt">) {
-    await crearCuenta(input);
+    const nueva = await crearCuenta(input);
     await recargar();
+    return nueva;
   }
   async function handleEliminarCuenta(id: string) {
     try {
@@ -515,6 +515,7 @@ function Dashboard({
                     onEliminar={handleEliminarCuenta}
                     onRegistrarPago={handleRegistrarPago}
                     onCrearGasto={handleCrearGasto}
+                    onImportado={recargar}
                   />
                 )}
                 {tab === "cuentas" && (
@@ -527,6 +528,7 @@ function Dashboard({
                     onEliminar={handleEliminarCuenta}
                     onCrearGasto={handleCrearGasto}
                     onCrearIngreso={handleCrearIngreso}
+                    onImportado={recargar}
                   />
                 )}
                 {tab === "deudas" && (

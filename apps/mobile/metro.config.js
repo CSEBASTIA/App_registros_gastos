@@ -40,5 +40,8 @@ config.resolver.nodeModulesPaths = [
   path.resolve(workspaceRoot, "node_modules"),
 ];
 config.resolver.resolveRequest = resolveFromMobileRuntime;
+// pdf.js para leer estados de cuenta dentro de la app (assets/pdfjs): se
+// empaqueta como archivo, no como código de la app, y se carga en un WebView.
+config.resolver.assetExts.push("pdfjs");
 
 module.exports = config;

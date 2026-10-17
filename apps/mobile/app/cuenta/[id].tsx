@@ -200,6 +200,12 @@ export default function DetalleCuenta() {
             }
           />
         </View>
+        {cuenta.tipo !== "efectivo" && (
+          <Boton
+            titulo="Importar estado de cuenta"
+            onPress={() => router.push({ pathname: "/importar-estado", params: { cuentaId: cuenta.id } })}
+          />
+        )}
         <Boton
           titulo="Eliminar cuenta"
           variante="peligro"

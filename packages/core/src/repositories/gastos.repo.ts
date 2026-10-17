@@ -74,34 +74,51 @@ async function listarGastosFiltrados(rango: RangoFechas, lugarId?: string): Prom
   return filas.map(filaAGasto);
 }
 
+function filaNuevaGasto(gasto: Omit<Gasto, "id" | "createdAt">) {
+  return {
+    monto: gasto.monto,
+    descripcion: gasto.descripcion,
+    categoria_id: gasto.categoriaId,
+    categoria_detalle: gasto.categoriaDetalle ?? null,
+    cuenta_id: gasto.cuentaId ?? null,
+    metodo_pago: gasto.metodoPago ?? null,
+    meses_diferido: gasto.mesesDiferido ?? null,
+    // Solo si se indicó: así crear gastos funciona también en una base sin
+    // la migración 20261015170000 (que agrega la columna).
+    ...(gasto.tasaInteres !== undefined ? { tasa_interes: gasto.tasaInteres } : {}),
+    // Igual con la migración de billeteras y ubicación (20261016120000).
+    ...(gasto.billetera !== undefined ? { billetera: gasto.billetera } : {}),
+    ...(gasto.ubicacion !== undefined ? filaDeUbicacion(gasto.ubicacion) : {}),
+    ...(gasto.lugarId !== undefined ? { lugar_id: gasto.lugarId } : {}),
+    factura_path: gasto.facturaPath ?? null,
+    fecha: gasto.fecha,
+  };
+}
+
 export async function crearGasto(
   gasto: Omit<Gasto, "id" | "createdAt">
 ): Promise<Gasto> {
   const { data, error } = await getSupabaseClient()
     .from("gastos")
-    .insert({
-      monto: gasto.monto,
-      descripcion: gasto.descripcion,
-      categoria_id: gasto.categoriaId,
-      categoria_detalle: gasto.categoriaDetalle ?? null,
-      cuenta_id: gasto.cuentaId ?? null,
-      metodo_pago: gasto.metodoPago ?? null,
-      meses_diferido: gasto.mesesDiferido ?? null,
-      // Solo si se indicó: así crear gastos funciona también en una base sin
-      // la migración 20261015170000 (que agrega la columna).
-      ...(gasto.tasaInteres !== undefined ? { tasa_interes: gasto.tasaInteres } : {}),
-      // Igual con la migración de billeteras y ubicación (20261016120000).
-      ...(gasto.billetera !== undefined ? { billetera: gasto.billetera } : {}),
-      ...(gasto.ubicacion !== undefined ? filaDeUbicacion(gasto.ubicacion) : {}),
-      ...(gasto.lugarId !== undefined ? { lugar_id: gasto.lugarId } : {}),
-      factura_path: gasto.facturaPath ?? null,
-      fecha: gasto.fecha,
-    })
+    .insert(filaNuevaGasto(gasto))
     .select()
     .single();
 
   if (error) throw error;
   return filaAGasto(data);
+}
+
+/**
+ * Varios gastos en una sola escritura (p. ej. al importar un estado de
+ * cuenta): la base los guarda todos o ninguno, y los triggers ajustan el saldo
+ * fila por fila dentro de esa misma transacción. Antes la web los mandaba de a
+ * uno: si fallaba el quinto, quedaban cuatro guardados y el resto no.
+ */
+export async function crearGastosEnLote(gastos: Omit<Gasto, "id" | "createdAt">[]): Promise<Gasto[]> {
+  if (gastos.length === 0) return [];
+  const { data, error } = await getSupabaseClient().from("gastos").insert(gastos.map(filaNuevaGasto)).select();
+  if (error) throw error;
+  return (data ?? []).map(filaAGasto);
 }
 
 export type CambiosGasto = Partial<

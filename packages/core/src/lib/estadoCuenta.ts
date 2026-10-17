@@ -99,6 +99,43 @@ function parsearTabla(texto: string, referencia: string): TransaccionEstadoCuent
   });
 }
 
+/** Un trozo de texto de una página de PDF con su posición (coordenadas de PDF: Y crece hacia arriba). */
+export interface FragmentoTextoPdf {
+  texto: string;
+  x: number;
+  y: number;
+}
+
+/**
+ * pdf.js entrega fragmentos sueltos con su posición, no líneas armadas: se
+ * agrupan por altura (misma línea visual, con 2 pt de tolerancia) y se ordenan
+ * por X para reconstruir el orden de lectura. Lo usan la web (pdf.js directo)
+ * y el teléfono (pdf.js dentro de un WebView).
+ */
+export function lineasDeTextoPdf(fragmentos: FragmentoTextoPdf[]): string[] {
+  const porLinea = new Map<number, FragmentoTextoPdf[]>();
+  for (const f of fragmentos) {
+    if (!f.texto.trim()) continue;
+    const claveY = Math.round(f.y / 2) * 2;
+    const grupo = porLinea.get(claveY);
+    if (grupo) grupo.push(f);
+    else porLinea.set(claveY, [f]);
+  }
+  return [...porLinea.entries()]
+    .sort((a, b) => b[0] - a[0]) // de arriba hacia abajo
+    .map(([, grupo]) =>
+      grupo
+        .sort((a, b) => a.x - b.x)
+        .map((f) => f.texto)
+        .join(" ")
+    );
+}
+
+/** Una página escaneada (solo imagen) casi no trae texto: hace falta OCR para leerla. */
+export function paginaSinTexto(fragmentos: Pick<FragmentoTextoPdf, "texto">[]): boolean {
+  return fragmentos.map((f) => f.texto).join("").trim().length < 8;
+}
+
 /** Lee texto extraído de PDF/OCR o CSV de cualquier banco sin depender de su nombre. */
 export function parseEstadoCuenta(texto: string, opciones: OpcionesEstadoCuenta = {}): TransaccionEstadoCuenta[] {
   const referencia = referenciaDe(texto, opciones);

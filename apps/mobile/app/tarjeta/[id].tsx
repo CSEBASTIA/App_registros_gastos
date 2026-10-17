@@ -206,6 +206,10 @@ export default function DetalleTarjeta() {
           }
         />
         <Boton
+          titulo="Importar estado de cuenta"
+          onPress={() => router.push({ pathname: "/importar-estado", params: { cuentaId: cuenta.id } })}
+        />
+        <Boton
           titulo="Eliminar tarjeta"
           variante="peligro"
           onPress={confirmarEliminar}

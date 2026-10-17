@@ -203,6 +203,7 @@ El trabajo se reparte entre varios agentes que se coordinan con contratos escrit
 | Categorías | CRUD propio; globales de solo lectura; "Otros" con detalle | Paridad |
 | Presupuestos | Lógica lista (Paso 1) | ✅ Pantalla con barras de uso |
 | Correo | — | Gmail / Outlook → bandeja de revisión |
+| Importar estado de cuenta (17-oct) | Al crear una cuenta o tarjeta y desde su detalle: PDF, CSV o foto; duplicados, ingresos y saldo final | Igual (también en la web de Vercel): PDF con texto o con clave y CSV, leídos en el dispositivo con pdf.js empaquetado. Ver [`docs/informe-importar-estado-cuenta.md`](docs/informe-importar-estado-cuenta.md). Requiere el APK 1.3.0 |
 
 ## packages/core
 

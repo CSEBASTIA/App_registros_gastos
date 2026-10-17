@@ -12,6 +12,7 @@ export * from "./lib/categorias";
 export * from "./lib/metodoPago";
 export * from "./lib/textoFinanciero";
 export * from "./lib/estadoCuenta";
+export * from "./lib/importacionEstadoCuenta";
 export * from "./lib/correoBancario";
 export * from "./lib/sincronizacionCorreo";
 export * from "./lib/fetchConTimeout";
@@ -126,6 +127,7 @@ export {
 
 export * from "./usecases/crearCategoria";
 export * from "./usecases/crearGasto";
+export * from "./usecases/importarEstadoCuenta";
 export * from "./usecases/guardarPresupuesto";
 export * from "./usecases/crearCuenta";
 export * from "./usecases/crearIngreso";

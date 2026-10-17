@@ -57,10 +57,12 @@ export default function CuentasScreen() {
 
   useFocusEffect(cargar);
 
-  async function crearYCerrar(input: Omit<Cuenta, "id" | "createdAt">) {
-    await crearCuenta(input);
+  async function crearYCerrar(input: Omit<Cuenta, "id" | "createdAt">, importar: boolean) {
+    const nueva = await crearCuenta(input);
     setMostrarForm(false);
-    cargar();
+    // Al volver de importar, la lista se recarga sola (useFocusEffect).
+    if (importar) router.push({ pathname: "/importar-estado", params: { cuentaId: nueva.id } });
+    else cargar();
   }
 
   if (cargando)
@@ -156,7 +158,7 @@ function NuevaCuenta({
   onCrear,
   onCancelar,
 }: {
-  onCrear: (input: Omit<Cuenta, "id" | "createdAt">) => Promise<void>;
+  onCrear: (input: Omit<Cuenta, "id" | "createdAt">, importar: boolean) => Promise<void>;
   onCancelar: () => void;
 }) {
   const { color } = useTheme();
@@ -169,7 +171,7 @@ function NuevaCuenta({
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  async function agregar() {
+  async function agregar(importar = false) {
     if (!nombre.trim()) {
       setError("Ponele un nombre a la cuenta.");
       return;
@@ -177,13 +179,16 @@ function NuevaCuenta({
     setError(null);
     setGuardando(true);
     try {
-      await onCrear({
-        nombre,
-        tipo,
-        banco,
-        disponible: saldoInicial ? parsearMonto(saldoInicial) : 0,
-        identificador: identificador.trim() || undefined,
-      });
+      await onCrear(
+        {
+          nombre,
+          tipo,
+          banco,
+          disponible: saldoInicial ? parsearMonto(saldoInicial) : 0,
+          identificador: identificador.trim() || undefined,
+        },
+        importar
+      );
       setNombre("");
       setSaldoInicial("");
       setIdentificador("");
@@ -243,10 +248,17 @@ function NuevaCuenta({
       <Boton
         titulo={guardando ? "Guardando…" : "Agregar"}
         variante="primario"
-        onPress={agregar}
+        onPress={() => agregar()}
         loading={guardando}
         disabled={guardando}
       />
+      {tipo !== "efectivo" && (
+        <Boton
+          titulo="Agregar e importar estado de cuenta"
+          onPress={() => agregar(true)}
+          disabled={guardando}
+        />
+      )}
     </Tarjeta>
   );
 }

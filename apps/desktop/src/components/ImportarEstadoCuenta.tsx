@@ -1,18 +1,36 @@
 import { useRef, useState, type ChangeEvent } from "react";
 import type { Categoria, Cuenta, Gasto } from "core";
-import { leerEstadoCuenta, parseEstadoCuenta, type TransaccionExtraida } from "../lib/estadoCuenta";
-import { mensajeError } from "core";
+import { leerEstadoCuenta, parseEstadoCuenta } from "../lib/estadoCuenta";
+import {
+  ErrorImportacionParcial,
+  formatMonto,
+  importarMovimientos,
+  mensajeError,
+  movimientosDelPeriodo,
+  prepararFilasImportacion,
+  resumenImportacion,
+} from "core";
 
-interface Fila extends TransaccionExtraida {
+interface Fila {
   id: number;
+  fecha: string;
+  descripcion: string;
+  monto: number;
+  tipo: "gasto" | "ingreso";
   seleccionado: boolean;
   categoriaId: string;
+  posibleDuplicado: boolean;
 }
 
 interface Props {
   categorias: Categoria[];
   cuentas: Cuenta[];
-  onImportar: (gastos: Omit<Gasto, "id" | "createdAt">[]) => Promise<void>;
+  /** Importar directo a esta cuenta (al crearla): marca duplicados, propone ingresos y muestra el saldo final. */
+  cuentaFija?: Cuenta;
+  /** Sin `cuentaFija`: guarda los gastos elegidos (vista Gastos). */
+  onImportar?: (gastos: Omit<Gasto, "id" | "createdAt">[]) => Promise<void>;
+  /** Con `cuentaFija`: se llama después de guardar, para recargar los datos. */
+  onImportado?: () => Promise<void>;
   onCerrar: () => void;
 }
 
@@ -20,13 +38,18 @@ interface Props {
  * Modal para subir un estado de cuenta (PDF o foto/captura) y convertir las
  * transacciones detectadas en gastos. Nada se guarda hasta que el usuario
  * revisa la tabla y confirma — el parseo es una heurística, no un OCR perfecto.
+ * Con `cuentaFija` usa la misma lógica que el teléfono (core: filas,
+ * duplicados, saldo y guardado en una sola escritura).
  */
-export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, onCerrar }: Props) {
+export default function ImportarEstadoCuenta({ categorias, cuentas, cuentaFija, onImportar, onImportado, onCerrar }: Props) {
   const [fase, setFase] = useState<"elegir" | "leyendo" | "revisar" | "importando">("elegir");
   const [filas, setFilas] = useState<Fila[]>([]);
-  const [cuentaId, setCuentaId] = useState("");
+  const [cuentaId, setCuentaId] = useState(cuentaFija?.id ?? "");
+  const [avisos, setAvisos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const categoriasGasto = categorias.filter((c) => c.tipo !== "ingreso");
 
   async function elegirArchivo(e: ChangeEvent<HTMLInputElement>) {
     const archivo = e.target.files?.[0];
@@ -46,16 +69,49 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
         return;
       }
 
-      const categoriaPorNombre = new Map(categorias.map((c) => [c.nombre, c.id]));
+      const categoriaPorNombre = new Map(categoriasGasto.map((c) => [c.nombre, c.id]));
       const otrosId = categoriaPorNombre.get("Otros") ?? "";
-      setFilas(
-        transacciones.map((t, i) => ({
-          ...t,
-          id: i,
-          seleccionado: !t.posiblePago,
-          categoriaId: categoriaPorNombre.get(t.categoriaSugerida) ?? otrosId,
-        }))
-      );
+      if (cuentaFija) {
+        const preparado = prepararFilasImportacion(transacciones, cuentaFija.tipo, await movimientosDelPeriodo(transacciones));
+        const notas: string[] = [];
+        if (preparado.pagosOmitidos > 0) {
+          notas.push(
+            `Se omitieron ${preparado.pagosOmitidos} pago(s) a la tarjeta: regístralos con «Registrar pago» para que también se descuenten de la cuenta de origen.`
+          );
+        }
+        if (preparado.filas.some((f) => f.tipo === "ingreso")) {
+          notas.push("Los abonos y depósitos salen sin marcar: revisa que de verdad sean ingresos antes de incluirlos.");
+        }
+        if (preparado.filas.some((f) => f.posibleDuplicado)) {
+          notas.push("Las filas «posible duplicado» tienen la misma fecha y monto que algo ya registrado: salen sin marcar.");
+        }
+        if (preparado.truncado) notas.push(`El archivo tenía demasiadas filas: se muestran las primeras ${preparado.filas.length}.`);
+        if (preparado.filas.length === 0) {
+          setError("El estado de cuenta solo trae pagos a la tarjeta: no hay consumos para importar.");
+          setFase("elegir");
+          return;
+        }
+        setAvisos(notas);
+        setFilas(
+          preparado.filas.map((f) => ({
+            ...f,
+            seleccionado: f.seleccionada,
+            categoriaId: f.tipo === "gasto" ? categoriaPorNombre.get(f.categoriaSugerida) ?? otrosId : "",
+          }))
+        );
+      } else {
+        setAvisos([]);
+        setFilas(
+          transacciones.map((t, i) => ({
+            ...t,
+            id: i,
+            tipo: "gasto",
+            posibleDuplicado: false,
+            seleccionado: !t.posiblePago,
+            categoriaId: categoriaPorNombre.get(t.categoriaSugerida) ?? otrosId,
+          }))
+        );
+      }
       setFase("revisar");
     } catch (err) {
       setError(mensajeError(err));
@@ -68,23 +124,53 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
   }
 
   const seleccionadas = filas.filter((f) => f.seleccionado);
-  const faltaCategoria = seleccionadas.some((f) => !f.categoriaId);
+  const faltaCategoria = seleccionadas.some((f) => f.tipo === "gasto" && !f.categoriaId);
+  const resumen = cuentaFija
+    ? resumenImportacion(
+        filas.map((f) => ({ ...f, seleccionada: f.seleccionado, categoriaSugerida: "Otros" as const })),
+        cuentaFija
+      )
+    : null;
+  // La base no acepta pasar el cupo de una tarjeta: se avisa antes de intentarlo.
+  const pasaElCupo = cuentaFija?.tipo === "credito" && !!resumen && resumen.disponibleDespues < 0;
 
   async function confirmarImportacion() {
     setError(null);
     setFase("importando");
     try {
-      await onImportar(
-        seleccionadas.map((f) => ({
-          monto: f.monto,
-          descripcion: f.descripcion,
-          categoriaId: f.categoriaId,
-          cuentaId: cuentaId || undefined,
-          fecha: f.fecha,
-        }))
-      );
+      if (cuentaFija) {
+        const metodoPago: Gasto["metodoPago"] =
+          cuentaFija.tipo === "credito" ? "credito" : cuentaFija.tipo === "debito" ? "debito" : undefined;
+        await importarMovimientos({
+          gastos: seleccionadas
+            .filter((f) => f.tipo === "gasto")
+            .map((f) => ({ monto: f.monto, descripcion: f.descripcion, categoriaId: f.categoriaId, cuentaId: cuentaFija.id, metodoPago, fecha: f.fecha })),
+          ingresos:
+            cuentaFija.tipo === "credito"
+              ? []
+              : seleccionadas
+                  .filter((f) => f.tipo === "ingreso")
+                  .map((f) => ({ monto: f.monto, descripcion: f.descripcion, cuentaId: cuentaFija.id, fecha: f.fecha })),
+        });
+        await onImportado?.();
+      } else {
+        await onImportar?.(
+          seleccionadas.map((f) => ({
+            monto: f.monto,
+            descripcion: f.descripcion,
+            categoriaId: f.categoriaId,
+            cuentaId: cuentaId || undefined,
+            fecha: f.fecha,
+          }))
+        );
+      }
       onCerrar();
     } catch (err) {
+      // Los gastos ya se guardaron: salen de la tabla y solo se reintentan los ingresos.
+      if (err instanceof ErrorImportacionParcial) {
+        setFilas((prev) => prev.filter((f) => !(f.tipo === "gasto" && f.seleccionado)));
+        await onImportado?.();
+      }
       setError(mensajeError(err));
       setFase("revisar");
     }
@@ -94,7 +180,7 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
     <div className="modal-overlay" onClick={onCerrar}>
       <div className="modal modal-ancho" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h3>Importar estado de cuenta</h3>
+          <h3>{cuentaFija ? `Importar estado de cuenta · ${cuentaFija.nombre}` : "Importar estado de cuenta"}</h3>
           <button className="btn-icon" onClick={onCerrar} title="Cerrar" type="button">
             ✕
           </button>
@@ -105,7 +191,8 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
             <>
               <p className="subtitulo">
                 Sube el PDF, CSV o una foto/captura de tu estado de cuenta y la app va a detectar los consumos
-                automáticamente. Vas a poder revisar y corregir cada fila antes de guardar nada.
+                automáticamente. El archivo se lee en tu computadora y no se sube a ningún servidor. Vas a poder
+                revisar y corregir cada fila antes de guardar nada.
               </p>
               <input
                 ref={inputRef}
@@ -117,6 +204,11 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
               <button type="button" className="btn btn-primary" onClick={() => inputRef.current?.click()}>
                 Elegir archivo
               </button>
+              {cuentaFija && (
+                <button type="button" className="btn" style={{ marginLeft: 8 }} onClick={onCerrar}>
+                  Ahora no
+                </button>
+              )}
             </>
           )}
 
@@ -124,22 +216,41 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
 
           {(fase === "revisar" || fase === "importando") && (
             <>
-              <div className="campo" style={{ maxWidth: 260, marginBottom: 14 }}>
-                <label htmlFor="cuenta-import">Cuenta / tarjeta (opcional, aplica a todo)</label>
-                <select
-                  id="cuenta-import"
-                  className="input"
-                  value={cuentaId}
-                  onChange={(e) => setCuentaId(e.target.value)}
-                >
-                  <option value="">Sin asignar</option>
-                  {cuentas.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.nombre}
-                    </option>
+              {cuentaFija && resumen ? (
+                <div style={{ marginBottom: 14 }}>
+                  <p style={{ margin: "0 0 6px" }}>
+                    {cuentaFija.tipo === "credito" ? "Cupo disponible" : "Saldo"}: {formatMonto(cuentaFija.disponible)} →{" "}
+                    <strong>{formatMonto(resumen.disponibleDespues)}</strong>
+                  </p>
+                  {pasaElCupo && (
+                    <p className="error" style={{ margin: "0 0 6px" }}>
+                      Lo marcado supera el cupo disponible de la tarjeta: desmarca algunos consumos o revisa el cupo.
+                    </p>
+                  )}
+                  {avisos.map((a) => (
+                    <p key={a} className="etiqueta" style={{ margin: "0 0 4px" }}>
+                      {a}
+                    </p>
                   ))}
-                </select>
-              </div>
+                </div>
+              ) : (
+                <div className="campo" style={{ maxWidth: 260, marginBottom: 14 }}>
+                  <label htmlFor="cuenta-import">Cuenta / tarjeta (opcional, aplica a todo)</label>
+                  <select
+                    id="cuenta-import"
+                    className="input"
+                    value={cuentaId}
+                    onChange={(e) => setCuentaId(e.target.value)}
+                  >
+                    <option value="">Sin asignar</option>
+                    {cuentas.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="tabla-scroll">
                 <table className="tabla">
@@ -148,6 +259,7 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
                       <th></th>
                       <th>Fecha</th>
                       <th>Descripción</th>
+                      {cuentaFija && <th>Tipo</th>}
                       <th>Categoría</th>
                       <th>Monto</th>
                     </tr>
@@ -158,6 +270,7 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
                         <td>
                           <input
                             type="checkbox"
+                            aria-label={`Importar ${f.descripcion}`}
                             checked={f.seleccionado}
                             onChange={(e) => actualizarFila(f.id, { seleccionado: e.target.checked })}
                           />
@@ -176,22 +289,32 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
                             value={f.descripcion}
                             onChange={(e) => actualizarFila(f.id, { descripcion: e.target.value })}
                           />
+                          {f.posibleDuplicado && (
+                            <span className="etiqueta" title="Ya registraste un movimiento con esta fecha y este monto">
+                              Posible duplicado
+                            </span>
+                          )}
                         </td>
+                        {cuentaFija && <td>{f.tipo === "ingreso" ? "Ingreso" : "Gasto"}</td>}
                         <td>
-                          <select
-                            className="input"
-                            value={f.categoriaId}
-                            onChange={(e) => actualizarFila(f.id, { categoriaId: e.target.value })}
-                          >
-                            <option value="" disabled>
-                              Elegir…
-                            </option>
-                            {categorias.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.nombre}
+                          {f.tipo === "gasto" ? (
+                            <select
+                              className="input"
+                              value={f.categoriaId}
+                              onChange={(e) => actualizarFila(f.id, { categoriaId: e.target.value })}
+                            >
+                              <option value="" disabled>
+                                Elegir…
                               </option>
-                            ))}
-                          </select>
+                              {categoriasGasto.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.nombre}
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td>
                           <input
@@ -229,13 +352,13 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, onImportar, 
             <button
               className="btn btn-primary"
               onClick={confirmarImportacion}
-              disabled={fase === "importando" || seleccionadas.length === 0 || faltaCategoria}
+              disabled={fase === "importando" || seleccionadas.length === 0 || faltaCategoria || pasaElCupo}
               type="button"
               title={faltaCategoria ? "Asigna una categoría a cada fila seleccionada" : undefined}
             >
               {fase === "importando"
                 ? "Importando…"
-                : `Importar ${seleccionadas.length} gasto${seleccionadas.length === 1 ? "" : "s"}`}
+                : `Importar ${seleccionadas.length} movimiento${seleccionadas.length === 1 ? "" : "s"}`}
             </button>
           </div>
         )}

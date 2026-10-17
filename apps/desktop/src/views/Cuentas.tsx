@@ -1,5 +1,5 @@
 import RippleButton from "../components/RippleButton";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   Banco,
   Categoria,
@@ -19,6 +19,7 @@ import { COLOR_CUENTA_BANCO, OPCIONES_BANCO } from "core";
 import SwatchBanco from "../components/SwatchBanco";
 import { IconoGastos, IconoMas, IconoWallet } from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
+import ImportarEstadoCuenta from "../components/ImportarEstadoCuenta";
 import { mensajeError } from "core";
 import { formatMonto } from "core";
 
@@ -27,10 +28,12 @@ interface Props {
   gastos: Gasto[];
   ingresos: Ingreso[];
   categorias: Categoria[];
-  onCrear: (input: Omit<Cuenta, "id" | "createdAt">) => Promise<void>;
+  onCrear: (input: Omit<Cuenta, "id" | "createdAt">) => Promise<Cuenta>;
   onEliminar: (id: string) => Promise<void>;
   onCrearGasto: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
   onCrearIngreso: (input: Omit<Ingreso, "id" | "createdAt">) => Promise<void>;
+  /** Después de importar un estado de cuenta: recargar los datos. */
+  onImportado: () => Promise<void>;
 }
 
 export default function Cuentas({
@@ -42,10 +45,12 @@ export default function Cuentas({
   onEliminar,
   onCrearGasto,
   onCrearIngreso,
+  onImportado,
 }: Props) {
   const cuentasBancarias = cuentas.filter((c) => c.tipo !== "credito");
   const [seleccionadaId, setSeleccionadaId] = useState<string | null>(null);
   const [mostrarForm, setMostrarForm] = useState(false);
+  const [importarEn, setImportarEn] = useState<Cuenta | null>(null);
 
   useEffect(() => {
     if (!cuentasBancarias.some((c) => c.id === seleccionadaId)) {
@@ -57,9 +62,11 @@ export default function Cuentas({
     (c) => c.id === seleccionadaId,
   );
 
-  async function crearYCerrar(input: Omit<Cuenta, "id" | "createdAt">) {
-    await onCrear(input);
+  async function crearYCerrar(input: Omit<Cuenta, "id" | "createdAt">, importar: boolean) {
+    const nueva = await onCrear(input);
     setMostrarForm(false);
+    setSeleccionadaId(nueva.id);
+    if (importar) setImportarEn(nueva);
   }
 
   return (
@@ -114,9 +121,20 @@ export default function Cuentas({
               onEliminar={onEliminar}
               onCrearGasto={onCrearGasto}
               onCrearIngreso={onCrearIngreso}
+              onImportarEstado={() => setImportarEn(cuentaSeleccionada)}
             />
           )}
         </>
+      )}
+
+      {importarEn && (
+        <ImportarEstadoCuenta
+          categorias={categorias}
+          cuentas={cuentas}
+          cuentaFija={importarEn}
+          onImportado={onImportado}
+          onCerrar={() => setImportarEn(null)}
+        />
       )}
     </>
   );
@@ -130,6 +148,7 @@ function DetalleCuenta({
   onEliminar,
   onCrearGasto,
   onCrearIngreso,
+  onImportarEstado,
 }: {
   cuenta: Cuenta;
   gastos: Gasto[];
@@ -138,6 +157,7 @@ function DetalleCuenta({
   onEliminar: (id: string) => Promise<void>;
   onCrearGasto: (input: Omit<Gasto, "id" | "createdAt">) => Promise<void>;
   onCrearIngreso: (input: Omit<Ingreso, "id" | "createdAt">) => Promise<void>;
+  onImportarEstado: () => void;
 }) {
   const [verEstadoCuenta, setVerEstadoCuenta] = useState(false);
   const movimientos = movimientosDe(
@@ -168,6 +188,11 @@ function DetalleCuenta({
                 onCrear={onCrearGasto}
               />
             </div>
+            {cuenta.tipo !== "efectivo" && (
+              <button className="btn" onClick={onImportarEstado}>
+                Importar estado de cuenta
+              </button>
+            )}
             <button className="btn" onClick={() => onEliminar(cuenta.id)}>
               Eliminar cuenta
             </button>
@@ -325,7 +350,7 @@ function NuevaCuentaBancaria({
   onCrear,
   onCancelar,
 }: {
-  onCrear: (input: Omit<Cuenta, "id" | "createdAt">) => Promise<void>;
+  onCrear: (input: Omit<Cuenta, "id" | "createdAt">, importar: boolean) => Promise<void>;
   onCancelar: () => void;
 }) {
   const [nombre, setNombre] = useState("");
@@ -334,18 +359,25 @@ function NuevaCuentaBancaria({
   const [saldoInicial, setSaldoInicial] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+  // Lo marca el botón «Agregar e importar» justo antes de enviar el formulario.
+  const importarAlCrear = useRef(false);
 
   async function agregar(e: FormEvent) {
     e.preventDefault();
+    const importar = importarAlCrear.current;
+    importarAlCrear.current = false;
     setError(null);
     setGuardando(true);
     try {
-      await onCrear({
-        nombre,
-        tipo,
-        banco,
-        disponible: Number(saldoInicial || 0),
-      });
+      await onCrear(
+        {
+          nombre,
+          tipo,
+          banco,
+          disponible: Number(saldoInicial || 0),
+        },
+        importar,
+      );
       setNombre("");
       setSaldoInicial("");
     } catch (err) {
@@ -416,6 +448,18 @@ function NuevaCuentaBancaria({
         >
           {guardando ? "Guardando…" : "Agregar"}
         </RippleButton>
+        {tipo !== "efectivo" && (
+          <button
+            type="submit"
+            className="btn"
+            disabled={guardando}
+            onClick={() => {
+              importarAlCrear.current = true;
+            }}
+          >
+            Agregar e importar estado de cuenta
+          </button>
+        )}
       </div>
 
       <div className="campo" style={{ marginTop: 16 }}>

@@ -53,19 +53,31 @@ export async function crearIngreso(
 ): Promise<Ingreso> {
   const { data, error } = await getSupabaseClient()
     .from("ingresos")
-    .insert({
-      monto: ingreso.monto,
-      descripcion: ingreso.descripcion,
-      categoria_id: ingreso.categoriaId ?? null,
-      categoria_detalle: ingreso.categoriaDetalle ?? null,
-      cuenta_id: ingreso.cuentaId ?? null,
-      fecha: ingreso.fecha,
-    })
+    .insert(filaNuevaIngreso(ingreso))
     .select()
     .single();
 
   if (error) throw error;
   return filaAIngreso(data);
+}
+
+function filaNuevaIngreso(ingreso: Omit<Ingreso, "id" | "createdAt">) {
+  return {
+    monto: ingreso.monto,
+    descripcion: ingreso.descripcion,
+    categoria_id: ingreso.categoriaId ?? null,
+    categoria_detalle: ingreso.categoriaDetalle ?? null,
+    cuenta_id: ingreso.cuentaId ?? null,
+    fecha: ingreso.fecha,
+  };
+}
+
+/** Igual que `crearGastosEnLote`: una sola escritura, se guardan todos o ninguno. */
+export async function crearIngresosEnLote(ingresos: Omit<Ingreso, "id" | "createdAt">[]): Promise<Ingreso[]> {
+  if (ingresos.length === 0) return [];
+  const { data, error } = await getSupabaseClient().from("ingresos").insert(ingresos.map(filaNuevaIngreso)).select();
+  if (error) throw error;
+  return (data ?? []).map(filaAIngreso);
 }
 
 /**

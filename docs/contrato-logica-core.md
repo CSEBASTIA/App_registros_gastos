@@ -370,3 +370,13 @@ Migración `20261016180000_captura_google_wallet`. **Pantalla hecha** en el tel�
 - **Diferidos:** solo cambian la descripción y la categoría. La migración `20261016230000_diferido_fecha_fija` agrega la fecha a lo que la base no deja cambiar (antes ya estaban el monto, la tarjeta, el método y el plazo), porque la deuda y los recordatorios de cuotas dependen de ella.
 - Los saldos se reajustan solos al editar el monto o la cuenta (disparadores de siempre); por encima del cupo, la base rechaza el cambio.
 - **«+ Nuevo»** recibe `mes` (y `semana` desde Gastos). `fechaPropuesta(mes, hoy?, semana?)` devuelve hoy si cae en ese período, su último día si ya pasó o su primer día si todavía no llega. El formulario avisa cuando la fecha no es hoy.
+
+## Importar el estado de cuenta de una cuenta (17-oct)
+
+Detalle, verificación y seguridad: [`docs/informe-importar-estado-cuenta.md`](informe-importar-estado-cuenta.md). Pantallas hechas (teléfono, web de Vercel y escritorio), a pedido del usuario.
+
+- **Leer:** `parseEstadoCuenta(texto)` (de antes) y, para PDF, `lineasDeTextoPdf(fragmentos)` + `paginaSinTexto(fragmentos)`.
+- **Revisar:** `prepararFilasImportacion(transacciones, tipoCuenta, existentes?)` → `{filas, pagosOmitidos, truncado}`. En crédito omite los pagos; en ahorro/débito los propone como ingreso sin marcar; marca «posible duplicado» (misma fecha y monto, uno a uno) sin marcar; tope `TOPE_FILAS_IMPORTACION` = 300. `existentes` sale de `movimientosDelPeriodo(transacciones)`.
+- **Saldo:** `resumenImportacion(filas, cuenta)` → `{gastos, totalGastos, ingresos, totalIngresos, disponibleDespues}` (en centavos).
+- **Guardar:** `movimientosParaGuardar(filas, cuenta, categorias)` y luego `importarMovimientos({gastos, ingresos})`: valida todo, revisa el cupo con `listarCuentas()` recién leído (`cupoInsuficiente`) y escribe cada tabla en **una** operación (`crearGastosEnLote`, `crearIngresosEnLote`): todo o nada. Si los gastos se guardan y los ingresos no, lanza `ErrorImportacionParcial` (`gastosGuardados`): reintentar solo con los ingresos.
+- **Cuidado al escribir gastos en lote:** la base valida el cupo antes de cada fila pero lo descuenta al final de la sentencia, así que un lote puede pasar el cupo sin que la base lo frene. Por eso `importarMovimientos` lo revisa antes. Propuesta pendiente: validación por sentencia en la base (informe, §5).

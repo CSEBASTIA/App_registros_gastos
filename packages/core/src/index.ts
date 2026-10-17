@@ -46,6 +46,7 @@ export {
 } from "./repositories/categorias.repo";
 export {
   listarGastos,
+  listarGastosRecientes,
   listarGastosDeLugar,
   actualizarGasto,
   obtenerGasto,
@@ -54,7 +55,7 @@ export {
 } from "./repositories/gastos.repo";
 export { listarPresupuestos, eliminarPresupuesto } from "./repositories/presupuestos.repo";
 export { listarCuentas, eliminarCuenta, actualizarFechasTarjeta } from "./repositories/cuentas.repo";
-export { listarIngresos, actualizarIngreso, eliminarIngreso } from "./repositories/ingresos.repo";
+export { listarIngresos, listarIngresosRecientes, actualizarIngreso, eliminarIngreso } from "./repositories/ingresos.repo";
 export { obtenerIngreso } from "./repositories/ingresos.repo";
 export { listarPagosTarjeta } from "./repositories/pagosTarjeta.repo";
 export {
@@ -72,6 +73,7 @@ export {
 } from "./repositories/recordatorios.repo";
 export {
   listarTransaccionesPendientes,
+  contarTransaccionesPendientes,
   insertarTransaccionesDetectadas,
   marcarTransaccionDetectada,
   confirmarTransaccionDetectada,

@@ -35,6 +35,19 @@ export async function listarIngresos(rango: RangoFechas = {}): Promise<Ingreso[]
   return filas.map(filaAIngreso);
 }
 
+/** Últimos ingresos sin descargar el historial completo para el resumen. */
+export async function listarIngresosRecientes(limite = 8): Promise<Ingreso[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("ingresos")
+    .select("*")
+    .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id")
+    .limit(limite);
+  if (error) throw error;
+  return (data ?? []).map(filaAIngreso);
+}
+
 export async function crearIngreso(
   ingreso: Omit<Ingreso, "id" | "createdAt">
 ): Promise<Ingreso> {

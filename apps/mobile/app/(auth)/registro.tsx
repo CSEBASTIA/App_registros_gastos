@@ -30,6 +30,7 @@ export default function Registro() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [aviso, setAviso] = useState<string | null>(null);
+  const [correoExistente, setCorreoExistente] = useState(false);
   const [cargando, setCargando] = useState(false);
   const [reenviando, setReenviando] = useState(false);
   const [acepto, setAcepto] = useState(false);
@@ -39,6 +40,7 @@ export default function Registro() {
   async function crearCuenta() {
     setError(null);
     setAviso(null);
+    setCorreoExistente(false);
     if (EXIGIR_ACEPTACION && !acepto) {
       setError("Para crear tu cuenta, acepta los términos y la política de privacidad.");
       return;
@@ -63,9 +65,14 @@ export default function Registro() {
         router.replace("/resumen");
         return;
       }
-      // Con confirmación de correo activada (proyecto en la nube), signUp no
-      // deja sesión hasta que la persona confirma.
-      setAviso("Te enviamos un correo para confirmar tu cuenta. Ábrelo en este mismo teléfono.");
+      // Con confirmación activada, Supabase puede devolver un usuario ficticio
+      // cuando el correo ya estaba registrado. No afirmar que se creó una
+      // cuenta nueva ni que se envió un mensaje en ese caso.
+      const cuentaExistente = Array.isArray(data.user?.identities) && data.user.identities.length === 0;
+      setCorreoExistente(cuentaExistente);
+      setAviso(cuentaExistente
+        ? "Este correo ya podría tener una cuenta. Prueba iniciar sesión con tu contraseña original."
+        : "Si es una cuenta nueva, revisa el correo de confirmación y ábrelo en este mismo teléfono. Si ya tenías cuenta, inicia sesión.");
     } catch (err) {
       setError(mensajeError(err));
     } finally {
@@ -130,7 +137,11 @@ export default function Registro() {
               autoComplete="email"
               keyboardType="email-address"
               value={email}
-              onChangeText={setEmail}
+              onChangeText={(valor) => {
+                setEmail(valor);
+                setCorreoExistente(false);
+                setAviso(null);
+              }}
             />
             <Campo
               etiqueta="Contraseña"
@@ -164,13 +175,15 @@ export default function Registro() {
               loading={cargando}
               disabled={cargando || reenviando || (EXIGIR_ACEPTACION && !acepto)}
             />
-            <Boton
-              titulo={reenviando ? "Reenviando…" : "Reenviar correo de confirmación"}
-              variante="secundario"
-              onPress={reenviarConfirmacion}
-              loading={reenviando}
-              disabled={cargando || reenviando}
-            />
+            {!correoExistente && (
+              <Boton
+                titulo={reenviando ? "Reenviando…" : "Reenviar correo de confirmación"}
+                variante="secundario"
+                onPress={reenviarConfirmacion}
+                loading={reenviando}
+                disabled={cargando || reenviando}
+              />
+            )}
           </Tarjeta>
           <Link href="/(auth)/login" style={styles.link}>
             ¿Ya tenés cuenta? Iniciá sesión

@@ -2,7 +2,7 @@ import { BlurFade } from "../../components/Motion";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { mensajeError, mesLocal, fechaLocal } from "core";
 import ErrorTexto from "../../components/ErrorTexto";
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -18,7 +18,9 @@ import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
   listarGastos,
+  listarGastosRecientes,
   listarIngresos,
+  listarIngresosRecientes,
   listarCategorias,
   listarCuentas,
   listarDeudas,
@@ -48,6 +50,13 @@ import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
 // mes, después de las 19:00 en Ecuador, ya mostraba el mes siguiente).
 const mesActual = () => mesLocal();
 
+// El resumen compara como máximo los tres meses previos con el actual.
+// La actividad reciente se consulta aparte para conservar movimientos más viejos.
+function inicioVentanaResumen() {
+  const [anio, mes] = mesActual().split("-").map(Number);
+  return fechaLocal(new Date(anio, mes - 4, 1));
+}
+
 const DIAS_SEMANA = ["D", "L", "M", "M", "J", "V", "S"];
 
 const ETIQUETA_NIVEL = { bajo: "Bajo", moderado: "Moderado", alto: "Alto" };
@@ -66,6 +75,8 @@ export default function ResumenScreen() {
   const mes = mesActual();
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
+  const [gastosRecientes, setGastosRecientes] = useState<Gasto[]>([]);
+  const [ingresosRecientes, setIngresosRecientes] = useState<Ingreso[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
@@ -82,25 +93,38 @@ export default function ResumenScreen() {
         if (!data.session) {
           setGastos([]);
           setIngresos([]);
+          setGastosRecientes([]);
+          setIngresosRecientes([]);
           setCategorias([]);
           setCuentas([]);
           setDeudas([]);
+          setLugares([]);
           setCargando(false);
           return;
         }
+        const desde = inicioVentanaResumen();
         const [g, i, c, cu, d] = await Promise.all([
-          listarGastos(),
-          listarIngresos(),
+          listarGastos({ desde }),
+          listarIngresos({ desde }),
           listarCategorias(),
           listarCuentas(),
           listarDeudas(),
         ]);
         if (!activo) return;
+        // Si el periodo ya contiene ocho movimientos, ningún registro más
+        // antiguo puede entrar en la actividad. Evitamos dos consultas.
+        const [gr, ir] = g.length + i.length >= 8
+          ? [g.slice(0, 8), i.slice(0, 8)]
+          : await Promise.all([listarGastosRecientes(), listarIngresosRecientes()]);
+        if (!activo) return;
         setGastos(g);
         setIngresos(i);
+        setGastosRecientes(gr);
+        setIngresosRecientes(ir);
         setCategorias(c);
         setCuentas(cu);
         setDeudas(d);
+        setLugares([]);
         // Aparte: sin la migración de lugares, el resto del resumen sigue funcionando.
         listarLugares().then((l) => activo && setLugares(l)).catch(() => activo && setLugares([]));
       } catch (err) {
@@ -114,11 +138,11 @@ export default function ResumenScreen() {
   }, []);
   useFocusEffect(cargar);
 
-  const gastosDelMes = gastos.filter((g) => g.fecha.startsWith(mes));
-  const ingresosDelMes = ingresos.filter((i) => i.fecha.startsWith(mes));
+  const gastosDelMes = useMemo(() => gastos.filter((g) => g.fecha.startsWith(mes)), [gastos, mes]);
+  const ingresosDelMes = useMemo(() => ingresos.filter((i) => i.fecha.startsWith(mes)), [ingresos, mes]);
   const balance = balanceGeneral(gastosDelMes, ingresosDelMes);
   const endeudamiento = calcularEndeudamiento(deudas, balance.totalIngresos);
-  const recomendaciones: Recomendacion[] = generarRecomendaciones({
+  const recomendaciones: Recomendacion[] = useMemo(() => generarRecomendaciones({
     mes,
     gastos,
     ingresos,
@@ -126,25 +150,34 @@ export default function ResumenScreen() {
     cuentas,
     endeudamiento,
     lugares,
-  });
+  }), [mes, gastos, ingresos, categorias, cuentas, endeudamiento.nivel, endeudamiento.porcentaje, lugares]);
 
   // «Dónde más pagas»: los 3 lugares con más gasto este mes.
-  const dondeMasPagas = lugares
-    .map((l) => {
-      const delLugar = gastosDelMes.filter((g) => g.lugarId === l.id);
-      return { lugar: l, pagos: delLugar.length, total: sumarMontos(delLugar.map((g) => g.monto)) };
-    })
-    .filter((x) => x.total > 0)
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 3);
+  const dondeMasPagas = useMemo(() => {
+    const porLugar = new Map<string, Gasto[]>();
+    for (const gasto of gastosDelMes) {
+      if (!gasto.lugarId) continue;
+      const grupo = porLugar.get(gasto.lugarId) ?? [];
+      grupo.push(gasto);
+      porLugar.set(gasto.lugarId, grupo);
+    }
+    return lugares
+      .map((lugar) => {
+        const pagos = porLugar.get(lugar.id) ?? [];
+        return { lugar, pagos: pagos.length, total: sumarMontos(pagos.map((g) => g.monto)) };
+      })
+      .filter((x) => x.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 3);
+  }, [lugares, gastosDelMes]);
 
-  const semana = construirSemana(gastos);
-  const actividad = construirActividad(
-    gastos,
-    ingresos,
+  const semana = useMemo(() => construirSemana(gastos), [gastos]);
+  const actividad = useMemo(() => construirActividad(
+    gastosRecientes,
+    ingresosRecientes,
     categorias,
     color,
-  ).slice(0, 8);
+  ).slice(0, 8), [gastosRecientes, ingresosRecientes, categorias, color]);
   const veredicto = veredictoFinanciero(balance, endeudamiento);
 
   if (cargando)
@@ -230,7 +263,7 @@ export default function ResumenScreen() {
 
           {/* Primer uso: sin ningún movimiento todavía, lo único que muestra
               valor es anotar el primero. Cuentas y tarjetas pueden esperar. */}
-          {gastos.length === 0 && ingresos.length === 0 && (
+          {gastosRecientes.length === 0 && ingresosRecientes.length === 0 && (
             <Tarjeta>
               <View style={styles.filaTitulo}>
                 <Text style={styles.tituloCard}>Empezá con tu primer gasto</Text>
@@ -486,6 +519,12 @@ export default function ResumenScreen() {
 
 function construirSemana(gastos: Gasto[]) {
   const hoy = new Date();
+  const montosPorDia = new Map<string, number[]>();
+  for (const gasto of gastos) {
+    const montos = montosPorDia.get(gasto.fecha) ?? [];
+    montos.push(gasto.monto);
+    montosPorDia.set(gasto.fecha, montos);
+  }
   const dias: {
     fecha: string;
     etiqueta: string;
@@ -496,9 +535,7 @@ function construirSemana(gastos: Gasto[]) {
     const fecha = new Date(hoy);
     fecha.setDate(hoy.getDate() - i);
     const clave = fechaLocal(fecha); // día local, no UTC
-    const total = gastos
-      .filter((g) => g.fecha === clave)
-      .reduce((acc, g) => acc + g.monto, 0);
+    const total = sumarMontos(montosPorDia.get(clave) ?? []);
     dias.push({
       fecha: clave,
       etiqueta: DIAS_SEMANA[fecha.getDay()],

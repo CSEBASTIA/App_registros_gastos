@@ -11,7 +11,7 @@ import {
 } from "react-native";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { listarTransaccionesPendientes } from "core";
+import { contarTransaccionesPendientes } from "core";
 import { supabase } from "../../lib/supabase";
 import { DOCUMENTOS, abrirDocumento } from "../../lib/legal";
 import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
@@ -26,6 +26,12 @@ const ITEMS: {
   url?: string;
   icono: keyof typeof Ionicons.glyphMap;
 }[] = [
+  {
+    titulo: "Mi perfil",
+    subtitulo: "Nombre, teléfono y correo de acceso",
+    ruta: "/perfil",
+    icono: "person-circle-outline",
+  },
   {
     titulo: "Cuentas",
     subtitulo: "Ahorros, débito, efectivo",
@@ -106,8 +112,8 @@ export default function Mas() {
 
   useFocusEffect(
     useCallback(() => {
-      listarTransaccionesPendientes()
-        .then((items) => setPendientes(items.length))
+      contarTransaccionesPendientes()
+        .then(setPendientes)
         .catch(() => setPendientes(0));
     }, []),
   );

@@ -44,6 +44,16 @@ export async function listarTransaccionesPendientes(): Promise<TransaccionDetect
   return (data ?? []).map(filaATransaccion);
 }
 
+/** Para el indicador de Más: pide solo el conteo, sin transferir avisos. */
+export async function contarTransaccionesPendientes(): Promise<number> {
+  const { count, error } = await getSupabaseClient()
+    .from("transacciones_detectadas")
+    .select("id", { count: "exact", head: true })
+    .eq("estado", "pendiente");
+  if (error) throw error;
+  return count ?? 0;
+}
+
 /** `origen` es opcional: si falta, el aviso es del correo (como hasta ahora). */
 export type TransaccionDetectadaInsert = Omit<TransaccionDetectada, "id" | "createdAt" | "estado" | "origen"> & {
   origen?: OrigenTransaccion;

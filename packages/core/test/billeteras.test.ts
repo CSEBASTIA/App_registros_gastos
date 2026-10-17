@@ -8,6 +8,7 @@ import { actualizarGasto, crearGasto } from "../src/repositories/gastos.repo.ts"
 import {
   insertarTransaccionesDetectadas,
   listarTransaccionesPendientes,
+  contarTransaccionesPendientes,
   type TransaccionDetectadaInsert,
 } from "../src/repositories/transaccionesDetectadas.repo.ts";
 import { eliminarTodosLosDatos } from "../src/usecases/eliminarTodosLosDatos.ts";
@@ -178,6 +179,25 @@ test("listarTransaccionesPendientes: una fila sin origen (base sin migrar) es de
   const [t] = await listarTransaccionesPendientes();
   assert.equal(t.origen, "correo");
   assert.equal(t.ubicacion, undefined);
+});
+
+test("el indicador cuenta pendientes sin descargar filas", async () => {
+  setSupabaseClient({
+    from: (tabla: string) => {
+      assert.equal(tabla, "transacciones_detectadas");
+      return {
+        select: (columnas: string, opciones: Record<string, unknown>) => {
+          assert.equal(columnas, "id");
+          assert.deepEqual(opciones, { count: "exact", head: true });
+          return { eq: async (campo: string, valor: string) => {
+            assert.deepEqual([campo, valor], ["estado", "pendiente"]);
+            return { count: 7, error: null };
+          } };
+        },
+      };
+    },
+  } as any);
+  assert.equal(await contarTransaccionesPendientes(), 7);
 });
 
 test("eliminarTodosLosDatos: borra los lugares y tolera una base sin esa tabla", async () => {

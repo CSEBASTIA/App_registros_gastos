@@ -2,8 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { setSupabaseClient } from "../src/client.ts";
 import { FILAS_POR_PAGINA, traerTodasLasFilas, validarRango } from "../src/lib/paginacion.ts";
-import { listarGastos } from "../src/repositories/gastos.repo.ts";
-import { listarIngresos } from "../src/repositories/ingresos.repo.ts";
+import { listarGastos, listarGastosRecientes } from "../src/repositories/gastos.repo.ts";
+import { listarIngresos, listarIngresosRecientes } from "../src/repositories/ingresos.repo.ts";
 import { eliminarMiCuenta } from "../src/repositories/cuentaUsuario.repo.ts";
 import { totalesPorMes } from "../src/repositories/totales.repo.ts";
 
@@ -25,6 +25,11 @@ function clienteConFilas(total: number) {
         range: (a: number, b: number) => {
           llamadas.push(`range ${a}-${b}`);
           rango = [a, b];
+          return consulta;
+        },
+        limit: (n: number) => {
+          llamadas.push(`limit ${n}`);
+          rango = [0, n - 1];
           return consulta;
         },
         then: (ok: (v: unknown) => unknown, mal?: (e: unknown) => unknown) =>
@@ -53,6 +58,15 @@ test("listarGastos: con rango filtra en la base, en cada página", async () => {
   const llamadas = clienteConFilas(10);
   await listarGastos({ desde: "2026-10-01", hasta: "2026-10-31" });
   assert.deepEqual(llamadas, ["gte fecha 2026-10-01", "lte fecha 2026-10-31", "range 0-999"]);
+});
+
+test("el resumen pide solo ocho movimientos recientes de cada tipo, sin excluir fechas antiguas", async () => {
+  const llamadasGastos = clienteConFilas(100);
+  assert.equal((await listarGastosRecientes()).length, 8);
+  assert.deepEqual(llamadasGastos, ["limit 8"]);
+  const llamadasIngresos = clienteConFilas(100);
+  assert.equal((await listarIngresosRecientes()).length, 8);
+  assert.deepEqual(llamadasIngresos, ["limit 8"]);
 });
 
 test("validarRango: rechaza fechas imposibles o al revés", () => {

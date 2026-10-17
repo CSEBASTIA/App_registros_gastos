@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { View, Text, Pressable, ScrollView, StyleSheet, type LayoutRectangle } from "react-native";
 import { useTheme, font, radius, spacing, type Colors } from "../lib/theme";
 import { AnimatedBackground } from "./Motion";
@@ -26,10 +26,18 @@ export default function SelectorChips({ titulo, opciones, valor, onCambiar }: Pr
   const { color } = useTheme();
   const styles = makeStyles(color);
   const [layouts, setLayouts] = useState<Record<string, LayoutRectangle>>({});
+  const scrollRef = useRef<ScrollView>(null);
+  const posicionActiva = layouts[valor]?.x;
+
+  useEffect(() => {
+    if (posicionActiva === undefined) return;
+    scrollRef.current?.scrollTo({ x: Math.max(0, posicionActiva - spacing(2)), animated: true });
+  }, [posicionActiva, valor]);
+
   return (
     <View style={styles.contenedor}>
       <Text style={styles.etiqueta}>{titulo}</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false}>
       <View style={styles.fila}>
         <AnimatedBackground layout={layouts[valor]} color={color.primaryBg} />
         {opciones.map((o) => {

@@ -40,6 +40,19 @@ export async function listarGastos(rango: RangoFechas = {}): Promise<Gasto[]> {
   return listarGastosFiltrados(rango);
 }
 
+/** Últimos movimientos sin descargar el historial completo para el resumen. */
+export async function listarGastosRecientes(limite = 8): Promise<Gasto[]> {
+  const { data, error } = await getSupabaseClient()
+    .from("gastos")
+    .select("*")
+    .order("fecha", { ascending: false })
+    .order("created_at", { ascending: false })
+    .order("id")
+    .limit(limite);
+  if (error) throw error;
+  return (data ?? []).map(filaAGasto);
+}
+
 /** Los pagos de un lugar (detalle del resumen por lugar), los más recientes primero. */
 export async function listarGastosDeLugar(lugarId: string, rango: RangoFechas = {}): Promise<Gasto[]> {
   return listarGastosFiltrados(rango, z.string().uuid("Lugar no válido.").parse(lugarId));

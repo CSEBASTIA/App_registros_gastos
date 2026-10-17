@@ -142,6 +142,7 @@ function ThemedLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="(auth)" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+      <Stack.Screen name="perfil" options={{ title: "Mi perfil" }} />
       <Stack.Screen name="cuentas" options={{ title: "Cuentas" }} />
       <Stack.Screen name="cuenta/[id]" options={{ title: "Cuenta" }} />
       <Stack.Screen name="deudas" options={{ title: "Deudas" }} />

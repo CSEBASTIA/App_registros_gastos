@@ -3,33 +3,36 @@ import { normalizarNumero, sugerirCategoria } from "./textoFinanciero";
 import { fechaIso } from "../schemas/limites";
 
 /**
- * Dominios/direcciones de remitente conocidas de cada banco, para
- * identificar de qué banco vino un aviso transaccional.
+ * Direcciones desde las que cada banco envía avisos de movimientos, para saber
+ * de qué banco vino un aviso. Salieron de una bandeja real (16-oct-2026; solo
+ * se miraron remitente y asunto, nunca montos ni datos personales).
  *
- * TODO: placeholder — completar con los remitentes reales en cuanto el
- * usuario comparta un correo real (redactado) de cada banco que use. Sin
- * esto, un correo no matcheado igual queda en la cola de revisión (con
- * `banco: undefined`), solo que el usuario tiene que elegir el banco/
- * cuenta a mano en vez de que la app lo adivine.
+ * Son direcciones EXACTAS y no dominios, a propósito: el mismo dominio manda
+ * también publicidad (info@email.bancoguayaquil.com, comunicados@pichincha.com)
+ * y avisos de ingreso a la banca (logininfo@pichincha.com) que no son
+ * movimientos y no deben quedar atribuidos al banco.
+ *
+ * Sin muestras todavía: Produbanco, Diners Club y Banco del Austro. Un aviso
+ * de un remitente que no está aquí igual llega a la Bandeja (con
+ * `banco: undefined`); la persona elige banco y cuenta a mano.
  */
 export const REMITENTES_BANCO: Partial<Record<Banco, string[]>> = {
-  // banco_guayaquil: ["notificaciones@bancoguayaquil.com"],
-  // pichincha: ["bancapichincha@pichincha.com"],
-  // produbanco: ["notificaciones@produbanco.com"],
-  // diners_club: ["dinersclub@dinersclub.com.ec"],
+  pichincha: ["banco@pichincha.com"],
+  banco_guayaquil: ["bancoguayaquil@bancoguayaquil.com", "bancavirtual@bancoguayaquil.com"],
+  banco_pacifico: ["intermail@bancopacifico.ec"],
 };
 
 const PALABRAS_GASTO =
   /\b(compra|consumo|d[eé]bito|retiro|pago\s+(?:realizado|enviado)|transferencia\s+(?:enviada|realizada)|env[ií]o\s+de\s+dinero)\b/i;
 const PALABRAS_INGRESO =
-  /\b(dep[oó]sito|abono\s+(?:recibido)?|acreditaci[oó]n|transferencia\s+recibida|pago\s+recibido|sueldo|rol\s+de\s+pagos)\b/i;
+  /\b(dep[oó]sito|abono\s+(?:recibido)?|acreditaci[oó]n|transferencia\s+recibida|pago\s+recibido|has\s+recibido\s+dinero|sueldo|rol\s+de\s+pagos)\b/i;
 
 // Monto con 2 decimales, con o sin separador de miles ("1.234,56", "1,234.56",
 // "1234.56"). Debe empezar al inicio o tras algo que no sea dígito ni separador:
 // sin esa condición, "$1234.56" se leía como 234.56.
 const REGEX_MONTO = /(?:^|[^\d.,])(\d{1,3}(?:[.,]\d{3})+[.,]\d{2}|\d+[.,]\d{2})(?!\d)/;
 // Pago a la tarjeta propia: es una salida de dinero, no un ingreso (aunque diga "abono").
-const PAGO_A_TARJETA = /\b(abono|pago)\s+(?:a|de)\s+(?:tu|su)\s+tarjeta\b/i;
+const PAGO_A_TARJETA = /\b(?:(?:abono|pago)\s+(?:a|de)\s+(?:tu|su)\s+tarjeta|pago\s+tarjeta\s+propia)\b/i;
 const REGEX_FECHA_DMY = /(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})/;
 const REGEX_FECHA_ISO = /(\d{4})-(\d{2})-(\d{2})/;
 // "cuenta ****1234" / "tarjeta terminada en 5678" / "cta. 1234"

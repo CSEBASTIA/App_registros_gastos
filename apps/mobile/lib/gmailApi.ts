@@ -1,4 +1,5 @@
 import {
+  consultaGmail,
   htmlATexto,
   crearFetchConTimeout,
   fechaLocal,
@@ -112,8 +113,7 @@ async function llamarGmail(path: string): Promise<any> {
  * la búsqueda, se cuenta en `fallidos`.
  */
 export async function traerCorreosNuevos(desde: Date, tope = TOPE_CORREOS): Promise<CorreosTraidos> {
-  const despuesDe = Math.floor(desde.getTime() / 1000);
-  const q = encodeURIComponent(`after:${despuesDe}`);
+  const q = encodeURIComponent(consultaGmail(desde));
   const { items: ids, truncado } = await juntarPaginas<string>(async (siguiente) => {
     const pagina = await llamarGmail(
       `/messages?q=${q}&maxResults=100${siguiente ? `&pageToken=${encodeURIComponent(siguiente)}` : ""}`

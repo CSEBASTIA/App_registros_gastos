@@ -37,9 +37,9 @@ async function borrarSeguro(clave: string): Promise<void> {
 }
 
 /**
- * Client ID del App Registration en Azure AD (portal.azure.com → Microsoft
- * Entra ID → App registrations). Placeholder hasta que exista uno real —
- * ver instrucciones en `app/correo.tsx`.
+ * Client ID del registro de aplicación en Microsoft Entra ID (portal.azure.com
+ * → App registrations), como cliente público: sin secreto, con la redirección
+ * `gastosapp://redirect`. Pasos completos en `docs/guia-conectar-correo.md`.
  */
 const CLIENT_ID = process.env.EXPO_PUBLIC_MS_CLIENT_ID ?? "";
 
@@ -76,7 +76,9 @@ async function guardarTokens(t: AuthSession.TokenResponse): Promise<void> {
 /** Abre el login de Microsoft y, si el usuario acepta, guarda los tokens en el dispositivo (nunca en Supabase). */
 export async function conectarCorreo(): Promise<void> {
   if (!correoConfigurado()) {
-    throw new Error("Falta configurar EXPO_PUBLIC_MS_CLIENT_ID — ver la pantalla Correo para las instrucciones.");
+    throw new Error(
+      "Outlook aún no está habilitado en esta versión de la app (falta EXPO_PUBLIC_MS_CLIENT_ID; ver docs/guia-conectar-correo.md)."
+    );
   }
 
   const request = new AuthSession.AuthRequest({
@@ -85,6 +87,9 @@ export async function conectarCorreo(): Promise<void> {
     redirectUri: REDIRECT_URI,
     usePKCE: true,
     responseType: AuthSession.ResponseType.Code,
+    // Pregunta con qué cuenta entrar: sin esto Microsoft reusa en silencio la
+    // que ya esté abierta en el navegador del teléfono (puede ser otra persona).
+    prompt: AuthSession.Prompt.SelectAccount,
   });
 
   const resultado = await request.promptAsync(DISCOVERY);

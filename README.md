@@ -126,8 +126,8 @@ cp apps/desktop/.env.example apps/desktop/.env
 | `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` | teléfono | Proyecto Supabase. **Debe llevar el prefijo `EXPO_PUBLIC_`**; con otro prefijo la app compila pero nunca conecta. |
 | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | web | Proyecto Supabase. |
 | `VITE_DEV_EMAIL` / `VITE_DEV_PASSWORD` | web | Auto-login **solo en `pnpm dev:desktop`**. En el build de producción se eliminan (verificado). |
-| `EXPO_PUBLIC_MS_CLIENT_ID` | teléfono | Opcional: conectar Outlook. |
-| `EXPO_PUBLIC_GOOGLE_CLIENT_ID` | teléfono | Opcional: conectar Gmail (ver [correo](#detección-de-movimientos-por-correo)). |
+| `EXPO_PUBLIC_MS_CLIENT_ID` | teléfono | Opcional: conectar Outlook (ver [guía de correo](docs/guia-conectar-correo.md)). |
+| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | teléfono | Opcional: conectar Gmail. Client ID de un cliente OAuth de tipo **Android** (antes `EXPO_PUBLIC_GOOGLE_CLIENT_ID`, de tipo Web, que no funcionaba). |
 
 **Aplica las migraciones** antes de usar la app:
 
@@ -388,12 +388,14 @@ Aún sin verificar: el timeout en un teléfono físico y el upsert de presupuest
 
 **Configuración:**
 
-- **Outlook:** Azure → App registrations → plataforma "Mobile and desktop applications" con redirect `gastosapp://redirect`.
-- **Gmail:** Google Cloud → habilitar Gmail API → OAuth client ID. **Por confirmar en el Paso 4:** el cliente de tipo "Web application" exige un secreto y no acepta redirects `gastosapp://`; lo habitual en móvil es un cliente Android/iOS. Además, `gmail.readonly` es un permiso restringido: para publicar hace falta la verificación de Google, y en modo de prueba el token caduca a los 7 días.
+Paso a paso, con lo que hay que hacer en Azure y en Google Cloud y cómo comprobarlo en un teléfono: [`docs/guia-conectar-correo.md`](docs/guia-conectar-correo.md).
 
-**Limitaciones actuales (Paso 4):** la lista de remitentes de bancos (`REMITENTES_BANCO`) está vacía hasta tener muestras reales, así que el banco queda sin asignar en la bandeja; no se verifica DKIM/SPF (un remitente falsificado con el dominio real pasaría, por eso todo va a revisión humana); no hay sincronización en segundo plano. Cada búsqueda pagina hasta 500 correos y avisa si hubo más.
+- **Outlook:** Microsoft Entra ID → registro de aplicación → plataforma "Mobile and desktop applications" con redirect `gastosapp://redirect` y «Allow public client flows» en Sí. Pide la cuenta cada vez (`prompt=select_account`).
+- **Gmail:** Google Cloud → habilitar Gmail API → cliente OAuth de tipo **Android** (paquete `com.csebastia.gastosapp` + huella SHA-1 de la firma) con el esquema de URI personalizado habilitado; la app vuelve por `com.csebastia.gastosapp:/oauthredirect`. El tipo «Web» exige un secreto y no sirve. Solo Android por ahora (en iOS y web el botón queda inactivo). `gmail.readonly` es un permiso restringido: para publicar hace falta la verificación de Google, y en modo de prueba el token caduca a los 7 días. La búsqueda deja fuera las pestañas Promociones, Social y Foros.
 
-**Privacidad al cerrar sesión (15-oct):** el permiso de correo es del teléfono, no de la cuenta. Al cerrar sesión se borran los tokens (y se revoca el de Google), y la conexión queda ligada a quien la hizo: si entra otra persona en el mismo teléfono, se olvida. Si el permiso fue retirado (`invalid_grant`), la app borra los tokens y pide reconectar. La revocación ante Google no se ha probado con un Client ID real.
+**Limitaciones actuales (Paso 4):** la lista de remitentes (`REMITENTES_BANCO`) trae solo Pichincha, Banco Guayaquil y Banco del Pacífico (direcciones exactas vistas en una bandeja real el 16-oct); de Produbanco, Diners Club y Banco del Austro no hubo muestras, y su banco se elige a mano en la bandeja; los asuntos se verificaron, pero no el cuerpo de los correos, así que el monto y el tipo de cada banco aún no están comprobados con avisos reales; no se verifica DKIM/SPF (un remitente falsificado con el dominio real pasaría, por eso todo va a revisión humana); no hay sincronización en segundo plano. Cada búsqueda pagina hasta 500 correos y avisa si hubo más.
+
+**Privacidad al cerrar sesión (15-oct):** el permiso de correo es del teléfono, no de la cuenta. Al cerrar sesión se borran los tokens (y se revoca el de Google), y la conexión queda ligada a quien la hizo: si entra otra persona en el mismo teléfono, se olvida. Si el permiso fue retirado (`invalid_grant`), la app borra los tokens y pide reconectar. La revocación ante Google y el ingreso con una cuenta real de Gmail y de Outlook no se han probado todavía: necesitan los Client ID reales (ver la guía).
 
 ## Modelo de negocio
 
@@ -435,7 +437,7 @@ Propuesta del Paso 5, como hipótesis a validar con usuarios:
 | Pantalla para editar ingresos (base y `actualizarIngreso` listos) | Media | 7 |
 | Anular un pago de tarjeta por error (hoy no se puede borrar, a propósito) | Baja | 3 |
 | Borrar una deuda con recordatorios falla por la clave foránea (el teléfono ahora muestra el error) | Media | 3 |
-| Correo: remitentes reales vacíos, tipo de cliente OAuth de Google, verificación de Google para `gmail.readonly` (no promocionarlo hasta resolverlo) | Media | 4 |
+| Correo: remitentes de Produbanco, Diners Club y Austro por conseguir, cuerpos de los avisos reales sin comprobar, crear los Client ID reales (Google Android y Microsoft) y probarlos en un teléfono, verificación de Google para `gmail.readonly` (no promocionarlo hasta resolverlo) | Media | 4 |
 | El nivel de endeudamiento sale 0 % en un mes sin ingresos (core ya acepta un ingreso de referencia; falta usarlo en las pantallas) | Baja | 6 |
 | La web no tiene login ni cierre de sesión; botón "Borrar todo (temporal)" visible | Alta antes de publicar la web | Fase web |
 | Reemplazar `toISOString().slice(…)` por `fechaLocal()` en las pantallas de la **web** (el teléfono ya está; quedan 9 usos en 8 archivos) | Media | Fase web |

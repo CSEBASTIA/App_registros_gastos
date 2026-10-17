@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import * as AuthSession from "expo-auth-session";
+import Constants from "expo-constants";
 import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { crearFetchConTimeout, esPermisoRetirado, MENSAJE_PERMISO_CORREO_VENCIDO } from "core";
@@ -33,11 +34,13 @@ async function borrarSeguro(clave: string): Promise<void> {
 }
 
 /**
- * Client ID de un OAuth Client (tipo "Web application") creado en Google
- * Cloud Console → APIs & Services → Credentials. Placeholder hasta que
- * exista uno real — ver instrucciones en `app/correo.tsx`.
+ * Client ID de un OAuth Client de tipo **Android** (Google Cloud Console →
+ * APIs y servicios → Credenciales), ligado al paquete y a la huella SHA-1 de
+ * la firma de la app. Un cliente "Web" no sirve aquí: exige un secreto que no
+ * puede viajar en la app y no admite la redirección propia del teléfono.
+ * Pasos completos en `docs/guia-conectar-correo.md`.
  */
-const CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_CLIENT_ID ?? "";
+const CLIENT_ID = process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID ?? "";
 
 const DISCOVERY = {
   authorizationEndpoint: "https://accounts.google.com/o/oauth2/v2/auth",
@@ -46,14 +49,19 @@ const DISCOVERY = {
 
 const SCOPES = ["openid", "email", "https://www.googleapis.com/auth/gmail.readonly"];
 
-const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: "gastosapp", path: "redirect" });
+// Google devuelve a la app por el esquema de su paquete (Expo ya lo registra en
+// el manifiesto). Debe coincidir con el paquete del cliente Android y con el
+// esquema personalizado habilitado en sus «Configuración avanzada».
+const PAQUETE_ANDROID = Constants.expoConfig?.android?.package ?? "com.csebastia.gastosapp";
+const REDIRECT_URI = `${PAQUETE_ANDROID}:/oauthredirect`;
 
 const CLAVE_REFRESH = "gmail_refresh_token";
 const CLAVE_ACCESS = "gmail_access_token";
 const CLAVE_EXPIRA = "gmail_access_expira";
 
+/** Gmail solo está listo en Android con su Client ID (el cliente de Google es de tipo Android). */
 export function correoConfigurado(): boolean {
-  return CLIENT_ID.length > 0;
+  return Platform.OS === "android" && CLIENT_ID.length > 0;
 }
 
 export async function hayCorreoConectado(): Promise<boolean> {
@@ -71,7 +79,9 @@ async function guardarTokens(t: AuthSession.TokenResponse): Promise<void> {
 /** Abre el login de Google y, si el usuario acepta, guarda los tokens en el dispositivo (nunca en Supabase). */
 export async function conectarCorreo(): Promise<void> {
   if (!correoConfigurado()) {
-    throw new Error("Falta configurar EXPO_PUBLIC_GOOGLE_CLIENT_ID — ver la pantalla Correo para las instrucciones.");
+    throw new Error(
+      "Gmail aún no está habilitado en esta versión de la app (falta EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID; ver docs/guia-conectar-correo.md)."
+    );
   }
 
   const request = new AuthSession.AuthRequest({

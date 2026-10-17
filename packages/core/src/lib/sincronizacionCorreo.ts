@@ -39,6 +39,16 @@ export function desdeParaSincronizar(marcaGuardada: string | null, ahora: Date =
   return new Date(ahora.getTime() - DIAS_PRIMERA_BUSQUEDA * 24 * 60 * 60 * 1000);
 }
 
+/**
+ * Búsqueda de Gmail para una sincronización: lo recibido desde `desde`, sin las
+ * pestañas Promociones, Social y Foros (ahí no llegan los avisos del banco).
+ * Se leen menos correos ajenos y casi nunca se llega al tope de `TOPE_CORREOS`.
+ */
+export function consultaGmail(desde: Date): string {
+  const segundos = Math.floor(desde.getTime() / 1000);
+  return `after:${segundos} -category:promotions -category:social -category:forums`;
+}
+
 /** El refresh token ya no sirve (permiso retirado, contraseña cambiada, token caducado). */
 export function esPermisoRetirado(err: unknown): boolean {
   const e = err as { code?: unknown; error?: unknown; message?: unknown } | undefined;

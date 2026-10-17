@@ -241,7 +241,9 @@ export default function CorreoScreen() {
                   titulo={
                     conectando === p
                       ? "Conectando…"
-                      : `Conectar ${ETIQUETA_PROVEEDOR[p]}`
+                      : proveedorConfigurado(p)
+                        ? `Conectar ${ETIQUETA_PROVEEDOR[p]}`
+                        : `${ETIQUETA_PROVEEDOR[p]} (aún no disponible)`
                   }
                   variante="primario"
                   onPress={() => conectar(p)}

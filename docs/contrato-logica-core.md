@@ -99,6 +99,7 @@ Origen: revisión de errores con dos agentes. Todo con pruebas: core 71/71, base
 - `lib/supabase.ts`: al cerrar sesión (`SIGNED_OUT`) se olvida el correo del teléfono. Antes, quien entrara después seguía leyendo el correo de la persona anterior. **`mas.tsx` no necesita cambios.**
 - `lib/gmailAuth.ts` y `outlookAuth.ts`: si el permiso fue retirado (`invalid_grant`), se borran los tokens y se pide reconectar. Gmail borra los tokens antes de revocar.
 - `lib/gmailApi.ts` y `graphMail.ts`: paginación y descarga de a 10 (un correo malo no tumba la búsqueda). En Graph, la fecha va en el día local y solo se sigue un `nextLink` de graph.microsoft.com.
+- **16-oct (cierre de Gmail/Outlook):** `gmailAuth.ts` usa un cliente OAuth de tipo **Android** (`EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`) y vuelve por `<paquete>:/oauthredirect`; `correoConfigurado()` es falso fuera de Android. `outlookAuth.ts` pide `prompt=select_account`. La búsqueda de Gmail la arma `consultaGmail(desde)` en core (fecha en segundos y sin Promociones/Social/Foros). Pasos de configuración: `docs/guia-conectar-correo.md`.
 - Pantallas (dueño: Agente 3), cambios mínimos sin tocar el diseño:
   - `app/correo.tsx`: los botones Buscar y Desconectar llaman a las funciones de `lib/correoProveedor`. El resultado se arma con `resumenSincronizacion`.
   - `parsearMonto` en `gasto/nuevo`, `ingreso/nuevo`, `(tabs)/tarjetas`, `cuentas`, `deudas`, `recordatorios`, `tarjeta/[id]`, `bandeja` y `presupuestos`.

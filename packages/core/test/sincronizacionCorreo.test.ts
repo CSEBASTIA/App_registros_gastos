@@ -2,6 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
   avisosDeCorreos,
+  consultaGmail,
   cuentaParaAviso,
   desdeParaSincronizar,
   enLotes,
@@ -61,6 +62,13 @@ test("desdeParaSincronizar: primera vez 14 días; después, la marca con 10 min 
   // Una marca dañada o en el futuro no deja la búsqueda en blanco para siempre.
   assert.equal(desdeParaSincronizar("basura", ahora).toISOString(), "2026-10-01T20:00:00.000Z");
   assert.equal(desdeParaSincronizar("2030-01-01T00:00:00.000Z", ahora).toISOString(), "2026-10-01T20:00:00.000Z");
+});
+
+test("consultaGmail: filtra por fecha en segundos y deja fuera las pestañas de publicidad", () => {
+  const q = consultaGmail(new Date("2026-10-15T18:00:00.000Z"));
+  assert.equal(q, "after:1792087200 -category:promotions -category:social -category:forums");
+  // Los milisegundos se descartan (Gmail solo entiende segundos).
+  assert.equal(consultaGmail(new Date(1_792_087_200_999)), q);
 });
 
 test("esPermisoRetirado: reconoce invalid_grant en sus distintas formas", () => {

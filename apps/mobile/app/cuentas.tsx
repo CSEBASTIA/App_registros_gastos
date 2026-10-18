@@ -125,11 +125,25 @@ export default function CuentasScreen() {
             onCancelar={() => setMostrarForm(false)}
           />
         ) : (
-          <Boton
-            titulo="+ Agregar cuenta"
-            variante="primario"
-            onPress={() => setMostrarForm(true)}
-          />
+          <>
+            <Boton
+              titulo="+ Agregar cuenta"
+              variante="primario"
+              onPress={() => setMostrarForm(true)}
+            />
+            <View style={{ flexDirection: "row", gap: spacing(2) }}>
+              <Boton
+                titulo="Transferir"
+                style={{ flex: 1 }}
+                onPress={() => router.push("/transferencia/nueva")}
+              />
+              <Boton
+                titulo="Ver transferencias"
+                style={{ flex: 1 }}
+                onPress={() => router.push("/transferencias")}
+              />
+            </View>
+          </>
         )}
 
         {!cargando && cuentas.length === 0 ? (

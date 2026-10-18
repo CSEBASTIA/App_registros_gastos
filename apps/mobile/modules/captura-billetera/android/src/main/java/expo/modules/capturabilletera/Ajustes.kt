@@ -17,8 +17,14 @@ internal object Ajustes {
   private const val CLAVE = "clave"
   private const val PENDIENTES = "pendientes"
   private const val ULTIMO = "ultimo"
+  private const val AVISO_PAGOS = "aviso_pagos"
+  private const val AVISO_BANDEJA = "aviso_bandeja"
+  private const val AVISO_PRESUPUESTOS = "aviso_presupuestos"
 
   data class Conexion(val url: String, val apikey: String, val clave: String)
+
+  /** Qué notificaciones mostrar al enviar un pago (se eligen en Más → Notificaciones). */
+  data class Avisos(val pagos: Boolean, val bandeja: Boolean, val presupuestos: Boolean)
 
   private fun preferencias(context: Context) =
     context.applicationContext.getSharedPreferences(ARCHIVO, Context.MODE_PRIVATE)
@@ -39,9 +45,35 @@ internal object Ajustes {
       .apply()
   }
 
-  /** Desconectar: borra la clave, los avisos pendientes y el último resultado. */
+  /**
+   * Desconectar: borra la clave, los avisos pendientes y el último resultado.
+   * Las preferencias de notificaciones son de la persona, no de la conexión: se quedan.
+   */
   fun borrar(context: Context) {
-    preferencias(context).edit().clear().apply()
+    preferencias(context).edit()
+      .remove(URL)
+      .remove(APIKEY)
+      .remove(CLAVE)
+      .remove(PENDIENTES)
+      .remove(ULTIMO)
+      .apply()
+  }
+
+  fun avisos(context: Context): Avisos {
+    val p = preferencias(context)
+    return Avisos(
+      pagos = p.getBoolean(AVISO_PAGOS, true),
+      bandeja = p.getBoolean(AVISO_BANDEJA, true),
+      presupuestos = p.getBoolean(AVISO_PRESUPUESTOS, true),
+    )
+  }
+
+  fun guardarAvisos(context: Context, avisos: Avisos) {
+    preferencias(context).edit()
+      .putBoolean(AVISO_PAGOS, avisos.pagos)
+      .putBoolean(AVISO_BANDEJA, avisos.bandeja)
+      .putBoolean(AVISO_PRESUPUESTOS, avisos.presupuestos)
+      .apply()
   }
 
   fun pendientes(context: Context): JSONArray =

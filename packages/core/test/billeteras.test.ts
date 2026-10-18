@@ -200,15 +200,17 @@ test("el indicador cuenta pendientes sin descargar filas", async () => {
   assert.equal(await contarTransaccionesPendientes(), 7);
 });
 
-test("eliminarTodosLosDatos: borra los lugares y tolera una base sin esa tabla", async () => {
+test("eliminarTodosLosDatos: borra los lugares y las transferencias, y tolera una base sin esas tablas", async () => {
   const enviado = clienteQueAnota();
   await eliminarTodosLosDatos();
-  assert.equal(enviado.at(-1)!.tabla, "lugares");
+  assert.deepEqual(enviado.slice(-2).map((e) => e.tabla), ["lugares", "transferencias"]);
 
   setSupabaseClient({
     from: (tabla: string) => ({
       delete: () => ({
-        not: async () => ({ error: tabla === "lugares" ? { code: "PGRST205", message: "no existe" } : null }),
+        not: async () => ({
+          error: tabla === "lugares" || tabla === "transferencias" ? { code: "PGRST205", message: "no existe" } : null,
+        }),
       }),
     }),
   } as any);

@@ -4,6 +4,7 @@ import { ingresoSchema } from "../schemas/ingreso.schema";
 import { crearGastosEnLote, listarGastos } from "../repositories/gastos.repo";
 import { crearIngresosEnLote, listarIngresos } from "../repositories/ingresos.repo";
 import { listarCuentas } from "../repositories/cuentas.repo";
+import { listarTransferencias } from "../repositories/transferencias.repo";
 import { mensajeError } from "../lib/mensajeError";
 import type { TransaccionEstadoCuenta } from "../lib/estadoCuenta";
 import {
@@ -14,12 +15,21 @@ import {
   type MovimientosParaGuardar,
 } from "../lib/importacionEstadoCuenta";
 
-/** Lo ya registrado en el periodo del estado de cuenta (todas las cuentas), para marcar posibles duplicados. */
+/**
+ * Lo ya registrado en el periodo del estado de cuenta (todas las cuentas), para
+ * marcar posibles duplicados. Una transferencia entre cuentas propias aparece
+ * en el estado como salida de una cuenta y entrada en la otra: cuenta para los
+ * dos lados, así no se importa otra vez como gasto o ingreso.
+ */
 export async function movimientosDelPeriodo(transacciones: Pick<TransaccionEstadoCuenta, "fecha">[]): Promise<MovimientosExistentes> {
   const rango = rangoDeFilas(transacciones);
   if (!rango) return { gastos: [], ingresos: [] };
-  const [gastos, ingresos] = await Promise.all([listarGastos(rango), listarIngresos(rango)]);
-  return { gastos, ingresos };
+  const [gastos, ingresos, transferencias] = await Promise.all([
+    listarGastos(rango),
+    listarIngresos(rango),
+    listarTransferencias(rango),
+  ]);
+  return { gastos: [...gastos, ...transferencias], ingresos: [...ingresos, ...transferencias] };
 }
 
 /** Los gastos se guardaron y los ingresos no: reintentar debe mandar solo los ingresos. */

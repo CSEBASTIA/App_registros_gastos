@@ -31,8 +31,14 @@ class CapturaBilleteraModule : Module() {
         "prefijo" to conexion?.clave?.substring(3, 9),
         "permiso" to permisoConcedido(c),
         "pendientes" to Ajustes.pendientes(c).length(),
-        "ultimo" to Ajustes.ultimo(c)
+        "ultimo" to Ajustes.ultimo(c),
+        "avisos" to Ajustes.avisos(c).let { mapOf("pagos" to it.pagos, "bandeja" to it.bandeja, "presupuestos" to it.presupuestos) }
       )
+    }
+
+    /** Qué notificaciones muestra el módulo al enviar un pago (Más → Notificaciones). */
+    Function("ajustarAvisos") { pagos: Boolean, bandeja: Boolean, presupuestos: Boolean ->
+      Ajustes.guardarAvisos(contexto, Ajustes.Avisos(pagos, bandeja, presupuestos))
     }
 
     Function("conectar") { url: String, apikey: String, clave: String ->

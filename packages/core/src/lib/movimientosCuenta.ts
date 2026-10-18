@@ -1,10 +1,14 @@
-import type { AbonoDeuda, Categoria, Gasto, Ingreso, PagoTarjeta } from "../types/domain";
+import type { AbonoDeuda, Categoria, Gasto, Ingreso, PagoTarjeta, Transferencia } from "../types/domain";
 import { fechaLocal } from "./semanas";
 
 export interface MovimientoCuenta {
   id: string;
-  /** "pago" = pago recibido por la tarjeta; "pago_enviado" = pago a una tarjeta desde esta cuenta; "abono" = abono a una deuda desde esta cuenta. */
-  tipo: "gasto" | "pago" | "ingreso" | "pago_enviado" | "abono";
+  /**
+   * "pago" = pago recibido por la tarjeta; "pago_enviado" = pago a una tarjeta desde esta cuenta;
+   * "abono" = abono a una deuda desde esta cuenta; "transferencia_enviada" / "transferencia_recibida" =
+   * dinero que salió hacia otra cuenta propia o llegó desde otra (no son gasto ni ingreso).
+   */
+  tipo: "gasto" | "pago" | "ingreso" | "pago_enviado" | "abono" | "transferencia_enviada" | "transferencia_recibida";
   /**
    * Entrada (suma al disponible) o salida (resta). Usar esto para el signo, no
    * `tipo`. `movimientosDe` siempre lo llena; es opcional solo para no romper
@@ -21,9 +25,11 @@ export interface MovimientoCuenta {
 
 /**
  * Línea de tiempo de una cuenta, más reciente primero: sus gastos e ingresos,
- * los pagos que recibió (si es tarjeta) y las salidas por pagar una tarjeta o
- * abonar a una deuda desde ella. Antes esas salidas no aparecían: el saldo
- * bajaba sin ningún movimiento que lo explicara.
+ * los pagos que recibió (si es tarjeta), las salidas por pagar una tarjeta o
+ * abonar a una deuda desde ella, y las transferencias con otras cuentas
+ * propias. Antes esas salidas no aparecían: el saldo bajaba sin ningún
+ * movimiento que lo explicara. `cuentas` sirve para nombrar la otra cuenta
+ * de una transferencia.
  */
 export function movimientosDe(
   cuentaId: string,
@@ -31,8 +37,11 @@ export function movimientosDe(
   pagos: PagoTarjeta[],
   ingresos: Ingreso[],
   categorias: Categoria[],
-  abonos: AbonoDeuda[] = []
+  abonos: AbonoDeuda[] = [],
+  transferencias: Transferencia[] = [],
+  cuentas: { id: string; nombre: string }[] = []
 ): MovimientoCuenta[] {
+  const nombreCuenta = (id?: string) => cuentas.find((c) => c.id === id)?.nombre ?? "otra cuenta";
   const items: MovimientoCuenta[] = [
     ...gastos
       .filter((g) => g.cuentaId === cuentaId)
@@ -88,6 +97,32 @@ export function movimientosDe(
         fecha: a.fecha,
         createdAt: a.createdAt,
         color: "#6b7280",
+      })),
+    ...transferencias
+      .filter((t) => t.cuentaOrigenId === cuentaId)
+      .map((t) => ({
+        id: `${t.id}-enviada`,
+        tipo: "transferencia_enviada" as const,
+        sentido: "salida" as const,
+        descripcion: t.descripcion || "Transferencia",
+        subtitulo: `A ${nombreCuenta(t.cuentaDestinoId)}`,
+        monto: t.monto,
+        fecha: t.fecha,
+        createdAt: t.createdAt,
+        color: "#0891b2",
+      })),
+    ...transferencias
+      .filter((t) => t.cuentaDestinoId === cuentaId)
+      .map((t) => ({
+        id: `${t.id}-recibida`,
+        tipo: "transferencia_recibida" as const,
+        sentido: "entrada" as const,
+        descripcion: t.descripcion || "Transferencia",
+        subtitulo: `Desde ${nombreCuenta(t.cuentaOrigenId)}`,
+        monto: t.monto,
+        fecha: t.fecha,
+        createdAt: t.createdAt,
+        color: "#0891b2",
       })),
     ...ingresos
       .filter((i) => i.cuentaId === cuentaId)

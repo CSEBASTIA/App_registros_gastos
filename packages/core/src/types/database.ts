@@ -256,6 +256,9 @@ export type Database = {
           tarjeta_final: string | null;
           clave_captura_id: string | null;
           pagado_en: string | null;
+          es_transferencia?: boolean;
+          transferencia_id?: string | null;
+          gasto_id?: string | null;
           usuario_id: string;
         };
         Insert: {
@@ -279,6 +282,7 @@ export type Database = {
           tarjeta_final?: string | null;
           clave_captura_id?: string | null;
           pagado_en?: string | null;
+          es_transferencia?: boolean;
           usuario_id?: string;
         };
         Update: {
@@ -302,8 +306,67 @@ export type Database = {
           tarjeta_final?: string | null;
           clave_captura_id?: string | null;
           pagado_en?: string | null;
+          es_transferencia?: boolean;
           usuario_id?: string;
         };
+        Relationships: [];
+      };
+      transferencias: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          cuenta_origen_id: string | null;
+          cuenta_destino_id: string | null;
+          monto: number;
+          fecha: string;
+          descripcion: string | null;
+          origen: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          usuario_id?: string;
+          cuenta_origen_id: string;
+          cuenta_destino_id: string;
+          monto: number;
+          fecha?: string;
+          descripcion?: string | null;
+        };
+        /** Solo descripción y fecha: el resto lo rechaza la base. */
+        Update: {
+          descripcion?: string | null;
+          fecha?: string;
+        };
+        Relationships: [];
+      };
+      ajustes_usuario: {
+        Row: {
+          usuario_id: string;
+          registro_automatico: boolean;
+          updated_at: string;
+        };
+        Insert: {
+          usuario_id?: string;
+          registro_automatico?: boolean;
+          updated_at?: string;
+        };
+        Update: {
+          registro_automatico?: boolean;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      // Solo se lee: los anota `revisar_mis_presupuestos` (y el registro automático).
+      avisos_presupuesto: {
+        Row: {
+          id: string;
+          usuario_id: string;
+          presupuesto_id: string;
+          nivel: number;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       ingresos: {
@@ -563,6 +626,27 @@ export type Database = {
         Args: { p_origen: string; p_destino: string };
         /** Cuántos pagos se movieron. */
         Returns: number;
+      };
+      confirmar_aviso_como_transferencia: {
+        Args: {
+          p_id: string;
+          p_cuenta: string;
+          p_otra_cuenta: string;
+          p_monto?: number | null;
+          p_descripcion?: string | null;
+        };
+        /** Id de la transferencia (la misma si se reintenta). */
+        Returns: string;
+      };
+      separar_transferencia: {
+        Args: { p_id: string };
+        /** Cuántos avisos volvieron a la bandeja. */
+        Returns: number;
+      };
+      revisar_mis_presupuestos: {
+        Args: { p_mes: string };
+        /** Lista de presupuestos que cruzaron un nivel nuevo (jsonb). */
+        Returns: unknown;
       };
     };
   };

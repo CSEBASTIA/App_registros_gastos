@@ -126,6 +126,7 @@ export function avisosDeCorreos(correos: CorreoRecibido[], cuentas: Cuenta[]): T
       cuentaId: cuentaParaAviso(cuentas, p.banco, p.identificadorCuenta),
       fecha: p.fecha ?? correo.fecha,
       correoAsunto: correo.asunto,
+      ...(p.esTransferencia ? { esTransferencia: true } : {}),
     });
   }
   return avisos;

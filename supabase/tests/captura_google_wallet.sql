@@ -19,6 +19,9 @@ insert into cuentas (id, nombre, tipo, banco, identificador, disponible, cupo_to
 insert into cuentas (id, nombre, tipo, banco, identificador, disponible) values
   ('7d200000-0000-4000-8000-000000000002', 'Débito Guayaquil', 'debito', 'banco_guayaquil', '8765', 500);
 insert into claves values ('android', crear_clave_captura('Mi Android'));
+-- Este archivo prueba la bandeja: el registro automático (20261018120000)
+-- se apaga para N; se prueba en registro_automatico.sql.
+insert into ajustes_usuario (registro_automatico) values (false);
 commit;
 
 -- G01-G07: la lectura del aviso, con los formatos que usa Google Wallet

@@ -5,8 +5,11 @@ import {
   cambiarPreferenciaUbicacion,
   clavePreferenciaUbicacion,
   enlaceMapa,
+  guardarUbicacionDeAhora,
   leerPreferenciaUbicacion,
+  ubicacionAnticipada,
   ubicacionParaGasto,
+  VIGENCIA_UBICACION_ANTICIPADA_MS,
   type AlmacenPreferencias,
   type ProveedorUbicacion,
 } from "../src/lib/ubicacionDispositivo.ts";
@@ -127,4 +130,40 @@ test("borrarMisUbicaciones: llama a la función de la base y devuelve los conteo
 
   setSupabaseClient({ rpc: async () => ({ data: null, error: { code: "42501", message: "Necesitas iniciar sesión." } }) } as any);
   await assert.rejects(borrarMisUbicaciones());
+});
+
+test("guardarUbicacionDeAhora: por defecto solo si el gasto es de hoy; la persona decide", () => {
+  assert.equal(guardarUbicacionDeAhora("2026-10-18", "2026-10-18"), true);
+  assert.equal(guardarUbicacionDeAhora("2026-10-15", "2026-10-18"), false);
+  assert.equal(guardarUbicacionDeAhora("2026-10-15", "2026-10-18", true), true);
+  assert.equal(guardarUbicacionDeAhora("2026-10-18", "2026-10-18", false), false);
+});
+
+test("ubicacionAnticipada: usa la que se pidió al abrir; reintenta si falló o si es vieja", async () => {
+  const aqui = { ubicacion: { latitud: -0.18, longitud: -78.47 } };
+  let pedidos = 0;
+  let reloj = 0;
+  const respuestas: any[] = [aqui, aqui];
+  const buscar = async () => respuestas[pedidos++] ?? { motivo: "error" };
+
+  const a = ubicacionAnticipada(buscar, () => reloj);
+  assert.deepEqual(await a.obtener(), aqui);
+  assert.equal(pedidos, 1, "no pide otra si la primera sirve");
+
+  pedidos = 0;
+  respuestas.splice(0, 2, { motivo: "tiempo_agotado" }, aqui);
+  const b = ubicacionAnticipada(buscar, () => reloj);
+  assert.deepEqual(await b.obtener(), aqui);
+  assert.equal(pedidos, 2, "el GPS frío se reintenta al guardar");
+
+  pedidos = 0;
+  respuestas.splice(0, 2, aqui, { motivo: "sin_permiso" });
+  const c = ubicacionAnticipada(buscar, () => reloj);
+  reloj += VIGENCIA_UBICACION_ANTICIPADA_MS + 1;
+  assert.deepEqual(await c.obtener(), { motivo: "sin_permiso" });
+
+  const d = ubicacionAnticipada(async () => {
+    throw new Error("GPS roto");
+  });
+  assert.deepEqual(await d.obtener(), { motivo: "error" });
 });

@@ -10,6 +10,7 @@ import {
   StyleSheet,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
+import { sincronizarNotificaciones } from "../lib/notificaciones";
 import { Ionicons } from "@expo/vector-icons";
 import {
   listarRecordatorios,
@@ -71,7 +72,15 @@ export default function RecordatoriosScreen() {
       .finally(() => setCargando(false));
   }, []);
 
-  useFocusEffect(cargar);
+  useFocusEffect(
+    useCallback(() => {
+      cargar();
+      // Al salir, las notificaciones de recordatorios se reprograman con lo que cambió.
+      return () => {
+        sincronizarNotificaciones();
+      };
+    }, [cargar]),
+  );
 
   const fechaHoy = hoy();
   const organizados = organizarRecordatorios(recordatorios, fechaHoy);

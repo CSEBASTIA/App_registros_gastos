@@ -34,6 +34,17 @@ function mensajeDeValidacion(p: ProblemaZod): string {
   return p.message;
 }
 
+const FALTA_EN_LA_BASE = new Set(["PGRST202", "PGRST205", "PGRST204", "42703", "42883", "42P01"]);
+
+/**
+ * La función, tabla o columna todavía no existe: falta aplicar una migración.
+ * Lo usan las funciones nuevas para seguir andando (sin la novedad) en una
+ * base que aún no se actualizó, como pide docs/actualizaciones.md.
+ */
+export function faltaEnLaBase(err: unknown): boolean {
+  return FALTA_EN_LA_BASE.has(String((err as { code?: unknown } | null)?.code ?? ""));
+}
+
 /** Errores de Postgres que pueden llegar a la pantalla, por código SQLSTATE. */
 function mensajeDePostgres(codigo: string | undefined): string | undefined {
   switch (codigo) {

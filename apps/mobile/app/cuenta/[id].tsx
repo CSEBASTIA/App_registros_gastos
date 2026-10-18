@@ -17,6 +17,7 @@ import {
   listarCategorias,
   listarPagosTarjeta,
   listarAbonosDeuda,
+  listarTransferencias,
   eliminarCuenta,
   movimientosDe,
   mensajeError,
@@ -26,9 +27,11 @@ import {
   type Categoria,
   type PagoTarjeta,
   type AbonoDeuda,
+  type Transferencia,
 } from "core";
 import Tarjeta from "../../components/Tarjeta";
 import TarjetaVisual from "../../components/TarjetaVisual";
+import DigitosCuenta from "../../components/DigitosCuenta";
 import Boton from "../../components/Boton";
 import ErrorTexto from "../../components/ErrorTexto";
 import ItemMovimiento from "../../components/ItemMovimiento";
@@ -43,6 +46,7 @@ export default function DetalleCuenta() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const [cuenta, setCuenta] = useState<Cuenta | null>(null);
+  const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [gastos, setGastos] = useState<Gasto[]>([]);
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -50,6 +54,7 @@ export default function DetalleCuenta() {
   // saldo bajaba sin ningún movimiento que lo explicara.
   const [pagos, setPagos] = useState<PagoTarjeta[]>([]);
   const [abonos, setAbonos] = useState<AbonoDeuda[]>([]);
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
@@ -62,9 +67,12 @@ export default function DetalleCuenta() {
       listarCategorias(),
       listarPagosTarjeta(),
       listarAbonosDeuda(),
+      listarTransferencias(),
     ])
-      .then(([cuentas, g, i, c, p, a]) => {
+      .then(([cuentas, g, i, c, p, a, t]) => {
         setCuenta(cuentas.find((c) => c.id === id) ?? null);
+        setCuentas(cuentas);
+        setTransferencias(t);
         setGastos(g);
         setIngresos(i);
         setCategorias(c);
@@ -129,6 +137,8 @@ export default function DetalleCuenta() {
     ingresos,
     categorias,
     abonos,
+    transferencias,
+    cuentas,
   ).slice(0, 30);
 
   function confirmarEliminar() {
@@ -177,6 +187,7 @@ export default function DetalleCuenta() {
           </Text>
         </BlurFade>
         <TarjetaVisual cuenta={cuenta} />
+        {cuenta.tipo !== "efectivo" && <DigitosCuenta key={cuenta.id} cuenta={cuenta} onCambio={setCuenta} />}
 
         <View style={{ flexDirection: "row", gap: spacing(2) }}>
           <Boton
@@ -200,6 +211,10 @@ export default function DetalleCuenta() {
             }
           />
         </View>
+        <Boton
+          titulo="Transferir a otra cuenta mía"
+          onPress={() => router.push({ pathname: "/transferencia/nueva", params: { origenId: cuenta.id } })}
+        />
         {cuenta.tipo !== "efectivo" && (
           <Boton
             titulo="Importar estado de cuenta"

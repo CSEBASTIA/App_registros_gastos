@@ -126,8 +126,54 @@ export interface TransaccionDetectada {
   tarjetaFinal?: string;
   /** Hora de la notificación de Google Wallet (si llegó tarde, la del pago). Sin ella, el pago es `createdAt`. */
   pagadoEn?: string;
+  /** El correo habla de una transferencia: la base busca la otra mitad en otra cuenta propia. */
+  esTransferencia?: boolean;
+  /** Se resolvió como transferencia entre cuentas propias (junto con su otra mitad, si llegó). */
+  transferenciaId?: string;
+  /** El gasto que creó este aviso (al confirmarlo o al registrarse solo). */
+  gastoId?: string;
   estado: EstadoTransaccionDetectada;
   createdAt: string;
+}
+
+/**
+ * Dinero que pasa de una cuenta propia a otra. No es gasto ni ingreso: no
+ * cuenta en el balance del mes ni en los presupuestos. Los saldos los mueve
+ * la base. Si se borra una de las cuentas, su lado queda vacío (undefined).
+ */
+export interface Transferencia {
+  id: string;
+  cuentaOrigenId?: string;
+  cuentaDestinoId?: string;
+  monto: number;
+  fecha: string;
+  descripcion?: string;
+  /** "correo": la juntó la base a partir de dos avisos, o se confirmó desde la bandeja. */
+  origen: "manual" | "correo";
+  createdAt: string;
+}
+
+/** Ajustes de la cuenta que la base necesita conocer (viven en `ajustes_usuario`). */
+export interface AjustesUsuario {
+  /**
+   * La base registra sola lo que reconoce con seguridad: pagos con billetera
+   * cuya tarjeta reconoce por sus últimos dígitos, y transferencias entre tus
+   * cuentas que llegan por correo («enviada» + «recibida»). Encendido por defecto.
+   */
+  registroAutomatico: boolean;
+}
+
+/** 75 = llegaste al 75 %; 100 = llegaste al límite; 101 = te pasaste. */
+export type NivelAvisoPresupuesto = 75 | 100 | 101;
+
+/** Un presupuesto que acaba de cruzar un nivel: la base lo avisa una sola vez. */
+export interface AvisoPresupuesto {
+  presupuestoId: string;
+  categoria: string;
+  nivel: NivelAvisoPresupuesto;
+  porcentaje: number;
+  gastado: number;
+  limite: number;
 }
 
 export interface Ingreso {

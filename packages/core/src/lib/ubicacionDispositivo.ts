@@ -130,6 +130,42 @@ export async function ubicacionParaGasto(
 }
 
 /**
+ * ¿Guardar con este gasto la ubicación de AHORA? Por defecto, solo si el gasto
+ * es de hoy: uno anotado después (con otra fecha) no se pagó donde estás
+ * ahora, y quedaría asignado al lugar equivocado. La persona puede cambiarlo
+ * en el formulario (`eleccion`).
+ */
+export function guardarUbicacionDeAhora(fecha: string, hoy: string, eleccion?: boolean): boolean {
+  return eleccion ?? fecha === hoy;
+}
+
+/** Una posición tomada hace más de esto ya no es «donde pagaste»: se pide otra al guardar. */
+export const VIGENCIA_UBICACION_ANTICIPADA_MS = 10 * 60_000;
+
+/**
+ * La ubicación empieza a buscarse al abrir el formulario (así guardar no
+ * espera al GPS y se toma donde estás al anotar el pago). Al guardar se usa
+ * esa, salvo que haya fallado (GPS frío: se intenta otra vez) o sea vieja.
+ * `buscar` es la consulta normal (`ubicacionParaGasto` ya conectada); nunca lanza.
+ */
+export function ubicacionAnticipada(
+  buscar: () => Promise<ResultadoUbicacion>,
+  ahora: () => number = () => Date.now()
+): { obtener(): Promise<ResultadoUbicacion> } {
+  const inicio = ahora();
+  const primera = buscar().catch((): ResultadoUbicacion => ({ motivo: "error" }));
+  return {
+    async obtener() {
+      const r = await primera;
+      if (r.motivo === "tiempo_agotado" || r.motivo === "error" || ahora() - inicio > VIGENCIA_UBICACION_ANTICIPADA_MS) {
+        return buscar().catch((): ResultadoUbicacion => ({ motivo: "error" }));
+      }
+      return r;
+    },
+  };
+}
+
+/**
  * Enlace para "Abrir en Mapas", sin clave de API. En Android `geo:` abre la
  * app de mapas que el usuario tenga; en iPhone, Apple Maps; en la web, Google
  * Maps. Solo lleva las coordenadas (redondeadas), nada más del gasto.

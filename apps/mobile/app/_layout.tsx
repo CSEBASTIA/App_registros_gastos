@@ -7,7 +7,14 @@ import { AceptacionContext, EXIGIR_ACEPTACION, type Aceptacion } from "../lib/le
 import { ThemeProvider, useTheme, font } from "../lib/theme";
 import { useFonts } from "expo-font";
 import { StatusBar } from "expo-status-bar";
-import { ActivityIndicator, Animated, StyleSheet, View } from "react-native";
+import { ActivityIndicator, Animated, AppState, StyleSheet, View } from "react-native";
+import * as Notifications from "expo-notifications";
+import {
+  NOTIFICACIONES_DISPONIBLES,
+  cancelarNotificaciones,
+  rutaDeNotificacion,
+  sincronizarNotificaciones,
+} from "../lib/notificaciones";
 
 // Sin sesión, RLS bloquea toda lectura y escritura: la app se ve vacía y
 // guardar un gasto falla. Por eso el login va activo también en desarrollo.
@@ -120,6 +127,42 @@ function ThemedLayout() {
     }
   }, [session, pathname, router, ready, fontsLoaded, fontError, estadoLegal]);
 
+  // Notificaciones: se reprograman al iniciar sesión y al volver a la app; al
+  // cerrar sesión se cancelan (no deben sonar para quien entre después).
+  const huboSesion = useRef(false);
+  useEffect(() => {
+    if (LOGIN_DESACTIVADO || session === undefined) return;
+    if (usuarioId) {
+      huboSesion.current = true;
+      sincronizarNotificaciones();
+      const sub = AppState.addEventListener("change", (estado) => estado === "active" && sincronizarNotificaciones());
+      return () => sub.remove();
+    }
+    if (huboSesion.current) {
+      huboSesion.current = false;
+      cancelarNotificaciones();
+    }
+  }, [usuarioId, session]);
+
+  // Tocar una notificación abre su pantalla. Solo con el Stack ya montado y
+  // con sesión (si no, el redireccionamiento de arriba manda a login). Las de
+  // pagos con Google Wallet llegan por enlace (gastosapp://…) y las abre el router.
+  const listo = session !== undefined && ready && (fontsLoaded || !!fontError);
+  const respuestaAtendida = useRef<string | null>(null);
+  useEffect(() => {
+    if (!NOTIFICACIONES_DISPONIBLES || !listo || !session) return;
+    const abrir = (r: Notifications.NotificationResponse | null) => {
+      const ruta = rutaDeNotificacion(r);
+      if (!r || !ruta || respuestaAtendida.current === r.notification.request.identifier) return;
+      respuestaAtendida.current = r.notification.request.identifier;
+      // Después del redireccionamiento inicial a Resumen.
+      setTimeout(() => router.push(ruta), 0);
+    };
+    Notifications.getLastNotificationResponseAsync().then(abrir).catch(() => undefined);
+    const sub = Notifications.addNotificationResponseReceivedListener(abrir);
+    return () => sub.remove();
+  }, [listo, session, router]);
+
   if (session === undefined || !ready || (!fontsLoaded && !fontError)) return null;
 
   return (
@@ -160,6 +203,9 @@ function ThemedLayout() {
       <Stack.Screen name="google-wallet" options={{ title: "Conectar Google Wallet" }} />
       <Stack.Screen name="lugares" options={{ title: "Lugares" }} />
       <Stack.Screen name="lugar/[id]" options={{ title: "Lugar" }} />
+      <Stack.Screen name="notificaciones" options={{ title: "Notificaciones" }} />
+      <Stack.Screen name="transferencias" options={{ title: "Transferencias" }} />
+      <Stack.Screen name="transferencia/nueva" options={{ title: "Nueva transferencia", presentation: "modal" }} />
       <Stack.Screen name="aceptar-terminos" options={{ headerShown: false, gestureEnabled: false }} />
     </Stack>
     {/* Mientras se comprueba la aceptación no se ve ninguna pantalla de la app. */}

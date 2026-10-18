@@ -27,6 +27,11 @@ const PALABRAS_GASTO =
 const PALABRAS_INGRESO =
   /\b(dep[oó]sito|abono\s+(?:recibido)?|acreditaci[oó]n|transferencia\s+recibida|pago\s+recibido|has\s+recibido\s+dinero|sueldo|rol\s+de\s+pagos)\b/i;
 
+// Transferencia (enviada o recibida): la base intenta juntarla con el aviso de
+// la otra cuenta propia, en vez de contarla como gasto e ingreso a la vez.
+const ES_TRANSFERENCIA =
+  /\b(transferencia|transferiste|te\s+transfiri[oó]|env[ií]o\s+de\s+dinero|has\s+recibido\s+dinero)\b/i;
+
 // Monto con 2 decimales, con o sin separador de miles ("1.234,56", "1,234.56",
 // "1234.56"). Debe empezar al inicio o tras algo que no sea dígito ni separador:
 // sin esa condición, "$1234.56" se leía como 234.56.
@@ -46,6 +51,8 @@ export interface CorreoParseado {
   banco: Banco | undefined;
   identificadorCuenta: string | undefined;
   categoriaSugerida: string | undefined;
+  /** Habla de una transferencia: puede ser entre cuentas propias (la base busca la otra mitad). */
+  esTransferencia: boolean;
 }
 
 /** "Banco X <avisos@banco.com>" → "avisos@banco.com". Se usa la dirección real, nunca el nombre visible. */
@@ -132,6 +139,8 @@ export function parsearCorreoBancario(remitente: string, asunto: string, cuerpoT
     banco: bancoDeRemitente(remitente),
     identificadorCuenta: matchId ? matchId[1] : undefined,
     categoriaSugerida: sugerirCategoria(texto),
+    // Un pago a la tarjeta propia ya tiene su camino («Pagar tarjeta»).
+    esTransferencia: ES_TRANSFERENCIA.test(texto) && !PAGO_A_TARJETA.test(texto),
   };
 }
 

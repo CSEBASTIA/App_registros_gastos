@@ -11,7 +11,8 @@ import org.json.JSONObject
 /**
  * Envía a Supabase el título y el texto de cada notificación de Google
  * Wallet. La base (`registrar_aviso_billetera`) lee el monto, el comercio y
- * la tarjeta, y deja el aviso en la bandeja.
+ * la tarjeta, y deja el aviso en la bandeja o, si reconoce la tarjeta por sus
+ * últimos dígitos, registra el gasto sola. Después, `Notificaciones` avisa.
  *
  * Cada aviso se guarda antes de enviarse: si no hay internet, o Android
  * cierra la app a mitad, se reintenta con la siguiente notificación o al
@@ -30,7 +31,7 @@ internal object EnvioAvisos {
   private val recientes = ArrayDeque<String>()
 
   private sealed class Resultado {
-    class Listo(val estado: String, val monto: Double?) : Resultado()
+    class Listo(val estado: String, val monto: Double?, val respuesta: JSONObject) : Resultado()
     class Rechazado(val mensaje: String) : Resultado()
     class Reintentar(val mensaje: String) : Resultado()
   }
@@ -89,6 +90,8 @@ internal object EnvioAvisos {
         is Resultado.Listo -> {
           ultimo.put("estado", resultado.estado)
           resultado.monto?.let { ultimo.put("monto", it) }
+          // «Registré $12.50 en…» o «Pago por confirmar» (si la persona no los apagó).
+          Notificaciones.alEnviar(context, resultado.respuesta, aviso.optString("titulo"))
         }
         is Resultado.Rechazado -> ultimo.put("estado", "error").put("mensaje", resultado.mensaje)
         is Resultado.Reintentar -> {
@@ -131,7 +134,7 @@ internal object EnvioAvisos {
       when {
         codigo in 200..299 -> {
           val json = JSONObject(respuesta)
-          Resultado.Listo(json.optString("estado", "recibido"), if (json.has("monto")) json.optDouble("monto") else null)
+          Resultado.Listo(json.optString("estado", "recibido"), if (json.has("monto")) json.optDouble("monto") else null, json)
         }
         // 404: la base todavía no tiene la función (falta aplicar la actualización).
         codigo == 404 || codigo == 429 || codigo >= 500 -> Resultado.Reintentar("El servidor no lo recibió ($codigo): se reintentará.")

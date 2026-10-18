@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { AppState, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
+import { AppState, Linking, Platform, ScrollView, StyleSheet, Text, View } from "react-native";
 import { router, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { crearClaveCaptura, listarClavesCaptura, mensajeError, revocarClaveCaptura } from "core";
@@ -8,6 +8,8 @@ import Boton from "../components/Boton";
 import ErrorTexto from "../components/ErrorTexto";
 import { BlurFade } from "../components/Motion";
 import { confirmar } from "../lib/dialogo";
+import RegistroAutomatico from "../components/RegistroAutomatico";
+import { estadoPermisoNotificaciones, pedirPermisoNotificaciones, type EstadoPermiso } from "../lib/notificaciones";
 import { spacing, useTheme, font, type Colors } from "../lib/theme";
 import { capturaGoogleWallet, type EstadoCaptura, type ResultadoCaptura } from "../modules/captura-billetera";
 
@@ -26,6 +28,8 @@ function haceCuanto(ms: number): string {
 function textoUltimo(u: ResultadoCaptura): string {
   const monto = u.monto !== undefined ? ` $${u.monto.toFixed(2)}` : "";
   switch (u.estado) {
+    case "registrado":
+      return `Se registró solo un pago de${monto} (reconocí la tarjeta) · ${haceCuanto(u.cuando)}`;
     case "recibido":
       return `Llegó a la bandeja un pago de${monto} · ${haceCuanto(u.cuando)}`;
     case "repetido":
@@ -45,8 +49,11 @@ export default function GoogleWalletScreen() {
   const [estado, setEstado] = useState<EstadoCaptura | null>(() => capturaGoogleWallet?.estado() ?? null);
   const [trabajando, setTrabajando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Sin este permiso (Android 13+), «Registré $12.50 en…» no se puede mostrar.
+  const [permisoAvisos, setPermisoAvisos] = useState<EstadoPermiso | null>(null);
 
   const refrescar = useCallback(() => {
+    estadoPermisoNotificaciones().then(setPermisoAvisos);
     if (!capturaGoogleWallet) return;
     const e = capturaGoogleWallet.estado();
     setEstado(e);
@@ -69,6 +76,8 @@ export default function GoogleWalletScreen() {
       // La clave no se muestra: va directo al almacenamiento privado de la app.
       const clave = await crearClaveCaptura("Google Wallet (Android)");
       capturaGoogleWallet.conectar(URL_SUPABASE, CLAVE_PUBLICA, clave);
+      // Para avisar cada pago registrado o por confirmar.
+      setPermisoAvisos(await pedirPermisoNotificaciones());
       refrescar();
     } catch (err) {
       setError(mensajeError(err));
@@ -106,7 +115,8 @@ export default function GoogleWalletScreen() {
       <BlurFade style={{ gap: spacing(2) }}>
         <Text accessibilityRole="header" style={styles.screenTitle}>Conectar Google Wallet</Text>
         <Text style={styles.screenIntro}>
-          Cuando pagas con Google Wallet, el pago llega solo a tu bandeja para que lo confirmes.
+          Cuando pagas con Google Wallet, la app reconoce la tarjeta y registra el pago sola (si no la reconoce, va a
+          tu bandeja para que lo confirmes). Te avisa con una notificación.
         </Text>
       </BlurFade>
 
@@ -129,7 +139,7 @@ export default function GoogleWalletScreen() {
           {listo && (
             <View style={styles.listo} accessibilityLiveRegion="polite">
               <Ionicons name="checkmark-circle" size={20} color={color.success} />
-              <Text style={styles.listoTexto}>Listo: tus pagos con Google Wallet llegan a la bandeja.</Text>
+              <Text style={styles.listoTexto}>Listo: tus pagos con Google Wallet se registran o llegan a la bandeja.</Text>
             </View>
           )}
 
@@ -172,6 +182,22 @@ export default function GoogleWalletScreen() {
             )}
           </Tarjeta>
 
+          <RegistroAutomatico />
+
+          {estado?.conectado && (permisoAvisos === "sin_preguntar" || permisoAvisos === "denegado") && (
+            <Tarjeta style={{ gap: spacing(2) }}>
+              <Text style={styles.tituloCard}>Permite las notificaciones</Text>
+              <Text style={styles.texto}>
+                Así te aviso cuando un pago se registra solo o queda por confirmar.
+              </Text>
+              {permisoAvisos === "denegado" ? (
+                <Boton titulo="Abrir ajustes del teléfono" onPress={() => Linking.openSettings()} />
+              ) : (
+                <Boton titulo="Permitir notificaciones" onPress={async () => setPermisoAvisos(await pedirPermisoNotificaciones())} />
+              )}
+            </Tarjeta>
+          )}
+
           {estado?.conectado && (
             <Tarjeta style={{ gap: spacing(2) }}>
               <Text style={styles.tituloCard}>Último aviso</Text>
@@ -185,6 +211,7 @@ export default function GoogleWalletScreen() {
                 </>
               )}
               <Boton titulo="Ver la bandeja" onPress={() => router.push("/bandeja")} />
+              <Boton titulo="Notificaciones" onPress={() => router.push("/notificaciones")} />
               <Boton titulo="Desconectar" variante="peligro" onPress={desconectar} disabled={trabajando} />
             </Tarjeta>
           )}

@@ -4,6 +4,8 @@ App de finanzas personales para Ecuador (Banco Guayaquil, Pichincha, Produbanco 
 
 **El producto principal es la app de teléfono** (`apps/mobile`). La versión web (`apps/desktop`) hoy es la más completa y sirve de referencia para la migración. Las dos comparten la misma lógica (`packages/core`) y el mismo backend (Supabase).
 
+> **Novedades (18-oct-2026):** transferencias entre cuentas propias (también juntadas solas desde el correo), pagos de Google Wallet que se registran solos cuando la tarjeta se reconoce por sus últimos dígitos, notificaciones del teléfono (pagos, bandeja, recordatorios y presupuestos) y revisión de la ubicación. Verificado: **328/328 pruebas de base de datos, 218/218 de lógica**, el código Kotlin compila y la app se empaqueta para Android y web; falta probar el APK 1.4.0 en un teléfono. Detalle: [`docs/informe-transferencias-wallet-notificaciones.md`](docs/informe-transferencias-wallet-notificaciones.md).
+>
 > **Estado (15-oct-2026):** saldos confiables (con saldo a favor), montos con coma decimal, correo opcional que se olvida al cerrar sesión, eliminar la cuenta, consultas sin el tope de 1.000 filas, recuperar la contraseña con enlaces seguros y política de privacidad (borrador), verificados: **93/93 pruebas de lógica, 104/104 de base de datos** (incluye dos abonos simultáneos), tipos sin errores en core, web y teléfono, y la app compila para Android y web. Lo que falta para producción: ver [Pendientes](#pendientes-y-riesgos-conocidos) y [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md); el informe de esta etapa está en [`docs/informe-preparacion-produccion-15oct.docx`](docs/informe-preparacion-produccion-15oct.docx). El plan de 10 pasos y el informe del Paso 1 están en [`docs/plan-10-pasos-y-paso-1.docx`](docs/plan-10-pasos-y-paso-1.docx); el piloto, en [`docs/piloto.md`](docs/piloto.md). Qué migración está desplegada en cada entorno: ver [Estado de despliegue](#estado-de-despliegue).
 
 ## Contenido
@@ -136,7 +138,7 @@ supabase migration up        # base local
 supabase db push             # proyecto remoto
 ```
 
-**Proyecto de Supabase nuevo, sin la CLI:** [`supabase/base-completa.sql`](supabase/base-completa.sql) tiene la base entera en un solo archivo: las 23 migraciones en orden y las categorías globales. En Supabase, abre *SQL Editor → New query*, pega el archivo completo y pulsa *Run*. Debe terminar mostrando `migraciones_registradas = 23`.
+**Proyecto de Supabase nuevo, sin la CLI:** [`supabase/base-completa.sql`](supabase/base-completa.sql) tiene la base entera en un solo archivo: las 36 migraciones en orden y las categorías globales. En Supabase, abre *SQL Editor → New query*, pega el archivo completo y pulsa *Run*. Debe terminar mostrando `migraciones_registradas = 36`.
 
 **Proyecto que ya tiene la base:** las migraciones nuevas van en [`supabase/para-supabase-web/`](supabase/para-supabase-web/), una por archivo y con nombre legible (por ejemplo `migracion-de-rendimiento.sql`). Se pegan igual en el SQL Editor y deben terminar mostrando `aplicada = sí`. Se generan con `bash supabase/preparar-migracion-web.sh "Migración de …" <versiones>`.
 
@@ -161,7 +163,7 @@ Los pasos 1 a 5 construyen las ideas de producto y negocio; los pasos 6 a 10 lle
 |---|---|---|
 | 1 | Presupuestos inteligentes | ✅ Lógica, base y pantalla móvil · ⏳ validar con usuarios si se entiende |
 | 2 | Plan de salida de deudas + score financiero | 🟡 Abono atómico con cuenta de origen (teléfono) · ⏳ pantallas de plan y score |
-| 3 | Recordatorios y alertas reales (notificaciones locales, recurrentes) | ⏳ |
+| 3 | Recordatorios y alertas reales (notificaciones locales, recurrentes) | 🟡 Notificaciones locales de recordatorios, cuotas, presupuestos y pagos (18-oct) · ⏳ probar en teléfono |
 | 4 | Detección por correo bien hecha (remitentes, OAuth nativo, confirmación atómica) | ⏳ |
 | 5 | Modelo de negocio y hoja de ruta | ⏳ |
 | 6 | Resumen y navegación como en la web | 🟡 Interfaz en curso |
@@ -202,7 +204,10 @@ El trabajo se reparte entre varios agentes que se coordinan con contratos escrit
 | Recordatorios | CRUD, recurrentes, completado | Paridad |
 | Categorías | CRUD propio; globales de solo lectura; "Otros" con detalle | Paridad |
 | Presupuestos | Lógica lista (Paso 1) | ✅ Pantalla con barras de uso |
-| Correo | — | Gmail / Outlook → bandeja de revisión |
+| Correo | — | Gmail / Outlook → bandeja de revisión. Las transferencias entre tus cuentas («enviada» + «recibida») se juntan solas |
+| Transferencias entre cuentas propias (18-oct) | — (pendiente) | Crear, ver, eliminar; no cuentan como gasto ni ingreso; desde la bandeja «Fue entre mis cuentas»; las que se juntaron por error se separan |
+| Google Wallet (18-oct) | — | Con la tarjeta reconocida por sus últimos 4 dígitos, el pago se registra solo (descuenta del cupo o saldo) y avisa; si no, a la bandeja. Se puede apagar. Requiere el APK 1.4.0 para las notificaciones |
+| Notificaciones (18-oct) | — | Locales: pagos registrados o por confirmar, recordatorios y cuotas (0, 1 o 3 días antes), presupuestos al 75 %, 100 % y excedido. *Más → Notificaciones* |
 | Importar estado de cuenta (17-oct) | Al crear una cuenta o tarjeta y desde su detalle: PDF, CSV o foto; duplicados, ingresos y saldo final | Igual (también en la web de Vercel): PDF con texto o con clave y CSV, leídos en el dispositivo con pdf.js empaquetado. Ver [`docs/informe-importar-estado-cuenta.md`](docs/informe-importar-estado-cuenta.md). Requiere el APK 1.3.0 |
 
 ## packages/core
@@ -282,6 +287,9 @@ Todas las tablas tienen Row Level Security con `auth.uid() = usuario_id`. Única
 | `20261015170000_diferidos_cupo_interes` y `20261015180000_proteger_tasa_diferido` | **Migración de interés diferido:** el diferido reserva todo el capital, el interés se cobra con cada cuota, compras sobre el cupo bloqueadas, tasa protegida |
 | `20261015190000_eliminar_cuenta` | **Migración de eliminar cuenta:** `eliminar_mi_cuenta('ELIMINAR')` borra al usuario y todos sus datos (exigido por Google Play) |
 | `20261015200000_rendimiento` | **Migración de rendimiento:** índices de claves foráneas, RLS con `(select auth.uid())` y `totales_por_mes` |
+| `20261016…` (11 migraciones) | Billeteras y ubicación, Apple Pay, resumen por lugar, casas comerciales y corte, recordatorios de diferidos, Google Wallet, aceptaciones legales, exportar datos, hora del pago, fecha fija en diferidos (ver los informes de `docs/`) |
+| `20261018120000_ajustes_y_transferencias` | `ajustes_usuario` (registro automático), `transferencias` con saldos por disparadores, juntar «enviada» + «recibida» del correo, confirmar un aviso como transferencia y separarla |
+| `20261018130000_registro_automatico_billetera` | Registro automático de pagos con la tarjeta reconocida por sus dígitos, categoría sugerida, lugar por comercio, `avisos_presupuesto` y `revisar_mis_presupuestos`, exportación con las tablas nuevas |
 
 ### Estado de despliegue
 
@@ -291,6 +299,8 @@ Actualizar esta tabla cada vez que se aplique una migración en un entorno.
 |---|---|---|---|
 | Supabase local (Docker, `127.0.0.1:54321`) | 21 de 23 (faltan eliminar cuenta y rendimiento) | `20261015180000_proteger_tasa_diferido` | 15-oct-2026 |
 | Supabase web (`ikyoawstrwihaqefosbq`) | 23 de 23 | `20261015200000_rendimiento` | 15-oct-2026 (comprobado por REST: `eliminar_mi_cuenta` y `totales_por_mes` existen y rechazan a quien no tiene sesión) |
+
+**Pendiente de aplicar en Supabase web (18-oct):** `supabase/para-supabase-web/18-10-2026 5AM/`, primero el 1 y después el 2 (cada uno termina en `aplicada = sí`). Verificado en una base desechable con las 34 migraciones anteriores.
 
 Para comprobarlo en cualquier base: `select version, name from supabase_migrations.schema_migrations order by version;`
 
@@ -353,8 +363,9 @@ Los textos que vienen de correos de terceros se recortan antes de guardarse.
 ## Pruebas y verificación
 
 ```bash
-pnpm --filter core test          # 93 pruebas de lógica
-bash supabase/tests/correr.sh    # 104 pruebas de base de datos (requiere Docker)
+pnpm --filter core test          # 218 pruebas de lógica
+pnpm --filter mobile test        # 18 pruebas del teléfono
+bash supabase/tests/correr.sh    # 328 pruebas de base de datos (requiere Docker)
 ```
 
 - **Lógica:** cálculos comparados contra resultados hechos a mano: presupuestos, plan de deudas, score, timeouts, fechas locales, mensajes de error y validación.
@@ -366,6 +377,9 @@ bash supabase/tests/correr.sh    # 104 pruebas de base de datos (requiere Docker
   - `integridad_saldos.sql` (16): saldo a favor, edición de gastos pagados, diferidos, borrado de deudas y categorías, avisos resueltos y borrado de un usuario con abonos.
   - `diferidos_cupo_interes.sql` (5): cupo, interés de las cuotas y tasa protegida.
   - `eliminar_cuenta_y_rendimiento.sql` (10): eliminar la cuenta borra todo lo propio y nada ajeno, índices, RLS optimizada y totales por mes.
+  - `transferencias.sql` (29): saldos al crear y borrar, reglas (tarjeta como destino, cupo, misma cuenta, cuentas ajenas), juntar avisos del correo (por separado, juntos, ambiguos, apagado), confirmar desde la bandeja, separar y permisos.
+  - `registro_automatico.sql` (26): pago registrado solo con la tarjeta reconocida, lugar por comercio, categoría aprendida, avisos de presupuesto una vez por nivel, casos que van a la bandeja, notificación atrasada, Apple Pay y funciones internas cerradas.
+  - Y las de billeteras, ubicación, legal, hora del pago y demás migraciones del 16-oct (un archivo por migración).
   - Concurrencia (1): dos abonos simultáneos de 70 sobre una deuda de 100 dejan la cuenta en −100, no en −140.
 - **Compilación:**
 
@@ -379,7 +393,7 @@ Aún sin verificar: el timeout en un teléfono físico y el upsert de presupuest
 
 ## Detección de movimientos por correo
 
-**Función opcional y en beta.** Ya no es un paso del registro: vive en *Más → Correo (beta)* y la app se usa completa sin conectarlo. Solo en el teléfono. Conectas Gmail u Outlook y la app detecta avisos bancarios. **Nada se guarda solo:** todo cae en la bandeja de revisión (`transacciones_detectadas`) para confirmar o descartar.
+**Función opcional y en beta.** Ya no es un paso del registro: vive en *Más → Correo (beta)* y la app se usa completa sin conectarlo. Solo en el teléfono. Conectas Gmail u Outlook y la app detecta avisos bancarios. **Gastos e ingresos no se guardan solos:** caen en la bandeja de revisión (`transacciones_detectadas`) para confirmar o descartar. La excepción (18-oct, con el registro automático encendido) son las transferencias entre tus cuentas: si llegan «enviada» de una cuenta tuya y «recibida» en otra, por el mismo monto y con hasta 2 días de diferencia, se registran como **una** transferencia; si se juntaron por error, se separan en *Más → Transferencias*.
 
 - OAuth con PKCE y sin secreto en la app (`lib/gmailAuth.ts`, `lib/outlookAuth.ts`); tokens en `expo-secure-store`.
 - El parser (`parsearCorreoBancario` en core) saca tipo, monto, fecha y últimos dígitos de la cuenta. El remitente se reconoce por **dirección exacta o dominio exacto** (antes bastaba con que lo "contuviera").
@@ -444,6 +458,9 @@ Propuesta del Paso 5, como hipótesis a validar con usuarios:
 | Reemplazar `toISOString().slice(…)` por `fechaLocal()` en las pantallas de la **web** (el teléfono ya está; quedan 9 usos en 8 archivos) | Media | Fase web |
 | Políticas RLS con `(select auth.uid())` para rendimiento; límites de intentos de login en Supabase | Baja / Media | 10 |
 | Ícono y pantalla de inicio propios (identificador y actualizaciones ya configurados) | — | 10 |
+| Compilar el APK 1.4.0 y probar en un teléfono: notificaciones nativas de Google Wallet, permiso de Android 13, recordatorios y presupuestos | Alta | 3 |
+| Transferencias en la versión web de escritorio (`apps/desktop`): hoy no se ven ni se registran ahí (su historial de cuentas tampoco muestra pagos de tarjeta ni abonos) | Media | Fase web |
+| Correos reales de transferencias de cada banco, para confirmar «enviada/recibida» y los dígitos | Media | 4 |
 
 ## Reglas para contribuir
 

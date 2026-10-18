@@ -1,12 +1,18 @@
 # Guía · Conectar Google Wallet (Android)
 
-Cada pago con Google Wallet llega solo a la **bandeja** para que lo confirmes, como el atajo de Apple Pay en el iPhone.
+Cada pago con Google Wallet se **registra solo** cuando la app reconoce la tarjeta (por sus últimos 4 dígitos), o llega a la **bandeja** para que lo confirmes. En los dos casos te llega una notificación.
 
 ## Cómo funciona
 
 1. Al pagar, Google Wallet muestra una notificación (por ejemplo «SUPERMAXI · $12,50 con Visa •••• 1234»).
 2. FinTrack lee **solo las notificaciones de Google Wallet** y envía su título y su texto a tu base, con una clave de captura de este teléfono.
-3. La base (`registrar_aviso_billetera`) lee el monto, el comercio y los últimos dígitos, y deja el aviso en la bandeja. Si la tarjeta coincide con una de tus cuentas, el aviso ya viene con esa cuenta.
+3. La base (`registrar_aviso_billetera`) lee el monto, el comercio y los últimos dígitos:
+   - **Si reconoce la tarjeta** (exactamente una cuenta tuya con esos 4 dígitos) y el **registro automático** está encendido (viene encendido), guarda el gasto: descuenta del cupo o del saldo de esa tarjeta, con la hora del pago y una categoría sugerida (la de tu último gasto en ese comercio, o por palabras clave). Te llega «Registré $12.50 en SUPERMAXI · Con tu tarjeta •••• 1234 · Comida»; tócala para corregirlo o eliminarlo.
+   - **Si no la reconoce**, si el pago supera el cupo o si apagaste el registro automático, queda en la bandeja (con la cuenta puesta, si la pudo deducir del banco). Te llega «Pago de $12.50 por confirmar».
+   - Si con ese pago un **presupuesto** llega al 75 %, al 100 % o te pasas, también te avisa (una vez por nivel y por mes).
+4. Los pagos de Google Wallet llegan sin ubicación (con la app cerrada, el teléfono no la da). Si ya tienes un **lugar con el nombre del comercio**, se asignan a ese lugar.
+
+**Para que reconozca tus tarjetas:** anota los últimos 4 dígitos de cada una en su detalle (*Tarjetas → la tarjeta → Últimos dígitos*, o *Cuentas → la cuenta*). Deben ser los que muestra Google Wallet en la notificación.
 
 **Qué se ignora:**
 
@@ -18,12 +24,13 @@ Cada pago con Google Wallet llega solo a la **bandeja** para que lo confirmes, c
 
 ## Configurarlo en el teléfono
 
-Necesitas la app **1.1.0 o más nueva** (el APK nuevo; la captura usa un módulo nativo).
+Necesitas la app **1.1.0 o más nueva** (el APK nuevo; la captura usa un módulo nativo). Las notificaciones de «Registré…» y «Por confirmar» necesitan la **1.4.0**; con una anterior, el registro automático funciona igual pero sin avisar.
 
 1. FinTrack → **Más → Conectar Google Wallet → Conectar**. Se crea una clave solo para este teléfono; no hace falta copiarla.
 2. **Abrir ajustes de Android** → activa «FinTrack: pagos con Google Wallet» en *Acceso a notificaciones*.
    - **Si dice «Ajuste restringido»** (Android 13 o más nuevo, con la app instalada desde un APK y no desde Play Store): Ajustes → Apps → FinTrack → menú ⋮ → **Permitir ajustes restringidos**, y vuelve a intentarlo.
-3. Paga con Google Wallet. En la pantalla verás «Último aviso: llegó a la bandeja un pago de $12,50».
+3. Paga con Google Wallet. En la pantalla verás «Último aviso: se registró solo un pago de $12,50» (o «llegó a la bandeja»).
+4. *Más → Notificaciones*: permite las notificaciones y elige cuáles quieres. El interruptor «Registrar solo cuando reconozco la tarjeta» está en *Conectar Google Wallet*.
 
 **Desconectar:** en la misma pantalla. Revoca la clave y borra del teléfono la clave y los avisos pendientes. También puedes quitar el permiso desde los ajustes de Android.
 
@@ -54,4 +61,6 @@ El formato de las notificaciones lo decide Google y puede cambiar. Como la lectu
   - No sale de ahí: la pantalla solo muestra sus 6 primeros caracteres.
 - **Solo se aceptan avisos de la app de Google Wallet** (`com.google.android.apps.walletnfcrel`).
 - **Los textos se limpian y se acortan** en la base (500 caracteres como máximo). En la bandeja solo se guardan el monto, el comercio y los últimos dígitos, no la notificación completa.
+- **Respuesta al teléfono:** solo el estado y el monto; si se registró, también el id del gasto, la categoría y, si cruzó un nivel, el del presupuesto (para la notificación). Nada más de tus datos.
+- **Notificaciones locales:** las arma el teléfono, sin un servidor de avisos. Con la pantalla bloqueada se muestra una versión sin montos si así lo elegiste en Android.
 - **Play Store:** el acceso a notificaciones se explica en la pantalla antes de pedirlo. En *Seguridad de los datos* corresponde declarar «Información financiera: historial de compras».

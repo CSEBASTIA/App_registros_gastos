@@ -39,6 +39,12 @@ const ITEMS: {
     icono: "wallet-outline",
   },
   {
+    titulo: "Transferencias",
+    subtitulo: "Pasar dinero entre tus cuentas",
+    ruta: "/transferencias",
+    icono: "swap-horizontal-outline",
+  },
+  {
     titulo: "Deudas",
     subtitulo: "Préstamos, endeudamiento",
     ruta: "/deudas",
@@ -55,6 +61,12 @@ const ITEMS: {
     subtitulo: "Pagos y cuotas próximas",
     ruta: "/recordatorios",
     icono: "notifications-outline",
+  },
+  {
+    titulo: "Notificaciones",
+    subtitulo: "Pagos registrados, cuotas y presupuestos",
+    ruta: "/notificaciones",
+    icono: "notifications-circle-outline",
   },
   {
     titulo: "Categorías",
@@ -82,7 +94,7 @@ const ITEMS: {
   },
   {
     titulo: "Conectar Google Wallet",
-    subtitulo: "En Android, tus pagos llegan solos a la bandeja",
+    subtitulo: "En Android, tus pagos se registran solos",
     ruta: "/google-wallet",
     icono: "wallet-outline",
   },

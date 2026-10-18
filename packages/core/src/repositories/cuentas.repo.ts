@@ -2,7 +2,7 @@ import { getSupabaseClient } from "../client";
 import type { Cuenta } from "../types/domain";
 import type { Database } from "../types/database";
 import { repararTexto } from "../lib/repararTexto";
-import { fechasTarjetaSchema } from "../schemas/cuenta.schema";
+import { fechasTarjetaSchema, identificadorCuentaSchema } from "../schemas/cuenta.schema";
 
 type CuentaRow = Database["public"]["Tables"]["cuentas"]["Row"];
 
@@ -74,6 +74,23 @@ export async function actualizarFechasTarjeta(
       ...(f.diaCorte !== undefined ? { dia_corte: f.diaCorte } : {}),
       ...(f.diaPago !== undefined ? { dia_pago: f.diaPago } : {}),
     })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return filaACuenta(data);
+}
+
+/**
+ * Cambia los últimos dígitos de una cuenta o tarjeta ("" los quita). Con
+ * ellos la base reconoce la tarjeta de un pago con Google Wallet o Apple Pay
+ * y lo registra sola (si el registro automático está encendido).
+ */
+export async function actualizarIdentificadorCuenta(id: string, identificador: string): Promise<Cuenta> {
+  const valor = identificadorCuentaSchema.parse(identificador).trim();
+  const { data, error } = await getSupabaseClient()
+    .from("cuentas")
+    .update({ identificador: valor || null })
     .eq("id", id)
     .select()
     .single();

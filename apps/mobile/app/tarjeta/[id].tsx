@@ -16,6 +16,7 @@ import {
   listarIngresos,
   listarPagosTarjeta,
   listarCategorias,
+  listarTransferencias,
   eliminarCuenta,
   registrarPagoTarjeta,
   movimientosDe,
@@ -26,6 +27,7 @@ import {
   type Gasto,
   type Ingreso,
   type PagoTarjeta,
+  type Transferencia,
   type Categoria,
   fechaLocal,
   actualizarFechasTarjeta,
@@ -35,6 +37,7 @@ import {
 } from "core";
 import Tarjeta from "../../components/Tarjeta";
 import TarjetaVisual from "../../components/TarjetaVisual";
+import DigitosCuenta from "../../components/DigitosCuenta";
 import Campo from "../../components/Campo";
 import Boton from "../../components/Boton";
 import ErrorTexto from "../../components/ErrorTexto";
@@ -60,6 +63,8 @@ export default function DetalleTarjeta() {
   const [ingresos, setIngresos] = useState<Ingreso[]>([]);
   const [pagos, setPagos] = useState<PagoTarjeta[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  // Avances de efectivo (transferencias desde la tarjeta a otra cuenta propia).
+  const [transferencias, setTransferencias] = useState<Transferencia[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   const cargar = useCallback(() => {
@@ -71,8 +76,10 @@ export default function DetalleTarjeta() {
       listarIngresos(),
       listarPagosTarjeta(),
       listarCategorias(),
+      listarTransferencias(),
     ])
-      .then(([todas, g, i, p, c]) => {
+      .then(([todas, g, i, p, c, t]) => {
+        setTransferencias(t);
         setCuenta(todas.find((c) => c.id === id) ?? null);
         setCuentas(todas);
         setGastos(g);
@@ -137,6 +144,9 @@ export default function DetalleTarjeta() {
     pagos,
     ingresos,
     categorias,
+    [],
+    transferencias,
+    cuentas,
   ).slice(0, 30);
   const cuentasOrigen = cuentas.filter(
     (c) => c.tipo === "ahorro" || c.tipo === "debito",
@@ -188,6 +198,7 @@ export default function DetalleTarjeta() {
           </Text>
         </BlurFade>
         <TarjetaVisual cuenta={cuenta} />
+        <DigitosCuenta key={cuenta.id} cuenta={cuenta} onCambio={setCuenta} />
         {cuenta.tipo === "credito" && <CicloDeTarjeta cuenta={cuenta} gastos={gastos} onGuardado={cargar} />}
 
         <PagarTarjeta

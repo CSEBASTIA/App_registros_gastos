@@ -7,7 +7,8 @@ import { requireOptionalNativeModule } from "expo-modules-core";
 export type ResultadoCaptura = {
   /** Milisegundos desde 1970. */
   cuando: number;
-  estado: "recibido" | "repetido" | "ignorado" | "pendiente" | "error";
+  /** "registrado": la base reconoció la tarjeta y guardó el gasto sola (APK 1.4.0+). */
+  estado: "registrado" | "recibido" | "repetido" | "ignorado" | "pendiente" | "error";
   monto?: number;
   mensaje?: string;
 };
@@ -21,12 +22,17 @@ export type EstadoCaptura = {
   ultimo: ResultadoCaptura | null;
 };
 
+/** Qué notificaciones muestra el módulo al enviar un pago. */
+export type AvisosCaptura = { pagos: boolean; bandeja: boolean; presupuestos: boolean };
+
 type Nativo = {
   estado(): { conectado: boolean; prefijo: string | null; permiso: boolean; pendientes: number; ultimo: string | null };
   conectar(url: string, apikey: string, clave: string): void;
   desconectar(): void;
   abrirPermiso(): void;
   reintentar(): void;
+  /** Desde el APK 1.4.0: en uno anterior no existe. */
+  ajustarAvisos?: (pagos: boolean, bandeja: boolean, presupuestos: boolean) => void;
 };
 
 const nativo = Platform.OS === "android" ? requireOptionalNativeModule<Nativo>("CapturaBilletera") : null;
@@ -50,5 +56,11 @@ export const capturaGoogleWallet = nativo
       desconectar: () => nativo.desconectar(),
       abrirPermiso: () => nativo.abrirPermiso(),
       reintentar: () => nativo.reintentar(),
+      /** Devuelve false si el APK es anterior a 1.4.0 (no sabe mostrar notificaciones). */
+      ajustarAvisos(avisos: AvisosCaptura): boolean {
+        if (typeof nativo.ajustarAvisos !== "function") return false;
+        nativo.ajustarAvisos(avisos.pagos, avisos.bandeja, avisos.presupuestos);
+        return true;
+      },
     }
   : null;

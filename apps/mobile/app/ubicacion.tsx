@@ -112,6 +112,11 @@ export default function UbicacionScreen() {
           Se guarda redondeada a unos 11 metros. Al encenderla, el teléfono te pedirá permiso de ubicación "mientras
           usas la app".
         </Text>
+        <Text style={styles.nota}>
+          Si anotas un gasto de otro día, no se guarda dónde estás (no lo pagaste ahí); puedes cambiarlo en el
+          formulario. Los pagos con Google Wallet llegan sin ubicación: si ya tienes un lugar con el nombre del
+          comercio, se asignan a ese lugar.
+        </Text>
       </Tarjeta>
 
       <Tarjeta>

@@ -2,8 +2,8 @@ import { getSupabaseClient } from "../client";
 
 /**
  * BOTÓN TEMPORAL DE DESARROLLO: borra TODOS los datos del usuario actual
- * (gastos, ingresos, cuentas, deudas, recordatorios, pagos de tarjeta, lugares
- * y sus categorías propias — las globales quedan). RLS ya limita cada delete al
+ * (gastos, ingresos, cuentas, deudas, recordatorios, pagos de tarjeta, lugares,
+ * transferencias y sus categorías propias — las globales quedan). RLS ya limita cada delete al
  * usuario autenticado; el orden respeta las foreign keys que no tienen
  * ON DELETE CASCADE/SET NULL (recordatorios -> deudas, gastos/ingresos ->
  * categorías propias).
@@ -30,8 +30,11 @@ export async function eliminarTodosLosDatos(): Promise<void> {
     if (error) throw error;
   }
 
-  // Al final y tolerante: una base sin la migración de billeteras no tiene
-  // la tabla, y eso no debe impedir borrar lo demás.
-  const { error } = await client.from("lugares").delete().not("id", "is", null);
-  if (error && error.code !== "PGRST205" && error.code !== "42P01") throw error;
+  // Al final y tolerantes: una base sin la migración de billeteras (o de
+  // transferencias) no tiene la tabla, y eso no debe impedir borrar lo demás.
+  // Las transferencias ya quedaron sin cuentas (SET NULL): borrarlas no mueve saldos.
+  for (const tabla of ["lugares", "transferencias"] as const) {
+    const { error } = await client.from(tabla).delete().not("id", "is", null);
+    if (error && error.code !== "PGRST205" && error.code !== "42P01") throw error;
+  }
 }

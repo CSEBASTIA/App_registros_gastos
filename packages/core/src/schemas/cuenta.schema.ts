@@ -52,3 +52,15 @@ export const fechasTarjetaSchema = z.object({
   diaCorte: diaDelMes("corte").nullable().optional(),
   diaPago: diaDelMes("pago").nullable().optional(),
 });
+
+/**
+ * Los últimos dígitos de una cuenta o tarjeta, para reconocer sus avisos (del
+ * correo, de Apple Pay o de Google Wallet). Vacío los quita.
+ */
+export const identificadorCuentaSchema = z.union([
+  z.literal(""),
+  z
+    .string()
+    .trim()
+    .regex(/^\d{3,4}$/, "Los últimos dígitos deben ser 3 o 4 números"),
+]);

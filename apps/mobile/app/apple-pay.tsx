@@ -17,6 +17,7 @@ import ErrorTexto from "../components/ErrorTexto";
 import EstadoVacio from "../components/EstadoVacio";
 import { BlurFade } from "../components/Motion";
 import { confirmar } from "../lib/dialogo";
+import RegistroAutomatico from "../components/RegistroAutomatico";
 import { spacing, useTheme, font, radius, type Colors } from "../lib/theme";
 
 const atajo = configuracionAtajo(process.env.EXPO_PUBLIC_SUPABASE_URL ?? "", process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? "");
@@ -38,7 +39,7 @@ const PASOS = [
   "Crea una clave aquí y cópiala: solo se muestra una vez.",
   "En el iPhone, abre Atajos → Automatización → + → Transacción, elige tus tarjetas y «Ejecutar inmediatamente».",
   "Agrega «Obtener ubicación actual» (opcional) y «Obtener contenido de URL» con la dirección, el método POST, el encabezado apikey y un cuerpo JSON con p_clave, p_monto (Importe), p_comercio (Comerciante), p_tarjeta (Tarjeta), p_latitud y p_longitud.",
-  "Paga con Apple Pay: el pago aparece en la bandeja para que lo confirmes.",
+  "Paga con Apple Pay: el pago aparece en la bandeja para que lo confirmes (o se registra solo si el atajo manda los últimos 4 dígitos de la tarjeta).",
 ];
 
 export default function ApplePayScreen() {
@@ -122,6 +123,8 @@ export default function ApplePayScreen() {
           </View>
         ))}
       </Tarjeta>
+
+      <RegistroAutomatico nota="Con Apple Pay, el atajo debe mandar en p_tarjeta el nombre con los últimos 4 dígitos (por ejemplo «Visa 1234»)." />
 
       <Tarjeta>
         <Text style={styles.tituloCard}>Datos para el atajo</Text>

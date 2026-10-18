@@ -2,7 +2,7 @@
 
 Inventario de **qué datos de las personas guarda fintrack, para qué, dónde y cuánto tiempo**. Es la base de la política de privacidad: si algo cambia aquí, cambia allá.
 
-Última revisión: **16-oct-2026** · Responsable: [el de las páginas públicas].
+Última revisión: **18-oct-2026** · Responsable: [el de las páginas públicas].
 
 > Una prueba (`packages/core/test/legal.test.ts`) lee `packages/core/src/types/database.ts` y falla si una tabla de la base no aparece con su nombre en este archivo. Si agregas una tabla, anótala aquí.
 
@@ -12,11 +12,12 @@ Inventario de **qué datos de las personas guarda fintrack, para qué, dónde y 
 |---|---|---|---|---|---|---|
 | 1 | Cuenta y acceso | Correo, contraseña (guardada con hash), fechas de sesión, IP y tipo de dispositivo o navegador | Supabase Auth (`auth.users`, sesiones y registros de Auth) | Crear la cuenta, iniciar sesión, detectar accesos indebidos | Consentimiento y ejecución del servicio | Mientras exista la cuenta. Registros técnicos: lo que defina el proveedor |
 | 2 | Constancia de aceptación | Documento (términos o privacidad), versión, plataforma, origen y fecha | `aceptaciones_legales` | Demostrar el consentimiento | Obligación de poder demostrarlo | Se borra con la cuenta |
-| 3 | Finanzas personales | Cuentas y tarjetas (nombre, banco, tipo, últimos 4 dígitos opcionales, saldo, cupo, fechas de corte y pago), gastos, ingresos, deudas, abonos, pagos de tarjeta, presupuestos, categorías propias y recordatorios | `cuentas`, `gastos`, `ingresos`, `deudas`, `abonos_deuda`, `pagos_tarjeta`, `presupuestos`, `categorias`, `recordatorios` | Mostrar el resumen, los presupuestos, el plan de deudas y las recomendaciones | Consentimiento y ejecución del servicio | Se borran con la cuenta |
+| 3 | Finanzas personales | Cuentas y tarjetas (nombre, banco, tipo, últimos 4 dígitos opcionales, saldo, cupo, fechas de corte y pago), gastos, ingresos, transferencias entre cuentas propias, deudas, abonos, pagos de tarjeta, presupuestos y los niveles ya avisados de cada uno (75 %, 100 %, excedido), categorías propias, recordatorios y el ajuste «registro automático» | `cuentas`, `gastos`, `ingresos`, `transferencias`, `deudas`, `abonos_deuda`, `pagos_tarjeta`, `presupuestos`, `avisos_presupuesto`, `categorias`, `recordatorios`, `ajustes_usuario` | Mostrar el resumen, los presupuestos, el plan de deudas y las recomendaciones; no avisar dos veces el mismo nivel de un presupuesto | Consentimiento y ejecución del servicio | Se borran con la cuenta |
 | 4 | Facturas | Fotos o PDF que la persona adjunta | Storage de Supabase, bucket privado `facturas/<id de la persona>/`; la ruta está en `gastos` | Que la persona las consulte | Consentimiento (adjuntar es opcional) | La app las borra antes de eliminar la cuenta |
 | 5 | Ubicación de pagos (opcional) | Latitud, longitud (redondeadas a unos 11 m), precisión y el lugar. Al abrir el detalle de un pago con ubicación, el teléfono pide las imágenes del mapa (teselas) a OpenStreetMap: ver la sección 2 | `gastos`, `lugares`, `transacciones_detectadas`. Las teselas vienen de `tile.openstreetmap.org` (externo) | Resumen de gastos por lugar y mapa del detalle de un pago | Consentimiento específico (hay que activarlo) | Se borra con la cuenta o con «Borrar mis ubicaciones» |
-| 6 | Atajo de Apple Pay (opcional) | Monto, comercio, nombre de la tarjeta o pase, ubicación opcional, y la clave de captura (solo su huella, su prefijo y su nombre) | `claves_captura`, `transacciones_detectadas`, `gastos` (billetera) | Dejar en la bandeja los pagos del iPhone para que la persona los confirme | Consentimiento (hay que crear la clave) | Se borran con la cuenta; la clave se revoca cuando la persona quiera |
+| 6 | Atajo de Apple Pay y notificaciones de Google Wallet (opcionales) | Monto, comercio, nombre o últimos dígitos de la tarjeta, ubicación opcional (solo el atajo), y la clave de captura (solo su huella, su prefijo y su nombre) | `claves_captura`, `transacciones_detectadas`, `gastos` (billetera) | Dejar en la bandeja los pagos para que la persona los confirme o, si la tarjeta se reconoce por sus últimos dígitos y el «registro automático» está encendido (lo está por defecto y se apaga en la app), registrarlos solos como gasto. Al teléfono que tiene la clave solo vuelven el monto, el id del gasto y su categoría (y el nivel de un presupuesto, si lo cruzó) | Consentimiento (hay que crear la clave o conectar Google Wallet) | Se borran con la cuenta; la clave se revoca cuando la persona quiera |
 | 7 | Correo conectado (opcional) | Del aviso de un banco: monto, fecha, banco y asunto (el asunto se borra al confirmar o descartar). El contenido del correo se analiza en el teléfono | `transacciones_detectadas`. El permiso de acceso (token) vive solo en el almacenamiento seguro del teléfono | Proponer movimientos a partir de avisos bancarios | Consentimiento (hay que conectarlo) | El token se borra al desconectar o cerrar sesión |
+| 7b | Notificaciones del teléfono (opcionales) | Título y texto de cada aviso (pueden llevar montos y nombres de categoría o comercio) y las preferencias de cada tipo de aviso | Solo en el teléfono: las programa el propio dispositivo (notificaciones locales). Las preferencias, en el almacenamiento de la app, por persona | Avisar pagos registrados o por confirmar, recordatorios y presupuestos | Consentimiento (permiso del sistema; cada tipo se apaga en la app) | Se borran al desinstalar; se cancelan al cerrar sesión |
 | 8 | Solicitudes de derechos | Correo, texto de la solicitud, fechas | Correo del responsable y `docs/legal/privado/` (fuera de Git) | Atender los derechos de la persona | Obligación legal | Mientras dure el trámite y el plazo de reclamos (a definir con el abogado) |
 
 ## 2. Quiénes tratan los datos (encargados)
@@ -46,6 +47,8 @@ Apple (Wallet y Atajos) corre en el iPhone de la persona: el atajo envía los pa
 | La aceptación no se puede modificar ni borrar a mano, y la fecha la pone el servidor | `aceptaciones_legales.sql` (L08 a L10) |
 | La copia de datos la saca solo la administración y no incluye secretos | `exportar_datos_persona.sql` |
 | Clave de captura de Apple Pay: solo su huella, límite de avisos por hora y día, nunca en la URL | `captura_apple_pay.sql` |
+| Transferencias solo entre cuentas propias; nadie ve, junta ni separa las de otra persona | `transferencias.sql` |
+| El registro automático solo usa la tarjeta reconocida por sus dígitos, se puede apagar, y sus funciones internas no se llaman desde afuera | `registro_automatico.sql` |
 | Funciones con permisos elevados fijan `search_path` y se quitan a `anon` | `aceptaciones_legales.sql` (L26), `captura_apple_pay.sql` |
 | La contraseña exige 8 o más caracteres con letras y números | `packages/core/test/acceso.test.ts` |
 | Enlaces del correo con código (PKCE); se rechazan los de `#access_token=` | `acceso.test.ts` |
@@ -58,4 +61,5 @@ Apple (Wallet y Atajos) corre en el iPhone de la persona: el atajo envía los pa
 - No se toma la ubicación en segundo plano.
 - No se envía al servicio de mapas el monto, el comercio, la cuenta ni el correo: solo las coordenadas de las teselas que dibujan la zona, la IP y el nombre de la app.
 - No se guarda el contenido de los correos, solo monto, fecha, banco y asunto de los avisos bancarios.
-- No hay decisiones automatizadas con efectos legales: las recomendaciones y el puntaje son informativos.
+- No hay decisiones automatizadas con efectos legales: las recomendaciones y el puntaje son informativos. El «registro automático» solo anota pagos y transferencias de la propia persona; se puede apagar, y cada movimiento se edita o se borra.
+- Las notificaciones no pasan por ningún servidor de avisos (push): las arma el teléfono.

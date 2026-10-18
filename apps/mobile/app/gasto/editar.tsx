@@ -5,6 +5,7 @@ import {
   actualizarGasto,
   cambiosDeGasto,
   edicionPermitida,
+  eliminarGasto,
   listarCategorias,
   listarCuentas,
   mensajeError,
@@ -15,6 +16,9 @@ import {
   type Gasto,
 } from "core";
 import FormularioEdicion from "../../components/FormularioEdicion";
+import Boton from "../../components/Boton";
+import { confirmar } from "../../lib/dialogo";
+import { avisarPresupuestos } from "../../lib/notificaciones";
 import ErrorTexto from "../../components/ErrorTexto";
 import { BlurFade } from "../../components/Motion";
 import { spacing, useTheme, font, type Colors } from "../../lib/theme";
@@ -28,6 +32,26 @@ export default function EditarGasto() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [eliminando, setEliminando] = useState(false);
+  // Abierta desde una notificación no hay pantalla anterior: se vuelve a Gastos.
+  const salir = () => (router.canGoBack() ? router.back() : router.replace("/gastos"));
+
+  // Se llega aquí también desde la notificación «Registré $12.50 en…»: si el
+  // pago no era tuyo o se registró de más, se elimina y el saldo vuelve.
+  async function eliminar() {
+    if (!gasto) return;
+    const ok = await confirmar("Eliminar gasto", `¿Eliminar «${gasto.descripcion}»? El monto vuelve a la cuenta.`, "Eliminar");
+    if (!ok) return;
+    setEliminando(true);
+    try {
+      await eliminarGasto(gasto.id);
+      salir();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setEliminando(false);
+    }
+  }
 
   useFocusEffect(
     useCallback(() => {
@@ -80,11 +104,17 @@ export default function EditarGasto() {
             permitido={edicionPermitida(gasto)}
             onGuardar={async (f) => {
               const cambios = cambiosDeGasto(gasto, f);
-              if (!sinCambios(cambios)) await actualizarGasto(gasto.id, cambios);
-              router.back();
+              if (!sinCambios(cambios)) {
+                await actualizarGasto(gasto.id, cambios);
+                avisarPresupuestos(cambios.fecha ?? gasto.fecha);
+              }
+              salir();
             }}
           />
         ) : null}
+        {gasto && (
+          <Boton titulo="Eliminar este gasto" variante="peligro" onPress={eliminar} loading={eliminando} disabled={eliminando} />
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );

@@ -9,6 +9,7 @@ import {
   cambiarPreferenciaUbicacion,
   enlaceMapa,
   leerPreferenciaUbicacion,
+  ubicacionAnticipada,
   ubicacionParaGasto,
   type ProveedorUbicacion,
   type ResultadoUbicacion,
@@ -63,6 +64,15 @@ export async function ubicacionParaNuevoGasto(): Promise<ResultadoUbicacion> {
   const id = await usuarioActual();
   if (!id) return { motivo: "apagada" };
   return ubicacionParaGasto(AsyncStorage, proveedor, id);
+}
+
+/**
+ * Empieza a buscar la ubicación al abrir el formulario de un gasto: al
+ * guardar ya está, y es la de donde anotas el pago (no la de varios segundos
+ * después). Solo si la persona activó la preferencia: si no, no toca el GPS.
+ */
+export function anticiparUbicacionDeGasto(): { obtener(): Promise<ResultadoUbicacion> } {
+  return ubicacionAnticipada(ubicacionParaNuevoGasto);
 }
 
 /** Abre el punto en la app de mapas del teléfono (Android: la que elija el usuario; iPhone: Apple Maps). */

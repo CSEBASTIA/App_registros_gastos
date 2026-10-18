@@ -15,6 +15,7 @@ import {
   listarCuentas,
   marcarTransaccionDetectada,
   confirmarTransaccionDetectada,
+  confirmarAvisoComoTransferencia,
   mensajeError,
   parsearMonto,
   ETIQUETA_BANCO,
@@ -35,6 +36,7 @@ import { BlurFade } from "../components/Motion";
 import { Ionicons } from "@expo/vector-icons";
 import { abrirEnMapas } from "../lib/ubicacion";
 import IslaDetalle from "../components/IslaDetalle";
+import { avisarPresupuestos, sincronizarNotificaciones } from "../lib/notificaciones";
 
 export default function BandejaScreen() {
   const { color } = useTheme();
@@ -62,7 +64,15 @@ export default function BandejaScreen() {
       .finally(() => setCargando(false));
   }, []);
 
-  useFocusEffect(cargar);
+  useFocusEffect(
+    useCallback(() => {
+      cargar();
+      // Al salir, el aviso «tienes N movimientos por confirmar» se reprograma.
+      return () => {
+        sincronizarNotificaciones();
+      };
+    }, [cargar]),
+  );
 
   if (cargando)
     return (
@@ -122,7 +132,7 @@ export default function BandejaScreen() {
           <EstadoVacio
             icono="checkmark-done-outline"
             titulo="No hay nada pendiente de revisar"
-            subtitulo="Los movimientos que la app detecte en tu correo o en tus pagos con Apple Pay van a aparecer aquí."
+            subtitulo="Los movimientos que la app detecte en tu correo o en tus pagos con Apple Pay o Google Wallet van a aparecer aquí. Los pagos con una tarjeta que reconoce por sus últimos dígitos se registran solos."
           />
         ) : (
           items.map((item) => (
@@ -160,8 +170,38 @@ function ItemBandeja({
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
   const [verDetalle, setVerDetalle] = useState(false);
+  // Un aviso del correo puede ser una transferencia entre cuentas propias.
+  const [comoTransferencia, setComoTransferencia] = useState(false);
+  const [otraCuentaId, setOtraCuentaId] = useState("");
 
   const categoriasDelTipo = categorias.filter((c) => c.tipo === item.tipo);
+  // Si salió de esta cuenta, la otra recibe (no puede ser una tarjeta de crédito: eso es «Pagar tarjeta»).
+  const otrasCuentas = cuentas.filter(
+    (c) => c.id !== cuentaId && (item.tipo === "ingreso" || c.tipo !== "credito"),
+  );
+
+  async function confirmarTransferencia() {
+    setError(null);
+    if (!cuentaId || !otraCuentaId) {
+      setError("Elige las dos cuentas de la transferencia.");
+      return;
+    }
+    setGuardando(true);
+    try {
+      // Si la otra mitad (el aviso de la otra cuenta) está en la bandeja, se resuelve junto.
+      await confirmarAvisoComoTransferencia(item.id, {
+        cuentaId,
+        otraCuentaId,
+        monto: parsearMonto(monto),
+        descripcion: descripcion.trim() || undefined,
+      });
+      onResuelto();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   async function confirmar() {
     setError(null);
@@ -177,6 +217,7 @@ function ItemBandeja({
         categoriaId: categoriaId || undefined,
         cuentaId: cuentaId || undefined,
       });
+      if (item.tipo === "gasto") avisarPresupuestos(item.fecha);
       onResuelto();
     } catch (err) {
       setError(mensajeError(err));
@@ -226,7 +267,7 @@ function ItemBandeja({
           onAbrirMapa={() => item.ubicacion && abrirEnMapas(item.ubicacion).catch(() => undefined)}
           sinUbicacion={
             item.origen === "google_wallet"
-              ? "Los pagos con Google Wallet llegan sin ubicación: con la app cerrada, el teléfono no puede leerla."
+              ? "Los pagos con Google Wallet llegan sin ubicación (con la app cerrada, el teléfono no puede leerla). Al confirmarlo, si ya tienes un lugar con el nombre del comercio, se asigna a ese lugar."
               : item.origen === "apple_pay"
                 ? "Este pago llegó sin ubicación (el atajo no la incluyó)."
                 : undefined
@@ -264,16 +305,24 @@ function ItemBandeja({
         />
       </View>
 
-      <SelectorChips
-        titulo="Categoría"
-        valor={categoriaId}
-        onCambiar={setCategoriaId}
-        opciones={categoriasDelTipo.map((c) => ({
-          valor: c.id,
-          etiqueta: c.nombre,
-          color: c.color,
-        }))}
-      />
+      {item.origen === "correo" && item.esTransferencia && !comoTransferencia && (
+        <Text style={styles.pista}>
+          Parece una transferencia. Si fue entre tus cuentas, márcala así para que no cuente como {item.tipo}.
+        </Text>
+      )}
+
+      {!comoTransferencia && (
+        <SelectorChips
+          titulo="Categoría"
+          valor={categoriaId}
+          onCambiar={setCategoriaId}
+          opciones={categoriasDelTipo.map((c) => ({
+            valor: c.id,
+            etiqueta: c.nombre,
+            color: c.color,
+          }))}
+        />
+      )}
 
       <SelectorChips
         titulo={cuentaId ? "Cuenta" : "Cuenta — no pude determinarla, elegila"}
@@ -282,13 +331,33 @@ function ItemBandeja({
         opciones={cuentas.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
       />
 
+      {comoTransferencia && (
+        <SelectorChips
+          titulo={item.tipo === "gasto" ? "¿A qué cuenta tuya fue?" : "¿De qué cuenta tuya vino?"}
+          valor={otraCuentaId}
+          onCambiar={setOtraCuentaId}
+          opciones={otrasCuentas.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+        />
+      )}
+
       {error && <ErrorTexto>{error}</ErrorTexto>}
+
+      {item.origen === "correo" && (
+        <Boton
+          titulo={comoTransferencia ? "No, era un " + item.tipo : "Fue entre mis cuentas (transferencia)"}
+          onPress={() => {
+            setComoTransferencia((v) => !v);
+            setError(null);
+          }}
+          disabled={guardando}
+        />
+      )}
 
       <View style={{ flexDirection: "row", gap: spacing(2) }}>
         <Boton
-          titulo="Confirmar"
+          titulo={comoTransferencia ? "Confirmar transferencia" : "Confirmar"}
           variante="primario"
-          onPress={confirmar}
+          onPress={comoTransferencia ? confirmarTransferencia : confirmar}
           loading={guardando}
           disabled={guardando}
           style={{ flex: 1 }}
@@ -340,5 +409,14 @@ const createStyles = (color: Colors) =>
       fontSize: 12.5,
       color: color.textMuted,
       fontStyle: "italic",
+    },
+    pista: {
+      fontFamily: font.body,
+      fontSize: 12.5,
+      lineHeight: 18,
+      color: color.text,
+      backgroundColor: color.primaryBg,
+      borderRadius: 8,
+      padding: spacing(2.5),
     },
   });

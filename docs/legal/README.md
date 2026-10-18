@@ -7,7 +7,7 @@ Estado al **16-oct-2026**. Todo es **borrador técnico**: sirve para tener la ba
 | Documento | Dónde | Quién lo ve | Estado |
 |---|---|---|---|
 | Términos y condiciones | [`apps/mobile/public/terminos.html`](../../apps/mobile/public/terminos.html) | Públicos (`/terminos.html`) | Borrador, versión `2026-10-16`. Faltan los datos del responsable |
-| Política de privacidad | [`apps/mobile/public/privacidad.html`](../../apps/mobile/public/privacidad.html) | Públicos (`/privacidad.html`) | Borrador, versión `2026-10-16`. Faltan los datos del responsable, la región de Supabase y los días de respaldos |
+| Política de privacidad | [`apps/mobile/public/privacidad.html`](../../apps/mobile/public/privacidad.html) | Públicos (`/privacidad.html`) | Borrador, versión `2026-10-18` (agrega Google Wallet, el registro automático de pagos, las transferencias y las notificaciones). Faltan los datos del responsable, la región de Supabase y los días de respaldos |
 | Registro de tratamiento de datos | [`registro-tratamiento-datos.md`](registro-tratamiento-datos.md) | Interno | Completo. Una prueba exige que cada tabla de la base esté aquí |
 | Procedimiento para atender derechos | [`procedimiento-derechos-titular.md`](procedimiento-derechos-titular.md) | Interno | Completo; la copia de datos está automatizada y probada |
 | Plan de respuesta a incidentes | [`plan-incidentes-seguridad.md`](plan-incidentes-seguridad.md) | Interno | Completo; falta tu cuenta en el sistema de notificación de la Superintendencia |

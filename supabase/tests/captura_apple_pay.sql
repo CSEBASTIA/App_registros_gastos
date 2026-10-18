@@ -23,6 +23,9 @@ insert into cuentas (id, nombre, tipo, banco, identificador, disponible) values
   ('7d100000-0000-4000-8000-000000000002', 'Débito Guayaquil A', 'debito', 'banco_guayaquil', '5678', 500),
   ('7d100000-0000-4000-8000-000000000003', 'Débito Guayaquil B', 'debito', 'banco_guayaquil', '9999', 500);
 insert into claves values ('iphone', crear_clave_captura('  Mi iPhone  '));
+-- Este archivo prueba la bandeja: el registro automático (20261018120000)
+-- se apaga para F; se prueba en registro_automatico.sql.
+insert into ajustes_usuario (registro_automatico) values (false);
 
 -- W01: la clave tiene el formato esperado y la base guarda solo su huella
 do $$ declare c text; ok boolean; begin

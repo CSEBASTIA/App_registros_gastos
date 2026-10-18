@@ -16,6 +16,9 @@ select set_config('request.jwt.claims', '{"sub":"7f000000-0000-4000-8000-0000000
 insert into cuentas (id, nombre, tipo, banco, identificador, disponible, cupo_total) values
   ('7d300000-0000-4000-8000-000000000001', 'Visa Produbanco P', 'credito', 'produbanco', '1234', 1000, 1000);
 insert into claves values ('telefono', crear_clave_captura('Teléfono de P'));
+-- Este archivo prueba la confirmación en la bandeja: el registro automático
+-- (20261018120000) se apaga para P; se prueba en registro_automatico.sql.
+insert into ajustes_usuario (registro_automatico) values (false);
 -- Un aviso del correo, para comparar.
 insert into transacciones_detectadas (id, mensaje_id, tipo, monto, descripcion, fecha, correo_asunto)
   values ('7d310000-0000-4000-8000-000000000001', 'msg-p-1', 'gasto', 9, 'Compra por correo', '2026-10-15', 'Consumo');

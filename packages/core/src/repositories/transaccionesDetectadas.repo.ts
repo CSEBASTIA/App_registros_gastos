@@ -5,6 +5,7 @@ import { z } from "zod";
 import { LIMITES, fechaIso, montoPositivo, textoRequerido } from "../schemas/limites";
 import { ubicacionSegura } from "../schemas/ubicacion.schema";
 import { filaDeUbicacion, ubicacionDeFila } from "../lib/ubicacion";
+import { faltaEnLaBase } from "../lib/mensajeError";
 
 type Row = Database["public"]["Tables"]["transacciones_detectadas"]["Row"];
 
@@ -28,6 +29,10 @@ function filaATransaccion(row: Row): TransaccionDetectada {
     ubicacion: ubicacionDeFila(row),
     tarjetaFinal: row.tarjeta_final ?? undefined,
     pagadoEn: row.pagado_en ?? undefined,
+    // Sin la migración de transferencias estas columnas no existen.
+    esTransferencia: row.es_transferencia === true,
+    transferenciaId: row.transferencia_id ?? undefined,
+    gastoId: row.gasto_id ?? undefined,
     estado: row.estado as TransaccionDetectada["estado"],
     createdAt: row.created_at,
   };
@@ -55,7 +60,10 @@ export async function contarTransaccionesPendientes(): Promise<number> {
 }
 
 /** `origen` es opcional: si falta, el aviso es del correo (como hasta ahora). */
-export type TransaccionDetectadaInsert = Omit<TransaccionDetectada, "id" | "createdAt" | "estado" | "origen"> & {
+export type TransaccionDetectadaInsert = Omit<
+  TransaccionDetectada,
+  "id" | "createdAt" | "estado" | "origen" | "transferenciaId" | "gastoId"
+> & {
   origen?: OrigenTransaccion;
 };
 
@@ -99,32 +107,41 @@ export async function insertarTransaccionesDetectadas(
   // Si se envían, van en TODAS las filas: en un lote, una columna que falta
   // en una fila llega como null (y `origen` no admite null).
   const conBilletera = validos.some(usaCamposDeBilletera);
-  const { error } = await getSupabaseClient()
-    .from("transacciones_detectadas")
-    .upsert(
-      // El texto viene de correos de terceros: se recorta a los límites que
-      // impone la base, para que un asunto larguísimo no tumbe el lote entero.
-      validos.map((t) => ({
-        mensaje_id: t.mensajeId,
-        tipo: t.tipo,
-        monto: t.monto,
-        descripcion: t.descripcion.trim().slice(0, LIMITES.descripcion) || "Movimiento bancario",
-        banco: t.banco ?? null,
-        cuenta_id: t.cuentaId ?? null,
-        categoria_id: t.categoriaId ?? null,
-        fecha: t.fecha,
-        correo_asunto: t.correoAsunto?.slice(0, LIMITES.asunto) ?? null,
-        ...(conBilletera
-          ? {
-              origen: t.origen ?? "correo",
-              comercio: t.comercio?.trim().slice(0, LIMITES.descripcion) || null,
-              ...filaDeUbicacion(ubicacionSegura(t.ubicacion) ?? null),
-              tarjeta_final: t.tarjetaFinal && TARJETA_FINAL.test(t.tarjetaFinal) ? t.tarjetaFinal : null,
-            }
-          : {}),
-      })),
-      { onConflict: "usuario_id,mensaje_id", ignoreDuplicates: true }
-    );
+  // Igual con la marca de transferencia (migración de transferencias): solo
+  // se envía si algún aviso la lleva, y entonces en todas las filas. En una
+  // base sin esa columna se reintenta sin ella: los avisos llegan igual, sin
+  // juntarse solos.
+  const conTransferencia = validos.some((t) => t.esTransferencia);
+  const enviar = (marcarTransferencias: boolean) =>
+    getSupabaseClient()
+      .from("transacciones_detectadas")
+      .upsert(
+        // El texto viene de correos de terceros: se recorta a los límites que
+        // impone la base, para que un asunto larguísimo no tumbe el lote entero.
+        validos.map((t) => ({
+          mensaje_id: t.mensajeId,
+          tipo: t.tipo,
+          monto: t.monto,
+          descripcion: t.descripcion.trim().slice(0, LIMITES.descripcion) || "Movimiento bancario",
+          banco: t.banco ?? null,
+          cuenta_id: t.cuentaId ?? null,
+          categoria_id: t.categoriaId ?? null,
+          fecha: t.fecha,
+          correo_asunto: t.correoAsunto?.slice(0, LIMITES.asunto) ?? null,
+          ...(conBilletera
+            ? {
+                origen: t.origen ?? "correo",
+                comercio: t.comercio?.trim().slice(0, LIMITES.descripcion) || null,
+                ...filaDeUbicacion(ubicacionSegura(t.ubicacion) ?? null),
+                tarjeta_final: t.tarjetaFinal && TARJETA_FINAL.test(t.tarjetaFinal) ? t.tarjetaFinal : null,
+              }
+            : {}),
+          ...(marcarTransferencias ? { es_transferencia: t.esTransferencia === true } : {}),
+        })),
+        { onConflict: "usuario_id,mensaje_id", ignoreDuplicates: true }
+      );
+  let { error } = await enviar(conTransferencia);
+  if (error && conTransferencia && faltaEnLaBase(error)) ({ error } = await enviar(false));
   if (error) throw error;
   return { enviados: validos.length, descartados };
 }

@@ -12,7 +12,11 @@ export default function ItemMovimiento({ item }: { item: MovimientoCuenta }) {
   return (
     <View style={styles.fila}>
       <View style={[styles.icono, { backgroundColor: `${item.color}1f` }]}>
-        <Ionicons name={esIngreso ? "arrow-up" : "document-text-outline"} size={16} color={item.color} />
+        <Ionicons
+          name={item.tipo.startsWith("transferencia") ? "swap-horizontal" : esIngreso ? "arrow-up" : "document-text-outline"}
+          size={16}
+          color={item.color}
+        />
       </View>
       <View style={styles.info}>
         <Text style={styles.descripcion} numberOfLines={1}>

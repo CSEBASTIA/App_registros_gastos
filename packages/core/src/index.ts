@@ -24,6 +24,7 @@ export * from "./lib/detalleTransaccion";
 export * from "./lib/mapaEstatico";
 export * from "./lib/edicionMovimiento";
 export * from "./lib/legal";
+export * from "./lib/notificaciones";
 export { FILAS_POR_PAGINA, type RangoFechas } from "./lib/paginacion";
 export * from "./schemas/limites";
 export * from "./schemas/gasto.schema";
@@ -35,6 +36,7 @@ export * from "./schemas/pagoTarjeta.schema";
 export * from "./schemas/deuda.schema";
 export * from "./schemas/recordatorio.schema";
 export * from "./schemas/categoria.schema";
+export * from "./schemas/transferencia.schema";
 
 // De gastos.repo/presupuestos.repo (y las demás) NO reexportamos los
 // `crear*` (inserts sin validar) para no chocar de nombre con los use cases
@@ -54,8 +56,26 @@ export {
   eliminarGasto,
   type CambiosGasto,
 } from "./repositories/gastos.repo";
-export { listarPresupuestos, eliminarPresupuesto } from "./repositories/presupuestos.repo";
-export { listarCuentas, eliminarCuenta, actualizarFechasTarjeta } from "./repositories/cuentas.repo";
+export {
+  listarPresupuestos,
+  eliminarPresupuesto,
+  revisarMisPresupuestos,
+  avisosPresupuestoDe,
+} from "./repositories/presupuestos.repo";
+export {
+  listarTransferencias,
+  registrarTransferencia,
+  eliminarTransferencia,
+  separarTransferencia,
+  confirmarAvisoComoTransferencia,
+} from "./repositories/transferencias.repo";
+export { obtenerAjustes, guardarAjustes, AJUSTES_POR_DEFECTO } from "./repositories/ajustes.repo";
+export {
+  listarCuentas,
+  eliminarCuenta,
+  actualizarFechasTarjeta,
+  actualizarIdentificadorCuenta,
+} from "./repositories/cuentas.repo";
 export { listarIngresos, listarIngresosRecientes, actualizarIngreso, eliminarIngreso } from "./repositories/ingresos.repo";
 export { obtenerIngreso } from "./repositories/ingresos.repo";
 export { listarPagosTarjeta } from "./repositories/pagosTarjeta.repo";

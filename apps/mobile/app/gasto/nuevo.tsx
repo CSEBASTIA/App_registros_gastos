@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -7,6 +7,7 @@ import {
   Text,
   ScrollView,
   StyleSheet,
+  Switch,
 } from "react-native";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
@@ -27,12 +28,15 @@ import {
   OPCIONES_BILLETERA,
   MENSAJE_SIN_UBICACION,
   billeteraCompatible,
+  guardarUbicacionDeAhora,
+  type ResultadoUbicacion,
   type Billetera,
   type Categoria,
   type Cuenta,
   type MetodoPago,
 } from "core";
-import { guardarUbicacionActiva, ubicacionParaNuevoGasto } from "../../lib/ubicacion";
+import { anticiparUbicacionDeGasto, guardarUbicacionActiva } from "../../lib/ubicacion";
+import { avisarPresupuestos } from "../../lib/notificaciones";
 import { avisar } from "../../lib/dialogo";
 import Campo from "../../components/Campo";
 import Boton from "../../components/Boton";
@@ -66,7 +70,11 @@ export default function NuevoGasto() {
   const [cuentaId, setCuentaId] = useState("");
   const [metodoPago, setMetodoPago] = useState<MetodoPago | "">("");
   const [billetera, setBilletera] = useState<Billetera | "">("");
+  // La preferencia «Guardar la ubicación de mis pagos» (Más → Ubicación).
   const [conUbicacion, setConUbicacion] = useState(false);
+  // Lo que eligió la persona en este gasto; sin elegir, solo si el gasto es de hoy.
+  const [eleccionUbicacion, setEleccionUbicacion] = useState<boolean | undefined>(undefined);
+  const ubicacionPrevia = useRef<{ obtener(): Promise<ResultadoUbicacion> } | null>(null);
   const [mesesDiferido, setMesesDiferido] = useState(3);
   const [tasaInteres, setTasaInteres] = useState("");
   // Si se abrió desde otro mes o semana, la fecha cae en ese período (no hoy).
@@ -74,6 +82,8 @@ export default function NuevoGasto() {
     fechaPropuesta(mesVisto, hoy(), semanaVista ? Number(semanaVista) : undefined),
   );
   const fechaNoEsHoy = fecha !== hoy();
+  // Un gasto anotado otro día no se pagó aquí: por defecto va sin ubicación.
+  const ubicacionDeAhora = conUbicacion && guardarUbicacionDeAhora(fecha, hoy(), eleccionUbicacion);
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -89,7 +99,13 @@ export default function NuevoGasto() {
         })
         .catch((err) => setError(mensajeError(err)))
         .finally(() => setCargando(false));
-      guardarUbicacionActiva().then(setConUbicacion).catch(() => setConUbicacion(false));
+      guardarUbicacionActiva()
+        .then((activa) => {
+          setConUbicacion(activa);
+          // El GPS empieza a buscar ya: al guardar no hay que esperarlo.
+          ubicacionPrevia.current = activa ? anticiparUbicacionDeGasto() : null;
+        })
+        .catch(() => setConUbicacion(false));
     }, [cuentaIdInicial]),
   );
 
@@ -139,8 +155,11 @@ export default function NuevoGasto() {
     }
     setGuardando(true);
     try {
-      // Nunca lanza ni pide permiso, y espera como mucho 8 s al GPS.
-      const lugar = await ubicacionParaNuevoGasto();
+      // Nunca lanza ni pide permiso, y espera como mucho 8 s al GPS (que ya
+      // empezó a buscar al abrir el formulario).
+      const lugar: ResultadoUbicacion = ubicacionDeAhora && ubicacionPrevia.current
+        ? await ubicacionPrevia.current.obtener()
+        : { motivo: "apagada" };
       await crearGasto({
         monto: montoNumerico,
         descripcion: descripcion || categoriaSeleccionada?.nombre || "Gasto",
@@ -154,6 +173,8 @@ export default function NuevoGasto() {
         ubicacion: lugar.ubicacion,
         fecha,
       });
+      // Si con este gasto un presupuesto llegó al 75 %, al 100 % o se pasó, avisa (sin esperar).
+      avisarPresupuestos(fecha);
       const aviso = lugar.motivo ? MENSAJE_SIN_UBICACION[lugar.motivo] : undefined;
       // El gasto ya se guardó: es un aviso, no un error.
       if (aviso) await avisar("Gasto guardado", aviso);
@@ -344,7 +365,24 @@ export default function NuevoGasto() {
         />
 
         {conUbicacion && (
-          <Text style={styles.ayudaTexto}>Se guardará dónde haces este pago (puedes apagarlo en Más → Ubicación de mis pagos).</Text>
+          <View style={styles.filaUbicacion}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.ubicacionTitulo}>Guardar dónde estoy ahora</Text>
+              <Text style={styles.ayudaTexto}>
+                {ubicacionDeAhora
+                  ? "Se guarda dónde estás, para ver cuánto gastas en cada lugar."
+                  : fechaNoEsHoy && eleccionUbicacion === undefined
+                    ? "Apagado: el gasto no es de hoy, así que no lo pagaste aquí."
+                    : "Este gasto se guarda sin ubicación."}
+              </Text>
+            </View>
+            <Switch
+              accessibilityLabel="Guardar dónde estoy ahora"
+              value={ubicacionDeAhora}
+              onValueChange={setEleccionUbicacion}
+              trackColor={{ true: color.primary, false: color.border }}
+            />
+          </View>
         )}
 
         {error && <ErrorTexto>{error}</ErrorTexto>}
@@ -382,4 +420,6 @@ const createStyles = (color: Colors) =>
       color: color.textMuted,
       lineHeight: 18,
     },
+    filaUbicacion: { flexDirection: "row", alignItems: "center", gap: spacing(3) },
+    ubicacionTitulo: { fontFamily: font.semibold, fontSize: 14, color: color.text },
   });

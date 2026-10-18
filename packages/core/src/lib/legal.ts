@@ -15,7 +15,7 @@ export type DocumentoLegal = (typeof DOCUMENTOS_LEGALES)[number];
  */
 export const VERSION_LEGAL: Readonly<Record<DocumentoLegal, string>> = {
   terminos: "2026-10-16",
-  privacidad: "2026-10-16",
+  privacidad: "2026-10-18",
 };
 
 export const PLATAFORMAS_LEGALES = ["android", "ios", "web"] as const;

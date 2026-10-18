@@ -21,6 +21,7 @@ import {
   type PreferenciasNotificaciones,
 } from "core";
 import { supabase } from "./supabase";
+import { avisar } from "./dialogo";
 import { capturaGoogleWallet } from "../modules/captura-billetera";
 
 /** Los mismos ids que usa el módulo de Android (Notificaciones.kt): un solo juego de canales. */
@@ -194,19 +195,28 @@ async function avisarPresupuestosAhora(mes: string): Promise<void> {
 }
 
 /**
- * Después de guardar o editar un gasto: si con él un presupuesto cruzó el
- * 75 %, el 100 % o el límite, avisa en el momento. `fecha` es la del gasto
- * (puede ser de otro mes). Nunca lanza.
+ * Después de guardar o editar un gasto (o un presupuesto): si un presupuesto
+ * cruzó el 75 %, el 100 % o el límite, avisa en el momento. `fecha` es la del
+ * gasto (puede ser de otro mes). En la web, que no tiene notificaciones del
+ * teléfono, el aviso sale en la misma pantalla. Nunca lanza.
  */
 export async function avisarPresupuestos(fecha?: string): Promise<void> {
-  if (!NOTIFICACIONES_DISPONIBLES) return;
+  const mes = fecha && /^\d{4}-\d{2}/.test(fecha) ? fecha.slice(0, 7) : mesLocal();
   try {
     const id = await usuarioActual();
     if (!id) return;
     const p = await leerPreferenciasNotificaciones(AsyncStorage, id);
-    if (!p.presupuestos || (await estadoPermisoNotificaciones()) !== "concedido") return;
+    if (!p.presupuestos) return;
+    if (!NOTIFICACIONES_DISPONIBLES) {
+      for (const aviso of await revisarMisPresupuestos(mes)) {
+        const { titulo, cuerpo } = textoAvisoPresupuesto(aviso);
+        await avisar(titulo, cuerpo);
+      }
+      return;
+    }
+    if ((await estadoPermisoNotificaciones()) !== "concedido") return;
     await prepararNotificaciones();
-    await avisarPresupuestosAhora(fecha && /^\d{4}-\d{2}/.test(fecha) ? fecha.slice(0, 7) : mesLocal());
+    await avisarPresupuestosAhora(mes);
   } catch {
     // No es parte de guardar el gasto.
   }

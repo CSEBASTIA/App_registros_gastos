@@ -40,6 +40,7 @@ import { radius, spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
 import { abrirEnMapas } from "../../lib/ubicacion";
 import { avisar, confirmar } from "../../lib/dialogo";
+import { tomarFechaGuardada } from "../../lib/semanaGuardada";
 import IslaDetalle, { type AccionIsla } from "../../components/IslaDetalle";
 
 function mesActual() {
@@ -74,6 +75,12 @@ export default function GastosScreen() {
       diaVisto.current = hoy;
       setMes(hoy.slice(0, 7));
       setSemanaActiva(semanaDeFecha(hoy));
+    }
+    // Recién guardado un gasto: se muestra su semana, aunque no sea la de hoy.
+    const guardada = tomarFechaGuardada();
+    if (guardada) {
+      setMes(guardada.slice(0, 7));
+      setSemanaActiva(semanaDeFecha(guardada));
     }
     setCargando(true);
     setError(null);

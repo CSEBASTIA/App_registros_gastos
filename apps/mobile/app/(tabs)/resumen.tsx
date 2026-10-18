@@ -24,7 +24,9 @@ import {
   listarCategorias,
   listarCuentas,
   listarDeudas,
+  listarPagosTarjeta,
   balanceGeneral,
+  efectivoNeto,
   calcularEndeudamiento,
   generarRecomendaciones,
   formatMonto,
@@ -36,6 +38,7 @@ import {
   type Categoria,
   type Cuenta,
   type Deuda,
+  type PagoTarjeta,
   type Recomendacion,
 } from "core";
 import { supabase } from "../../lib/supabase";
@@ -80,6 +83,7 @@ export default function ResumenScreen() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [deudas, setDeudas] = useState<Deuda[]>([]);
+  const [pagosTarjeta, setPagosTarjeta] = useState<PagoTarjeta[]>([]);
   const [lugares, setLugares] = useState<Lugar[]>([]);
 
   const cargar = useCallback(() => {
@@ -98,17 +102,19 @@ export default function ResumenScreen() {
           setCategorias([]);
           setCuentas([]);
           setDeudas([]);
+          setPagosTarjeta([]);
           setLugares([]);
           setCargando(false);
           return;
         }
         const desde = inicioVentanaResumen();
-        const [g, i, c, cu, d] = await Promise.all([
+        const [g, i, c, cu, d, pt] = await Promise.all([
           listarGastos({ desde }),
           listarIngresos({ desde }),
           listarCategorias(),
           listarCuentas(),
           listarDeudas(),
+          listarPagosTarjeta(),
         ]);
         if (!activo) return;
         // Si el periodo ya contiene ocho movimientos, ningún registro más
@@ -124,6 +130,7 @@ export default function ResumenScreen() {
         setCategorias(c);
         setCuentas(cu);
         setDeudas(d);
+        setPagosTarjeta(pt);
         setLugares([]);
         // Aparte: sin la migración de lugares, el resto del resumen sigue funcionando.
         listarLugares().then((l) => activo && setLugares(l)).catch(() => activo && setLugares([]));
@@ -140,7 +147,16 @@ export default function ResumenScreen() {
 
   const gastosDelMes = useMemo(() => gastos.filter((g) => g.fecha.startsWith(mes)), [gastos, mes]);
   const ingresosDelMes = useMemo(() => ingresos.filter((i) => i.fecha.startsWith(mes)), [ingresos, mes]);
+  // La salud financiera mira todo lo gastado (también con tarjeta); el
+  // efectivo neto, solo el dinero que ya salió (la tarjeta, al pagarla).
   const balance = balanceGeneral(gastosDelMes, ingresosDelMes);
+  const efectivo = efectivoNeto(
+    gastosDelMes,
+    ingresosDelMes,
+    cuentas,
+    pagosTarjeta.filter((p) => p.fecha.startsWith(mes)),
+  );
+  const salioDeTuDinero = sumarMontos([efectivo.gastadoConTuDinero, efectivo.pagosTarjeta]);
   const endeudamiento = calcularEndeudamiento(deudas, balance.totalIngresos);
   const recomendaciones: Recomendacion[] = useMemo(() => generarRecomendaciones({
     mes,
@@ -286,15 +302,15 @@ export default function ResumenScreen() {
           )}
 
           <View style={styles.hero}>
-            <Text style={styles.heroEtiqueta}>Balance del mes</Text>
+            <Text style={styles.heroEtiqueta}>Efectivo neto del mes</Text>
             <Text
               numberOfLines={1}
               adjustsFontSizeToFit
               minimumFontScale={0.65}
               style={styles.heroValor}
             >
-              {balance.balance > 0 ? "+" : balance.balance < 0 ? "−" : ""}$
-              {Math.abs(balance.balance).toFixed(2)}
+              {efectivo.efectivoNeto > 0 ? "+" : efectivo.efectivoNeto < 0 ? "−" : ""}$
+              {Math.abs(efectivo.efectivoNeto).toFixed(2)}
             </Text>
             <View style={styles.heroStats}>
               <View style={styles.heroStat}>
@@ -311,7 +327,7 @@ export default function ResumenScreen() {
                     minimumFontScale={0.65}
                     style={styles.heroStatValor}
                   >
-                    ${balance.totalIngresos.toFixed(2)}
+                    ${efectivo.totalIngresos.toFixed(2)}
                   </Text>
                 </View>
               </View>
@@ -322,18 +338,29 @@ export default function ResumenScreen() {
                   color={color.danger}
                 />
                 <View>
-                  <Text style={styles.heroStatEtiqueta}>Gastado este mes</Text>
+                  <Text style={styles.heroStatEtiqueta}>Salió de tu dinero</Text>
                   <Text
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.65}
                     style={styles.heroStatValor}
                   >
-                    ${balance.totalGastos.toFixed(2)}
+                    ${salioDeTuDinero.toFixed(2)}
                   </Text>
                 </View>
               </View>
             </View>
+            {(efectivo.conTarjeta > 0 || efectivo.pagosTarjeta > 0) && (
+              <Text style={styles.heroNota}>
+                {efectivo.conTarjeta > 0
+                  ? `Con tarjeta de crédito: $${efectivo.conTarjeta.toFixed(2)}. No baja tu efectivo hasta que pagues la tarjeta.`
+                  : ""}
+                {efectivo.conTarjeta > 0 && efectivo.pagosTarjeta > 0 ? " " : ""}
+                {efectivo.pagosTarjeta > 0
+                  ? `Incluye $${efectivo.pagosTarjeta.toFixed(2)} que pagaste a tus tarjetas.`
+                  : ""}
+              </Text>
+            )}
           </View>
 
           <Tarjeta>
@@ -691,6 +718,13 @@ const createStyles = (color: Colors) =>
       fontSize: 11,
     },
     heroStatValor: { fontFamily: font.mono, color: color.text, fontSize: 14 },
+    heroNota: {
+      fontFamily: font.body,
+      color: color.textMuted,
+      fontSize: 12,
+      lineHeight: 17,
+      marginTop: spacing(3),
+    },
     filaTitulo: {
       flexDirection: "row",
       flexWrap: "wrap",

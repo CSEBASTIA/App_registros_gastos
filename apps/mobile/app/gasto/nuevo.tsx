@@ -37,6 +37,7 @@ import {
 } from "core";
 import { anticiparUbicacionDeGasto, guardarUbicacionActiva } from "../../lib/ubicacion";
 import { avisarPresupuestos } from "../../lib/notificaciones";
+import { recordarFechaGuardada } from "../../lib/semanaGuardada";
 import { avisar } from "../../lib/dialogo";
 import Campo from "../../components/Campo";
 import Boton from "../../components/Boton";
@@ -173,6 +174,8 @@ export default function NuevoGasto() {
         ubicacion: lugar.ubicacion,
         fecha,
       });
+      // Gastos vuelve mostrando la semana de este gasto.
+      recordarFechaGuardada(fecha);
       // Si con este gasto un presupuesto llegó al 75 %, al 100 % o se pasó, avisa (sin esperar).
       avisarPresupuestos(fecha);
       const aviso = lugar.motivo ? MENSAJE_SIN_UBICACION[lugar.motivo] : undefined;

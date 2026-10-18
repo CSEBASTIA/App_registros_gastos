@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { parsearMonto, sumarMontos } from "../src/lib/montos.ts";
 import { mensajeError, MENSAJE_SIN_CONEXION } from "../src/lib/mensajeError.ts";
-import { balanceGeneral } from "../src/usecases/balanceGeneral.ts";
+import { balanceGeneral, efectivoNeto, esConsumoConTarjeta } from "../src/usecases/balanceGeneral.ts";
 import { estadoPresupuestos } from "../src/usecases/estadoPresupuestos.ts";
 import { generarRecomendaciones } from "../src/usecases/generarRecomendaciones.ts";
 import { calcularEndeudamiento } from "../src/usecases/calcularEndeudamiento.ts";
@@ -86,6 +86,41 @@ test("balanceGeneral: 100,30 − 50,10 − 50,20 da 0 exacto (antes: −$0.00)",
   const resultado = balanceGeneral(gastos, ingresos);
   assert.equal(resultado.totalGastos, 100.3);
   assert.equal(resultado.balance, 0);
+});
+
+test("efectivoNeto: una compra con tarjeta no baja el efectivo; el pago de la tarjeta sí", () => {
+  const cuentas = [
+    { id: "visa", tipo: "credito" as const },
+    { id: "ahorro", tipo: "ahorro" as const },
+    { id: "efectivo", tipo: "efectivo" as const },
+  ];
+  const gasto = (id: string, monto: number, extra: { cuentaId?: string; metodoPago?: "efectivo" | "debito" | "credito" | "diferido" | "transferencia" }) =>
+    ({ id, monto, descripcion: "", categoriaId: "c", fecha: "2026-10-05", createdAt: "", ...extra });
+  const gastos = [
+    gasto("super", 45.3, { cuentaId: "visa" }), // tarjeta
+    gasto("audifonos", 360, { cuentaId: "visa", metodoPago: "diferido" }), // tarjeta, diferido
+    gasto("taxi", 6.2, { cuentaId: "efectivo" }),
+    gasto("luz", 25.1, { cuentaId: "ahorro", metodoPago: "transferencia" }),
+    gasto("sin-cuenta-credito", 10, { metodoPago: "credito" }), // sin cuenta: manda el método
+    gasto("sin-nada", 3.4, {}),
+  ];
+  const ingresos = [{ id: "sueldo", monto: 800, descripcion: "", fecha: "2026-10-01", createdAt: "" }];
+  const r = efectivoNeto(gastos, ingresos, cuentas, [{ monto: 100.1 }]);
+  assert.equal(r.totalIngresos, 800);
+  assert.equal(r.conTarjeta, 415.3);
+  assert.equal(r.gastadoConTuDinero, 34.7);
+  assert.equal(r.pagosTarjeta, 100.1);
+  // 800 − 34,70 − 100,10 = 665,20: los 415,30 con tarjeta no se restan dos veces.
+  assert.equal(r.efectivoNeto, 665.2);
+});
+
+test("esConsumoConTarjeta: la cuenta manda sobre el método (lo que descuenta la base)", () => {
+  const cuentas = [{ id: "efectivo", tipo: "efectivo" as const }, { id: "visa", tipo: "credito" as const }];
+  assert.equal(esConsumoConTarjeta({ cuentaId: "efectivo", metodoPago: "credito" }, cuentas), false);
+  assert.equal(esConsumoConTarjeta({ cuentaId: "visa", metodoPago: undefined }, cuentas), true);
+  // Una cuenta que ya no está: se usa el método.
+  assert.equal(esConsumoConTarjeta({ cuentaId: "borrada", metodoPago: "credito" }, cuentas), true);
+  assert.equal(esConsumoConTarjeta({ cuentaId: undefined, metodoPago: "debito" }, cuentas), false);
 });
 
 test("estadoPresupuestos: 70,10 + 29,90 de un límite de 100 es justo 100 % y restante 0", () => {

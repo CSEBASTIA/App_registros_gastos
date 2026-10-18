@@ -9,7 +9,7 @@ Bancos con logo y catálogo: Banco Guayaquil, Pichincha, Produbanco, Diners Club
 > **Estado (18-oct-2026)**
 > - Teléfono: versión **1.4.0**. Falta compilar el APK y probarlo en un teléfono real.
 > - Base de Supabase web: **al día**, con 36 migraciones del repositorio más `cupo_en_lote` (ver [Base de datos](#base-de-datos)).
-> - Pruebas en verde: **328** de base de datos, **218** de lógica, **18** del teléfono y **3** de la web de escritorio. Sin errores de tipos en ninguna parte.
+> - Pruebas en verde: **328** de base de datos, **224** de lógica, **18** del teléfono y **3** de la web de escritorio. Sin errores de tipos en ninguna parte.
 > - Auditoría completa: [`docs/auditoria-app-2026-10-18.md`](docs/auditoria-app-2026-10-18.md). Lo que falta para publicar: [Pendientes](#pendientes-y-riesgos).
 
 ## Contenido
@@ -35,7 +35,7 @@ Bancos con logo y catálogo: Banco Guayaquil, Pichincha, Produbanco, Diners Club
 
 | Módulo | Teléfono y web de Vercel (`apps/mobile`) | Web de escritorio (`apps/desktop`) |
 |---|---|---|
-| Resumen | Balance del mes, últimos 7 días, salud financiera, recomendaciones, actividad reciente y dónde gastas más | Balance, gráfico de 7 días, salud financiera, recomendaciones y actividad |
+| Resumen | Efectivo neto del mes (las compras con tarjeta bajan el efectivo recién al pagar la tarjeta), últimos 7 días, salud financiera, recomendaciones, actividad reciente y dónde gastas más | Balance, gráfico de 7 días, salud financiera, recomendaciones y actividad |
 | Gastos | Crear, editar y eliminar; vista por semana (abre la de hoy); diferidos de 3 a 24 meses con interés; «pagado con» Apple Pay o Google Wallet; ubicación opcional; detalle con mapa | Alta completa, factura adjunta, OCR de recibos, edición en la tabla |
 | Ingresos | Crear, editar, eliminar y gráfico | Alta y gráfico por semana o mes |
 | Tarjetas | Catálogo con imagen real, cupo, fecha de corte y de pago, «Pagar tarjeta» desde una cuenta, importar estado de cuenta, últimos dígitos | Catálogo, cupo, estado de cuenta y pago |
@@ -50,7 +50,7 @@ Bancos con logo y catálogo: Banco Guayaquil, Pichincha, Produbanco, Diners Club
 | Billeteras | Google Wallet (Android) y atajo de Apple Pay (iPhone): el pago se registra solo si la tarjeta se reconoce por sus últimos dígitos | — |
 | Correo (beta) | Gmail u Outlook: lee solo los avisos del banco | — |
 | Notificaciones | Pagos registrados o por confirmar, recordatorios y cuotas, presupuestos | — |
-| Importar estado de cuenta | PDF (también con clave) o CSV, leído en el propio teléfono o navegador; marca duplicados | Igual, y además PDF escaneado (OCR) |
+| Importar estado de cuenta | PDF (también con clave) o CSV, leído en el propio teléfono o navegador; fechas numéricas o con el mes en letras; marca duplicados | Igual, y además PDF escaneado (OCR) |
 | Perfil | Nombre, teléfono y cambio del correo de acceso | — |
 
 ## Ejemplos de uso
@@ -314,7 +314,7 @@ Con la pantalla bloqueada, Android oculta los montos si así lo elige la persona
 ## Pruebas y verificación
 
 ```bash
-pnpm --filter core test          # 218 pruebas de lógica
+pnpm --filter core test          # 224 pruebas de lógica
 pnpm --filter mobile test        # 18 pruebas del teléfono
 pnpm --filter desktop test       # 3 pruebas de la web de escritorio
 bash supabase/tests/correr.sh    # 328 pruebas de base de datos (requiere Docker)

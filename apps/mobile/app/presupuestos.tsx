@@ -4,6 +4,7 @@ import {
   Alert,
   Animated,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -11,7 +12,7 @@ import {
   Text,
   View,
 } from "react-native";
-import { Stack, useFocusEffect } from "expo-router";
+import { Stack, useFocusEffect, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import {
   estadoPresupuestos,
@@ -39,6 +40,14 @@ import SelectorMes from "../components/SelectorMes";
 import Tarjeta from "../components/Tarjeta";
 import { BlurFade } from "../components/Motion";
 import { supabase } from "../lib/supabase";
+import {
+  avisarPresupuestos,
+  estadoPermisoNotificaciones,
+  pedirPermisoNotificaciones,
+  preferenciasNotificaciones,
+  NOTIFICACIONES_DISPONIBLES,
+  type EstadoPermiso,
+} from "../lib/notificaciones";
 import { font, radius, spacing, useTheme, type Colors } from "../lib/theme";
 
 export default function PresupuestosScreen() {
@@ -54,6 +63,24 @@ export default function PresupuestosScreen() {
   const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [presupuestoEditando, setPresupuestoEditando] = useState<Presupuesto | null>(null);
   const [actualizacion, setActualizacion] = useState(0);
+  const router = useRouter();
+  // Para avisar al momento hace falta el permiso del teléfono y el aviso encendido.
+  const [permisoAvisos, setPermisoAvisos] = useState<EstadoPermiso | null>(null);
+  const [avisosApagados, setAvisosApagados] = useState(false);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!NOTIFICACIONES_DISPONIBLES) return;
+      let activa = true;
+      estadoPermisoNotificaciones().then((p) => activa && setPermisoAvisos(p));
+      preferenciasNotificaciones()
+        .then((p) => activa && setAvisosApagados(!p.presupuestos))
+        .catch(() => {});
+      return () => {
+        activa = false;
+      };
+    }, []),
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -118,6 +145,10 @@ export default function PresupuestosScreen() {
     await guardarPresupuesto(input);
     cerrarFormulario();
     setActualizacion((valor) => valor + 1);
+    // El momento natural para pedir el permiso: quien pone un límite quiere saber cuándo lo pasa.
+    if (permisoAvisos === "sin_preguntar") setPermisoAvisos(await pedirPermisoNotificaciones());
+    // Si el límite nuevo ya quedó corto (o al 75 %), avisa ahora, no recién con el próximo gasto.
+    if (input.mes === mesLocal()) void avisarPresupuestos();
   }
 
   function confirmarEliminar(estado: EstadoPresupuesto) {
@@ -212,6 +243,31 @@ export default function PresupuestosScreen() {
                   onGuardar={guardar}
                   onCancelar={cerrarFormulario}
                 />
+              )}
+
+              {estados.length > 0 && (permisoAvisos === "sin_preguntar" || permisoAvisos === "denegado" || avisosApagados) && (
+                <Tarjeta style={{ gap: spacing(2) }}>
+                  <Text style={styles.avisoTitulo}>Avisos al momento</Text>
+                  <Text style={styles.restante}>
+                    {avisosApagados && permisoAvisos === "concedido"
+                      ? "Los avisos de presupuesto están apagados. Enciéndelos para saber apenas llegues al 75 %, al 100 % o te pases."
+                      : "Permite las notificaciones y te aviso apenas llegues al 75 %, al 100 % o te pases de un presupuesto."}
+                  </Text>
+                  {permisoAvisos === "denegado" ? (
+                    <Boton titulo="Abrir ajustes del teléfono" onPress={() => Linking.openSettings()} />
+                  ) : permisoAvisos === "sin_preguntar" ? (
+                    <Boton
+                      titulo="Permitir notificaciones"
+                      onPress={async () => {
+                        const nuevo = await pedirPermisoNotificaciones();
+                        setPermisoAvisos(nuevo);
+                        if (nuevo === "concedido" && mes === mesLocal()) void avisarPresupuestos();
+                      }}
+                    />
+                  ) : (
+                    <Boton titulo="Ir a Notificaciones" onPress={() => router.push("/notificaciones")} />
+                  )}
+                </Tarjeta>
               )}
 
               {estados.length > 0 && (
@@ -585,6 +641,11 @@ const createStyles = (color: Colors) =>
     seccionTitulo: {
       fontFamily: font.display,
       fontSize: 19,
+      color: color.text,
+    },
+    avisoTitulo: {
+      fontFamily: font.semibold,
+      fontSize: 15,
       color: color.text,
     },
     filaCard: {

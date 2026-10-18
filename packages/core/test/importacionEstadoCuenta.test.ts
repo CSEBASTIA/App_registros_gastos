@@ -271,7 +271,7 @@ test("textoResultadoImportacion: singular, plural y nada", () => {
 
 // --- Texto de PDF --------------------------------------------------------------
 
-test("lineasDeTextoPdf: arma líneas por altura (tolerancia 2 pt) y las ordena por X, de arriba a abajo", () => {
+test("lineasDeTextoPdf: arma líneas por altura (tolerancia 2,5 pt) y las ordena por X, de arriba a abajo", () => {
   const lineas = lineasDeTextoPdf([
     { texto: "45,30", x: 400, y: 700.4 },
     { texto: "02/10/2026", x: 50, y: 700 },
@@ -287,6 +287,20 @@ test("lineasDeTextoPdf: arma líneas por altura (tolerancia 2 pt) y las ordena p
   ]);
 });
 
+
+test("lineasDeTextoPdf: una fila con alturas casi iguales (700,9 y 701,1) no se parte en dos", () => {
+  // Con el redondeo de antes, 700,9 y 701,1 caían en líneas distintas: la
+  // fecha quedaba sin monto y el estado de cuenta salía sin movimientos.
+  const lineas = lineasDeTextoPdf([
+    { texto: "02/10/2026", x: 50, y: 700.9 },
+    { texto: "SUPERMAXI", x: 150, y: 700.9 },
+    { texto: "45,30", x: 400, y: 701.1 },
+    { texto: "03/10/2026", x: 50, y: 688.0 },
+    { texto: "FYBECA", x: 150, y: 687.2 },
+    { texto: "8,00", x: 400, y: 689.4 },
+  ]);
+  assert.deepEqual(lineas, ["02/10/2026 SUPERMAXI 45,30", "03/10/2026 FYBECA 8,00"]);
+});
 test("paginaSinTexto: una página escaneada casi no trae texto", () => {
   assert.equal(paginaSinTexto([{ texto: " " }, { texto: "1" }]), true);
   assert.equal(paginaSinTexto([{ texto: "02/10/2026 SUPERMAXI 45,30" }]), false);

@@ -19,6 +19,7 @@ import FormularioEdicion from "../../components/FormularioEdicion";
 import Boton from "../../components/Boton";
 import { confirmar } from "../../lib/dialogo";
 import { avisarPresupuestos } from "../../lib/notificaciones";
+import { recordarFechaGuardada } from "../../lib/semanaGuardada";
 import ErrorTexto from "../../components/ErrorTexto";
 import { BlurFade } from "../../components/Motion";
 import { spacing, useTheme, font, type Colors } from "../../lib/theme";
@@ -106,6 +107,7 @@ export default function EditarGasto() {
               const cambios = cambiosDeGasto(gasto, f);
               if (!sinCambios(cambios)) {
                 await actualizarGasto(gasto.id, cambios);
+                recordarFechaGuardada(cambios.fecha ?? gasto.fecha);
                 avisarPresupuestos(cambios.fecha ?? gasto.fecha);
               }
               salir();

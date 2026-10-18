@@ -29,6 +29,7 @@ import Campo from "../components/Campo";
 import Casilla from "../components/Casilla";
 import ErrorTexto from "../components/ErrorTexto";
 import LectorPdf, { ErrorClavePdf, type LectorPdfRef } from "../components/LectorPdf";
+import { avisarPresupuestos } from "../lib/notificaciones";
 import { borrarCopiaTemporal, leerArchivoBase64, leerArchivoTexto, TAMANO_MAXIMO_ESTADO } from "../lib/archivosImportacion";
 import { spacing, useTheme, font, radius, type Colors } from "../lib/theme";
 
@@ -191,6 +192,8 @@ export default function ImportarEstadoScreen() {
     try {
       const r = await importarMovimientos(movimientosParaGuardar(filas, cuenta, categorias));
       setResultado(textoResultadoImportacion(r));
+      // Si lo importado de este mes pasó un presupuesto, avisa ya (sin esperar).
+      void avisarPresupuestos();
       setFase("listo");
     } catch (err) {
       // Los gastos ya quedaron guardados: salen de la lista y solo se reintentan los ingresos.

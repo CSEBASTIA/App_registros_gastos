@@ -300,7 +300,9 @@ Actualizar esta tabla cada vez que se aplique una migración en un entorno.
 | Supabase local (Docker, `127.0.0.1:54321`) | 21 de 23 (faltan eliminar cuenta y rendimiento) | `20261015180000_proteger_tasa_diferido` | 15-oct-2026 |
 | Supabase web (`ikyoawstrwihaqefosbq`) | 23 de 23 | `20261015200000_rendimiento` | 15-oct-2026 (comprobado por REST: `eliminar_mi_cuenta` y `totales_por_mes` existen y rechazan a quien no tiene sesión) |
 
-**Pendiente de aplicar en Supabase web (18-oct):** `supabase/para-supabase-web/18-10-2026 5AM/`, primero el 1 y después el 2 (cada uno termina en `aplicada = sí`). Verificado en una base desechable con las 34 migraciones anteriores.
+**Pendiente de aplicar en Supabase web (18-oct):** un solo archivo, `supabase/para-supabase-web/18-10-2026 6AM/TODO EN UNO - ….sql`, con las 4 migraciones que faltaban en el proyecto web (`hora_del_pago`, `diferido_fecha_fija` y las dos del 18-oct). Termina en `aplicada = sí`, se puede pegar dos veces sin problema y se detiene sin cambiar nada si faltan las del 16-oct anteriores. Verificado en una base como la del proyecto web (hasta `exportar_datos_persona`, más una validación de cupo por sentencia): 0 pruebas fallan. Los archivos de `18-10-2026 5AM/` son lo mismo, en dos partes, para una base que ya tiene todo el 16-oct.
+
+**Ojo:** el proyecto web tiene registrada `20261017020000_cupo_en_lote`, que **no está en este repositorio** (se aplicó desde fuera). Hay que agregar su archivo a `supabase/migrations/` y regenerar `base-completa.sql`; si no, un proyecto nuevo creado con `base-completa.sql` no la tendrá. Las migraciones del 18-oct no tocan la validación del cupo.
 
 Para comprobarlo en cualquier base: `select version, name from supabase_migrations.schema_migrations order by version;`
 

@@ -1,5 +1,6 @@
 import { fechaIso } from "../schemas/limites";
 import { clasificarConsumoEstadoCuenta, normalizarNumero } from "./textoFinanciero";
+import { fechaLocal } from "./semanas";
 
 export interface TransaccionEstadoCuenta {
   fecha: string;
@@ -65,8 +66,8 @@ function fechaNormalizada(valor: string, referencia: string): string | undefined
 function referenciaDe(texto: string, opciones: OpcionesEstadoCuenta): string {
   if (opciones.fechaReferencia && fechaValida(opciones.fechaReferencia)) return opciones.fechaReferencia;
   const corte = texto.match(CORTE);
-  if (corte) return fechaNormalizada(corte[1], "2000-01-01") ?? new Date().toISOString().slice(0, 10);
-  return new Date().toISOString().slice(0, 10);
+  if (corte) return fechaNormalizada(corte[1], "2000-01-01") ?? fechaLocal();
+  return fechaLocal();
 }
 
 function movimiento(fecha: string | undefined, descripcion: string, montoTexto: string): TransaccionEstadoCuenta | undefined {

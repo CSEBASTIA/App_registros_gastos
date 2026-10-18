@@ -1,10 +1,10 @@
 import AnimatedBackground from "../components/AnimatedBackground";
 import RippleButton from "../components/RippleButton";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 import type { CambiosGasto, Categoria, Cuenta, Gasto, MetodoPago } from "core";
 import { leerImagen, parseRecibo } from "../lib/ocr";
 import { subirFactura, urlFactura } from "../lib/storage";
-import { semanasDelMes, enRangoSemana, sumarMeses } from "core";
+import { semanasDelMes, enRangoSemana, semanaDeFecha, semanaInicial, sumarMeses } from "core";
 import GraficoBarras from "../components/GraficoBarras";
 import {
   IconoCamara,
@@ -16,7 +16,7 @@ import {
 } from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
 import ImportarEstadoCuenta from "../components/ImportarEstadoCuenta";
-import { mensajeError } from "core";
+import { fechaLocal, mensajeError } from "core";
 import {
   agruparPorCategoriaODetalle,
   ETIQUETA_METODO_PAGO,
@@ -24,8 +24,9 @@ import {
   OPCIONES_MESES_DIFERIDO,
 } from "core";
 
+// Día local, no UTC: con toISOString, en Ecuador después de las 19:00 ya era mañana.
 function hoy() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocal();
 }
 
 const MAX_CARACTERES_DESCRIPCION = 40;
@@ -57,7 +58,16 @@ export default function Gastos({
   const categoriasGasto = categorias.filter((c) => c.tipo === "gasto");
   const [mostrarForm, setMostrarForm] = useState(false);
   const [mostrarImportar, setMostrarImportar] = useState(false);
-  const [semanaActiva, setSemanaActiva] = useState(1);
+  // Se abre en la semana de hoy (antes, siempre en la 1: un gasto de hoy
+  // quedaba en otra semana y parecía que no se había guardado).
+  const [semanaActiva, setSemanaActiva] = useState(() => semanaInicial(mes));
+  const fechaRecienGuardada = useRef<string | null>(null);
+  useEffect(() => {
+    // Al cambiar de mes: la semana del gasto recién guardado, si es de ese mes; si no, la de hoy (o la 1).
+    const fecha = fechaRecienGuardada.current;
+    fechaRecienGuardada.current = null;
+    setSemanaActiva(fecha?.startsWith(mes) ? semanaDeFecha(fecha) : semanaInicial(mes));
+  }, [mes]);
   const semanas = semanasDelMes(mes);
   const rango = semanas[semanaActiva - 1];
   const gastosSemana = gastosDelMes.filter((g) =>
@@ -80,8 +90,19 @@ export default function Gastos({
   }));
 
   async function crearYCerrar(input: Omit<Gasto, "id" | "createdAt">) {
-    await onCrear(input);
+    // Antes de crear: si el gasto es de otro mes, App cambia de mes y el efecto de arriba lo usa.
+    fechaRecienGuardada.current = input.fecha;
+    try {
+      await onCrear(input);
+    } catch (err) {
+      fechaRecienGuardada.current = null;
+      throw err;
+    }
     setMostrarForm(false);
+    if (input.fecha.startsWith(mes)) {
+      fechaRecienGuardada.current = null;
+      setSemanaActiva(semanaDeFecha(input.fecha));
+    }
   }
 
   return (

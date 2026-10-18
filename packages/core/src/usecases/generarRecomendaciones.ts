@@ -157,11 +157,13 @@ export function generarRecomendaciones(params: ParametrosRecomendaciones): Recom
   }
 
   if (recomendaciones.length === 0 && totalIngresosMes > 0) {
-    const ahorro = totalIngresosMes - totalGastosMes;
+    // Cuenta también lo comprado con tarjeta (se pagará): por eso no coincide
+    // con el efectivo neto del Resumen, y el texto lo dice.
+    const ahorro = sumarMontos([totalIngresosMes, -totalGastosMes]);
     if (ahorro > 0) {
       recomendaciones.push({
         severidad: "info",
-        mensaje: `Vas bien este mes: te sobraron $${ahorro.toFixed(2)}. Considera moverlos a una cuenta de ahorro.`,
+        mensaje: `Vas bien este mes: tus ingresos superan en $${ahorro.toFixed(2)} todo lo que gastaste, también con tarjeta. Considera moverlo a una cuenta de ahorro.`,
       });
     }
   }

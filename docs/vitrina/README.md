@@ -35,7 +35,7 @@ Está hecha para el día a día en Ecuador: precios en dólares, bancos y casas 
 
 | | Qué puedes hacer |
 |---|---|
-| **Resumen** | Balance del mes, gastos de los últimos 7 días, salud financiera, recomendaciones y dónde gastas más |
+| **Resumen** | Efectivo neto del mes (lo comprado con tarjeta se descuenta al pagar la tarjeta), gastos de los últimos 7 días, salud financiera, recomendaciones y dónde gastas más |
 | **Gastos e ingresos** | Anotarlos, editarlos y verlos por semana y por categoría. Compras diferidas con interés |
 | **Tarjetas de crédito** | Cupo disponible, fecha de corte y de pago, consumos del ciclo y pago de la tarjeta desde una de tus cuentas |
 | **Cuentas** | Ahorro, débito y efectivo, con su historial completo |

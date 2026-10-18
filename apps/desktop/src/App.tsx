@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { mensajeError } from "core";
+import { fechaLocal, mensajeError, mesLocal } from "core";
 import {
   listarGastos,
   listarCategorias,
@@ -28,6 +28,7 @@ import {
   actualizarCategoria,
   eliminarCategoria,
   balanceGeneral,
+  efectivoNeto,
   calcularEndeudamiento,
   generarRecomendaciones,
   eliminarTodosLosDatos,
@@ -153,7 +154,7 @@ export default function App() {
 }
 
 function mesActual() {
-  return new Date().toISOString().slice(0, 7); // YYYY-MM
+  return mesLocal(); // YYYY-MM en la zona del navegador, no UTC
 }
 
 type Tab =
@@ -244,6 +245,17 @@ function Dashboard({
     () => balanceGeneral(gastosDelMes, ingresosDelMes),
     [gastosDelMes, ingresosDelMes],
   );
+  // Las compras con tarjeta bajan el efectivo recién cuando se paga la tarjeta.
+  const efectivo = useMemo(
+    () =>
+      efectivoNeto(
+        gastosDelMes,
+        ingresosDelMes,
+        cuentas,
+        pagosTarjeta.filter((p) => p.fecha.startsWith(mes)),
+      ),
+    [gastosDelMes, ingresosDelMes, cuentas, pagosTarjeta, mes],
+  );
   const endeudamiento = useMemo(
     () => calcularEndeudamiento(deudas, balance.totalIngresos),
     [deudas, balance.totalIngresos],
@@ -266,6 +278,8 @@ function Dashboard({
   // finanzas completas), así que el estado local no puede calcularlo solo.
   async function handleCrearGasto(input: Omit<Gasto, "id" | "createdAt">) {
     await crearGasto(input);
+    // Un gasto de otro mes: se muestra ese mes (si no, parecía que no se guardó).
+    if (!input.fecha.startsWith(mes)) setMes(input.fecha.slice(0, 7));
     await recargar();
   }
   async function handleActualizarGasto(id: string, cambios: CambiosGasto) {
@@ -315,7 +329,7 @@ function Dashboard({
       cuentaId,
       cuentaOrigenId,
       monto,
-      fecha: new Date().toISOString().slice(0, 10),
+      fecha: fechaLocal(),
     });
     await recargar();
   }
@@ -475,6 +489,7 @@ function Dashboard({
                 {tab === "resumen" && (
                   <Resumen
                     balance={balance}
+                    efectivo={efectivo}
                     endeudamiento={endeudamiento}
                     recomendaciones={recomendaciones}
                     gastos={gastos}

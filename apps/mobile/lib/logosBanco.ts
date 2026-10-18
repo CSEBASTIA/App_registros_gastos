@@ -13,3 +13,16 @@ const LOGO_BANCO: Partial<Record<Banco, ReturnType<typeof require>>> = {
 export function logoDeBanco(banco: Banco) {
   return LOGO_BANCO[banco];
 }
+
+// Logos con letras oscuras sobre fondo transparente: sobre el degradado de la
+// tarjeta no se ven (Produbanco era verde sobre azul) y van sobre blanco. Los
+// cuadrados con fondo propio (Guayaquil, Pichincha, Diners) se muestran tal cual.
+const LOGO_SOBRE_BLANCO: Partial<Record<Banco, true>> = {
+  produbanco: true,
+  banco_pacifico: true,
+  banco_austro: true,
+};
+
+export function logoVaSobreBlanco(banco: Banco): boolean {
+  return LOGO_SOBRE_BLANCO[banco] === true;
+}

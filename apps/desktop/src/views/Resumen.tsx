@@ -1,6 +1,8 @@
 import BlurFade from "../components/BlurFade";
+import { fechaLocal, sumarMontos } from "core";
 import type {
   BalanceGeneral,
+  EfectivoNeto,
   Categoria,
   Endeudamiento,
   Gasto,
@@ -21,6 +23,7 @@ import {
 
 interface Props {
   balance: BalanceGeneral;
+  efectivo: EfectivoNeto;
   endeudamiento: Endeudamiento;
   recomendaciones: Recomendacion[];
   gastos: Gasto[];
@@ -32,6 +35,7 @@ const DIAS_SEMANA = ["D", "L", "M", "M", "J", "V", "S"];
 
 export default function Resumen({
   balance,
+  efectivo,
   endeudamiento,
   recomendaciones,
   gastos,
@@ -52,11 +56,23 @@ export default function Resumen({
 
       <div className="saldo-hero">
         <div className="saldo-hero-principal">
-          <div className="saldo-hero-header">Balance del mes</div>
+          <div className="saldo-hero-header">Efectivo neto del mes</div>
           <div className="saldo-hero-valor">
-            {balance.balance > 0 ? "+" : balance.balance < 0 ? "−" : ""}$
-            {Math.abs(balance.balance).toFixed(2)}
+            {efectivo.efectivoNeto > 0 ? "+" : efectivo.efectivoNeto < 0 ? "−" : ""}$
+            {Math.abs(efectivo.efectivoNeto).toFixed(2)}
           </div>
+          {(efectivo.conTarjeta > 0 || efectivo.pagosTarjeta > 0) && (
+            <p className="saldo-hero-nota">
+              {[
+                efectivo.conTarjeta > 0 &&
+                  `Con tarjeta de crédito: $${efectivo.conTarjeta.toFixed(2)}. No baja tu efectivo hasta que pagues la tarjeta.`,
+                efectivo.pagosTarjeta > 0 &&
+                  `Incluye $${efectivo.pagosTarjeta.toFixed(2)} que pagaste a tus tarjetas.`,
+              ]
+                .filter(Boolean)
+                .join(" ")}
+            </p>
+          )}
         </div>
         <div className="saldo-hero-stats">
           <div className="saldo-hero-stat">
@@ -66,7 +82,7 @@ export default function Resumen({
             <div>
               <span className="saldo-hero-stat-etiqueta">Ingresos del mes</span>
               <span className="saldo-hero-stat-valor">
-                ${balance.totalIngresos.toFixed(2)}
+                ${efectivo.totalIngresos.toFixed(2)}
               </span>
             </div>
           </div>
@@ -75,9 +91,9 @@ export default function Resumen({
               <IconoFlechaAbajo />
             </span>
             <div>
-              <span className="saldo-hero-stat-etiqueta">Gastado este mes</span>
+              <span className="saldo-hero-stat-etiqueta">Salió de tu dinero</span>
               <span className="saldo-hero-stat-valor">
-                ${balance.totalGastos.toFixed(2)}
+                ${sumarMontos([efectivo.gastadoConTuDinero, efectivo.pagosTarjeta]).toFixed(2)}
               </span>
             </div>
           </div>
@@ -298,7 +314,7 @@ function construirSemana(gastos: Gasto[]) {
   for (let i = 6; i >= 0; i--) {
     const fecha = new Date(hoy);
     fecha.setDate(hoy.getDate() - i);
-    const clave = fecha.toISOString().slice(0, 10);
+    const clave = fechaLocal(fecha); // día local, no UTC
     const total = gastos
       .filter((g) => g.fecha === clave)
       .reduce((acc, g) => acc + g.monto, 0);

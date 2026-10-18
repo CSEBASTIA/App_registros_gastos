@@ -15,7 +15,7 @@ import {
   inicialesDeEntidad,
   textoDias,
 } from "core";
-import { logoDeBanco } from "../lib/logosBanco";
+import { logoDeBanco, logoVaSobreBlanco } from "../lib/logosBanco";
 import BarraProgreso from "./BarraProgreso";
 import { useTheme, font, radius, spacing } from "../lib/theme";
 import { imagenDe, productoDe } from "../lib/catalogoTarjetas";
@@ -97,7 +97,12 @@ export default function TarjetaVisual({
       style={[styles.base, compacta && styles.baseCompacta]}
     >
       <View style={styles.encabezado}>
-        {logo ? (
+        {logo && logoVaSobreBlanco(cuenta.banco) ? (
+          // Letras oscuras sobre fondo transparente: no se veían sobre el degradado.
+          <View style={styles.logoPastilla}>
+            <Image source={logo} style={styles.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
+          </View>
+        ) : logo ? (
           <Image source={logo} style={styles.logo} resizeMode="contain" />
         ) : (
           <View style={styles.entidad}>
@@ -221,7 +226,7 @@ const styles = StyleSheet.create({
   seleccionada: { borderWidth: 2.5, borderRadius: radius.lg + 3 },
   encabezado: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   bancoTexto: { fontFamily: font.body, fontSize: 12, fontWeight: "700", color: "#fff", letterSpacing: 0.4, textTransform: "uppercase" },
-  logo: { height: 20, width: 90 },
+  logo: { height: 18, width: 80 },
   logoPastilla: { backgroundColor: "#ffffff", borderRadius: radius.sm, paddingHorizontal: 6, paddingVertical: 3 },
   logoPequeno: { height: 16, width: 64 },
   entidad: { flexDirection: "row", alignItems: "center", gap: spacing(2), flexShrink: 1 },

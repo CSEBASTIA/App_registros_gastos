@@ -4,7 +4,7 @@ import type { Cuenta, Deuda, Endeudamiento, TipoDeuda } from "core";
 import BarraProgreso from "../components/BarraProgreso";
 import { IconoDeudas, IconoPapelera } from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
-import { mensajeError } from "core";
+import { fechaLocal, mensajeError } from "core";
 
 interface Props {
   deudas: Deuda[];
@@ -15,8 +15,9 @@ interface Props {
   onEliminar: (id: string) => Promise<void>;
 }
 
+// Día local, no UTC: con toISOString, en Ecuador después de las 19:00 ya era mañana.
 function hoy() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocal();
 }
 
 export default function Deudas({

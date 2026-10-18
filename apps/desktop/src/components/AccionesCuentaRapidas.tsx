@@ -1,8 +1,10 @@
 import { useState } from "react";
 import type { Categoria, Cuenta, Gasto, Ingreso } from "core";
+import { fechaLocal } from "core";
 
+// Día local, no UTC: con toISOString, en Ecuador después de las 19:00 ya era mañana.
 function hoy() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocal();
 }
 
 export function PagarTarjeta({

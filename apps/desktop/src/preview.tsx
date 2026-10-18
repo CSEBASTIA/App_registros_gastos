@@ -176,6 +176,13 @@ function Vista() {
         <div className="contenedor">
           <Resumen
             balance={balance}
+            efectivo={{
+              totalIngresos: balance.totalIngresos,
+              gastadoConTuDinero: balance.totalGastos,
+              conTarjeta: 0,
+              pagosTarjeta: 0,
+              efectivoNeto: balance.balance,
+            }}
             endeudamiento={endeudamiento}
             recomendaciones={recomendaciones}
             gastos={gastos}

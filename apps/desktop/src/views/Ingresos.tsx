@@ -6,12 +6,13 @@ import { IconoIngresos, IconoMas, IconoPapelera } from "../components/iconos";
 import EstadoVacio from "../components/EstadoVacio";
 import GraficoBarras from "../components/GraficoBarras";
 import { semanasDelMes, enRangoSemana, ultimosMeses, etiquetaMes } from "core";
-import { mensajeError } from "core";
+import { fechaLocal, mensajeError } from "core";
 
 const COLOR_INGRESOS = "var(--color-success)";
 
+// Día local, no UTC: con toISOString, en Ecuador después de las 19:00 ya era mañana.
 function hoy() {
-  return new Date().toISOString().slice(0, 10);
+  return fechaLocal();
 }
 
 interface Props {

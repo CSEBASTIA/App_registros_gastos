@@ -381,3 +381,4 @@ pnpm update:produccion    # publica a los usuarios
 | [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md) · [`docs/actualizaciones.md`](docs/actualizaciones.md) | Publicar en producción y actualizar la app |
 | [`docs/legal/`](docs/legal/) | Registro de tratamiento, derechos, incidentes y qué preguntar al abogado |
 | [`reports/`](reports/) | Modelo de negocio y un día de uso como cliente |
+| [`docs/vitrina/`](docs/vitrina/) | Presentación pública (README y capturas con datos de ejemplo) para el repositorio público FinTrack, sin código |

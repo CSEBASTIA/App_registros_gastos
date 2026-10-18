@@ -121,7 +121,7 @@ Origen: revisión de errores con dos agentes. Todo con pruebas: core 71/71, base
 10. `app/correo.tsx`: los textos de desconexión usan voseo ("entrá", "revisá"); el resto de la app usa tú.
 
 ### Proyecto de Supabase web (15-oct)
-- Proyecto nuevo `ikyoawstrwihaqefosbq` creado con `supabase/base-completa.sql` (19 migraciones). Los `.env` del teléfono y de la web apuntan a él con la clave publishable; la local quedó comentada.
+- Proyecto nuevo (`<id-del-proyecto>`) creado con `supabase/base-completa.sql` (19 migraciones). Los `.env` del teléfono y de la web apuntan a él con la clave publishable; la local quedó comentada.
 - Ya tiene las 23 migraciones: la de interés diferido, la de eliminar cuenta y la de rendimiento se aplicaron el 15-oct (comprobado por REST). `crearGasto` sigue enviando `tasa_interes` solo si se indicó, lo que no cambia nada ahora que la columna existe.
 
 ## Paso 1 antes de producción (15-oct)

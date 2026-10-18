@@ -2,7 +2,7 @@
 
 **Fecha:** 16 de octubre de 2026
 **Alcance:** app móvil, vista web de desarrollo y servicio Supabase configurado en `apps/mobile/.env`.
-**Cuenta de ensayo:** `sedas7778+fintrack-prueba-20261016@gmail.com` (confirmada, usuario normal; la app no define roles de cliente o administrador). La contraseña se entrega en el chat, no se guarda en este archivo.
+**Cuenta de ensayo:** `<tu-correo>+fintrack-prueba@gmail.com` (dirección de ejemplo) (confirmada, usuario normal; la app no define roles de cliente o administrador). La contraseña se entrega en el chat, no se guarda en este archivo.
 
 ## Resumen
 
@@ -103,4 +103,4 @@ Estos son **objetivos de producto**, no mediciones actuales: primera pantalla ú
 
 ## Límites de esta revisión
 
-La cuenta original `sedas7778@gmail.com` ya existía; el intento de registro no le cambió la contraseña. La cuenta de ensayo se creó con una dirección `+fintrack`, fue confirmada y solo contiene movimientos ficticios. Las cifras medidas son de Auth, consultas/escrituras Supabase y servidor local; la revisión visual posterior fue en React Native Web, no en un teléfono físico.
+La cuenta original (tu correo personal) ya existía; el intento de registro no le cambió la contraseña. La cuenta de ensayo se creó con una dirección `+fintrack`, fue confirmada y solo contiene movimientos ficticios. Las cifras medidas son de Auth, consultas/escrituras Supabase y servidor local; la revisión visual posterior fue en React Native Web, no en un teléfono físico.

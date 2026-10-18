@@ -1,487 +1,383 @@
-# gastos-app
+# FinTrack (gastos-app)
 
-App de finanzas personales para Ecuador (Banco Guayaquil, Pichincha, Produbanco y Diners Club). Registra gastos, ingresos, tarjetas de crédito, cuentas, deudas, recordatorios, categorías y presupuestos.
+App de finanzas personales para Ecuador. Registra gastos, ingresos, tarjetas de crédito, cuentas, transferencias entre tus cuentas, deudas, recordatorios, categorías y presupuestos. Además, detecta pagos solos: los de Google Wallet y Apple Pay, y los avisos del banco que llegan al correo.
 
-**El producto principal es la app de teléfono** (`apps/mobile`). La versión web (`apps/desktop`) hoy es la más completa y sirve de referencia para la migración. Las dos comparten la misma lógica (`packages/core`) y el mismo backend (Supabase).
+Bancos con logo y catálogo: Banco Guayaquil, Pichincha, Produbanco, Diners Club, Banco del Pacífico y Banco del Austro. Casas comerciales: Comandato, Artefacta, Marcimex, La Ganga, Japón, De Prati y Créditos Económicos.
 
-> **Novedades (18-oct-2026):** transferencias entre cuentas propias (también juntadas solas desde el correo), pagos de Google Wallet que se registran solos cuando la tarjeta se reconoce por sus últimos dígitos, notificaciones del teléfono (pagos, bandeja, recordatorios y presupuestos) y revisión de la ubicación. Verificado: **328/328 pruebas de base de datos, 218/218 de lógica**, el código Kotlin compila y la app se empaqueta para Android y web; falta probar el APK 1.4.0 en un teléfono. Detalle: [`docs/informe-transferencias-wallet-notificaciones.md`](docs/informe-transferencias-wallet-notificaciones.md).
->
-> **Estado (15-oct-2026):** saldos confiables (con saldo a favor), montos con coma decimal, correo opcional que se olvida al cerrar sesión, eliminar la cuenta, consultas sin el tope de 1.000 filas, recuperar la contraseña con enlaces seguros y política de privacidad (borrador), verificados: **93/93 pruebas de lógica, 104/104 de base de datos** (incluye dos abonos simultáneos), tipos sin errores en core, web y teléfono, y la app compila para Android y web. Lo que falta para producción: ver [Pendientes](#pendientes-y-riesgos-conocidos) y [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md); el informe de esta etapa está en [`docs/informe-preparacion-produccion-15oct.docx`](docs/informe-preparacion-produccion-15oct.docx). El plan de 10 pasos y el informe del Paso 1 están en [`docs/plan-10-pasos-y-paso-1.docx`](docs/plan-10-pasos-y-paso-1.docx); el piloto, en [`docs/piloto.md`](docs/piloto.md). Qué migración está desplegada en cada entorno: ver [Estado de despliegue](#estado-de-despliegue).
+**El producto principal es la app de teléfono** (`apps/mobile`, Expo). El mismo código se publica como versión web en Vercel. `apps/desktop` es una versión web anterior (React + Vite) que sirvió de referencia y hoy va detrás del teléfono. Las tres usan la misma lógica (`packages/core`) y el mismo backend (Supabase).
+
+> **Estado (18-oct-2026)**
+> - Teléfono: versión **1.4.0**. Falta compilar el APK y probarlo en un teléfono real.
+> - Base de Supabase web: **al día**, con 36 migraciones del repositorio más `cupo_en_lote` (ver [Base de datos](#base-de-datos)).
+> - Pruebas en verde: **328** de base de datos, **218** de lógica, **18** del teléfono y **3** de la web de escritorio. Sin errores de tipos en ninguna parte.
+> - Auditoría completa: [`docs/auditoria-app-2026-10-18.md`](docs/auditoria-app-2026-10-18.md). Lo que falta para publicar: [Pendientes](#pendientes-y-riesgos).
 
 ## Contenido
 
-1. [Arquitectura](#arquitectura)
-2. [Stack](#stack)
-3. [Estructura del repositorio](#estructura-del-repositorio)
-4. [Primeros pasos](#primeros-pasos)
-5. [Plan de 10 pasos](#plan-de-10-pasos)
-6. [Organización del trabajo](#organización-del-trabajo)
-7. [Funcionalidades](#funcionalidades)
-8. [packages/core](#packagescore)
-9. [Base de datos](#base-de-datos)
-10. [Seguridad](#seguridad)
-11. [Pruebas y verificación](#pruebas-y-verificación)
-12. [Detección de movimientos por correo](#detección-de-movimientos-por-correo)
-13. [Modelo de negocio](#modelo-de-negocio)
-14. [Errores corregidos](#errores-corregidos)
-15. [Pendientes y riesgos conocidos](#pendientes-y-riesgos-conocidos)
-16. [Reglas para contribuir](#reglas-para-contribuir)
-17. [App instalable y actualizaciones](#app-instalable-y-actualizaciones)
+1. [Qué hace](#qué-hace)
+2. [Ejemplos de uso](#ejemplos-de-uso)
+3. [Arquitectura](#arquitectura)
+4. [Stack](#stack)
+5. [Estructura del repositorio](#estructura-del-repositorio)
+6. [Primeros pasos](#primeros-pasos)
+7. [Base de datos](#base-de-datos)
+8. [Seguridad](#seguridad)
+9. [Privacidad y documentos legales](#privacidad-y-documentos-legales)
+10. [Pagos detectados solos](#pagos-detectados-solos)
+11. [Notificaciones](#notificaciones)
+12. [Pruebas y verificación](#pruebas-y-verificación)
+13. [App instalable y actualizaciones](#app-instalable-y-actualizaciones)
+14. [Pendientes y riesgos](#pendientes-y-riesgos)
+15. [Reglas para contribuir](#reglas-para-contribuir)
+16. [Documentos](#documentos)
+
+## Qué hace
+
+| Módulo | Teléfono y web de Vercel (`apps/mobile`) | Web de escritorio (`apps/desktop`) |
+|---|---|---|
+| Resumen | Balance del mes, últimos 7 días, salud financiera, recomendaciones, actividad reciente y dónde gastas más | Balance, gráfico de 7 días, salud financiera, recomendaciones y actividad |
+| Gastos | Crear, editar y eliminar; vista por semana (abre la de hoy); diferidos de 3 a 24 meses con interés; «pagado con» Apple Pay o Google Wallet; ubicación opcional; detalle con mapa | Alta completa, factura adjunta, OCR de recibos, edición en la tabla |
+| Ingresos | Crear, editar, eliminar y gráfico | Alta y gráfico por semana o mes |
+| Tarjetas | Catálogo con imagen real, cupo, fecha de corte y de pago, «Pagar tarjeta» desde una cuenta, importar estado de cuenta, últimos dígitos | Catálogo, cupo, estado de cuenta y pago |
+| Cuentas | Ahorro, débito y efectivo; historial con gastos, ingresos, pagos, abonos y transferencias; importar estado de cuenta; últimos dígitos | Logo del banco, ocultar saldo, acciones rápidas |
+| Transferencias | Entre cuentas propias: no cuentan como gasto ni ingreso. Las del correo se juntan solas | — (pendiente) |
+| Deudas | Manuales y automáticas (las crea un diferido); abono con cuenta de origen | Igual, sin cuenta de origen en el abono |
+| Recordatorios | Crear y completar, recurrentes, cuotas automáticas de diferidos y notificaciones antes del vencimiento | Crear y completar, recurrentes |
+| Presupuestos | Por categoría y mes, barras de uso, límite sugerido, avisos al 75 %, 100 % y excedido | — |
+| Categorías | Propias y globales; «Otros» con detalle | Igual |
+| Lugares | Cuánto gastas en cada lugar y comercio; renombrar y juntar sucursales | — |
+| Bandeja | Avisos del correo, de Apple Pay y de Google Wallet para confirmar, descartar o marcar como transferencia | — |
+| Billeteras | Google Wallet (Android) y atajo de Apple Pay (iPhone): el pago se registra solo si la tarjeta se reconoce por sus últimos dígitos | — |
+| Correo (beta) | Gmail u Outlook: lee solo los avisos del banco | — |
+| Notificaciones | Pagos registrados o por confirmar, recordatorios y cuotas, presupuestos | — |
+| Importar estado de cuenta | PDF (también con clave) o CSV, leído en el propio teléfono o navegador; marca duplicados | Igual, y además PDF escaneado (OCR) |
+| Perfil | Nombre, teléfono y cambio del correo de acceso | — |
+
+## Ejemplos de uso
+
+**Un pago con Google Wallet.** Pagas $12,50 en un supermercado con tu Visa terminada en 4321, que tienes registrada con esos dígitos:
+1. Google Wallet muestra su notificación: «SUPERMAXI · US$12,50 con Visa •••• 4321».
+2. FinTrack lee solo esa notificación y la envía a la base con la clave de captura del teléfono.
+3. La base reconoce la tarjeta por los dígitos, guarda el gasto (categoría «Comida», hora del pago, lugar «Supermaxi» si ya existía) y baja el cupo disponible de esa tarjeta.
+4. Te llega «Registré $12.50 en SUPERMAXI · Con tu tarjeta •••• 4321 · Comida». Tocarla abre el gasto para corregirlo o eliminarlo.
+
+Si la tarjeta no tiene dígitos anotados, o el pago supera el cupo, el gasto no se guarda. Va a la bandeja con el aviso «Pago de $12.50 por confirmar».
+
+**Pasar dinero de ahorros a efectivo.** *Más → Transferencias → Nueva*: desde «Ahorro Pichincha» ($500) hacia «Efectivo» ($20), $40. Los saldos quedan en $460 y $60. El balance del mes no cambia, porque no es un gasto.
+
+**Una transferencia que llega por correo.** Llega «Transferencia enviada $100» de tu cuenta de Pichincha y, al día siguiente, «Transferencia recibida $100» en tu cuenta de Guayaquil. La base las junta en una sola transferencia. Si se juntaron por error, «No era entre mis cuentas» devuelve los dos avisos a la bandeja.
+
+**Un presupuesto.** Comida, $200 en octubre. Al pasar de $150 llega «Presupuesto de Comida: 75 %». Al pasar de $200 llega «Te pasaste del presupuesto de Comida». Cada aviso sale una sola vez.
+
+**Una compra a cuotas.** Audífonos de $360 diferidos a 3 meses en la tarjeta. Se ocupa todo el cupo, se crea la deuda y se crean 3 recordatorios mensuales, cada uno con su notificación.
 
 ## Arquitectura
 
 ```mermaid
 flowchart TB
     subgraph Clientes
-        Mobile["apps/mobile\nExpo + expo-router\n(producto principal)"]
-        Desktop["apps/desktop\nReact + Vite\n(referencia web)"]
+        Mobile["apps/mobile\nExpo + expo-router\n(Android y web en Vercel)"]
+        Desktop["apps/desktop\nReact + Vite\n(web anterior)"]
+        Modulo["Módulo nativo Android\ncaptura-billetera\n(notificaciones de Google Wallet)"]
+        Atajo["Atajo de Apple Pay\n(iPhone)"]
     end
 
     subgraph Core["packages/core (compartido)"]
-        Schemas["schemas/ — zod + LIMITES"]
-        Repos["repositories/ — camelCase ⇄ snake_case"]
-        Usecases["usecases/ — presupuestos, plan de deudas,\nscore, endeudamiento, recomendaciones"]
-        Lib["lib/ — fechas locales, fetch con timeout,\nparser de correo, formato de montos"]
+        Schemas["schemas: zod + LIMITES"]
+        Repos["repositories: camelCase ⇄ snake_case"]
+        Usecases["usecases: presupuestos, deudas, score, importación"]
+        Lib["lib: fechas locales, correo, ubicación,\nnotificaciones, montos"]
     end
 
     subgraph Supabase
-        Valid["Trigger BEFORE\nvalidar_referencias_propias"]
         DB[("Postgres\nRLS por usuario_id")]
-        Triggers["Triggers AFTER\nsaldos, cupos, deuda por diferido"]
+        Triggers["Disparadores: saldos, cupos,\ndiferidos, transferencias"]
+        RPC["Funciones: confirmar avisos, abonos,\nregistrar pagos con billetera"]
         Auth["Auth"]
-        Storage["Storage\nbucket privado facturas"]
+        Storage["Storage\n(facturas, privado)"]
     end
 
     Mail["Gmail / Outlook\n(solo lectura, OAuth PKCE)"]
 
     Mobile --> Core
     Desktop --> Core
-    Mobile -. lee avisos bancarios .-> Mail
-    Core -- "fetch con timeout 15 s" --> Auth
-    Core -- "fetch con timeout 15 s" --> Valid --> DB <--> Triggers
-    Core -- "subidas 60 s" --> Storage
+    Mobile -. lee avisos del banco .-> Mail
+    Core --> Auth
+    Core --> RPC --> DB
+    Core --> DB <--> Triggers
+    Core --> Storage
+    Modulo -- "clave de captura" --> RPC
+    Atajo -- "clave de captura" --> RPC
 ```
 
 **Principios:**
-
-- **El dinero se calcula en la base, nunca en el cliente.** Saldos, cupos y deudas derivadas se ajustan con triggers de Postgres, así el dato es correcto venga de la web o del teléfono.
-- **`packages/core` es la única puerta a Supabase.** Valida con zod antes de ir a la red y traduce entre TypeScript y las tablas. Ninguna app duplica esa lógica.
-- **La base es la última barrera de seguridad.** La clave pública de Supabase viaja dentro de la app, así que RLS, los CHECK y los triggers de validación protegen los datos aunque alguien llame a la API directamente.
+- **El dinero se calcula en la base, nunca en el cliente.** Los saldos, los cupos, las deudas de los diferidos y las transferencias se ajustan con disparadores de Postgres. Así el dato es correcto venga del teléfono, de la web o del módulo de Android.
+- **`packages/core` es la única puerta a Supabase.** Valida con zod antes de ir a la red y traduce entre TypeScript y las tablas.
+- **La base es la última barrera.** La clave pública de Supabase viaja dentro de la app. Por eso RLS, los CHECK y los disparadores de validación protegen los datos aunque alguien llame a la API directamente.
+- **Lo nuevo no rompe una base vieja.** Las funciones nuevas siguen andando, sin la novedad, si todavía no se aplicó la migración (`faltaEnLaBase`).
 
 ## Stack
 
 | Capa | Tecnología |
 |---|---|
-| Teléfono | Expo SDK 51, expo-router 3, React Native 0.74, expo-font, componentes propios |
-| Web | React 18, Vite 5, CSS propio con variables (tema claro/oscuro). Tauri está declarado pero `src-tauri` no está inicializado |
-| Lógica compartida | TypeScript, zod |
-| Backend | Supabase: Postgres con RLS, Auth, Storage |
-| OCR y lectura de PDF (web) | Tesseract.js, pdf.js |
-| Correo (teléfono) | expo-auth-session (OAuth PKCE), expo-secure-store, Gmail API, Microsoft Graph |
+| Teléfono | Expo SDK 51, expo-router 3, React Native 0.74, expo-location, expo-notifications, módulo nativo propio en Kotlin |
+| Web de escritorio | React 18, Vite 5, CSS propio (tema claro/oscuro). Tauri está declarado, pero `src-tauri` no está inicializado |
+| Lógica compartida | TypeScript y zod |
+| Backend | Supabase: Postgres con RLS, Auth y Storage |
+| Lectura de PDF | pdf.js empaquetado dentro de la app (teléfono y web); Tesseract.js para OCR (escritorio) |
+| Correo | expo-auth-session (OAuth PKCE), expo-secure-store, Gmail API y Microsoft Graph |
+| Mapas | Teselas de OpenStreetMap, solo al abrir el detalle de un pago |
 | Pruebas | `node:test` (sin dependencias nuevas) y SQL sobre un Postgres desechable en Docker |
 
 ## Estructura del repositorio
 
 ```
 apps/
-  mobile/                 app de teléfono (Expo)
-    app/(auth)/            login, registro, conectar correo
-    app/(tabs)/            Resumen · Ingresos · Gastos · Tarjetas · Más
-    app/                   cuentas, cuenta/[id], tarjeta/[id], deudas, recordatorios,
-                           categorías, gasto/nuevo, ingreso/nuevo, correo, bandeja
-    components/            componentes visuales (Dock, Motion, AnimatedList, Boton, Tarjeta…)
-    lib/                   tema, cliente Supabase, OAuth y APIs de Gmail/Outlook
-  desktop/                versión web (React + Vite)
-    src/views/             Resumen, Ingresos, Gastos, Tarjetas, Cuentas, Deudas,
-                           Recordatorios, Categorías
-    src/components/        Dock, ThemeToggler, BlurFade, RippleButton, gráficos…
-    src/lib/               cliente Supabase, OCR, estado de cuenta, catálogo de tarjetas
+  mobile/                     app de teléfono (Expo) y web de Vercel
+    app/(auth)/               login, registro, confirmación del correo
+    app/(tabs)/               Resumen · Ingresos · Gastos · Tarjetas · Más
+    app/                      cuentas, tarjetas, transferencias, deudas, presupuestos,
+                              recordatorios, notificaciones, bandeja, correo, billeteras,
+                              lugares, ubicación, perfil, importar estado de cuenta…
+    components/               componentes visuales (Dock, IslaDetalle, Tarjeta, Boton…)
+    lib/                      tema, Supabase, notificaciones, ubicación, Gmail/Outlook
+    modules/captura-billetera módulo nativo de Android (Google Wallet y sus notificaciones)
+    public/                   términos y política de privacidad (borradores)
+  desktop/                    web anterior (React + Vite)
 packages/
-  core/
-    src/                   tipos, schemas, repositorios, casos de uso, lib
-    test/                  pruebas de lógica (node --test)
+  core/src/                   tipos, schemas, repositorios, casos de uso, lib
+  core/test/                  pruebas de lógica
 supabase/
-  migrations/              13 migraciones en orden cronológico
-  tests/                   pruebas de base de datos + script correr.sh
-  seed.sql                 categorías globales
-docs/                     plan, informes (.docx) y contratos entre agentes
+  migrations/                 36 migraciones en orden
+  tests/                      pruebas de base de datos + correr.sh
+  para-supabase-web/          actualizaciones listas para pegar en el SQL Editor
+  base-completa.sql           la base entera en un archivo (proyecto nuevo)
+docs/                         auditorías, informes, guías, contratos y documentos legales
 ```
 
 ## Primeros pasos
 
-Requisitos: Node 22.18 o superior, pnpm, Docker y el CLI de Supabase.
+Requisitos: Node 22.18 o superior, pnpm, Docker y la CLI de Supabase.
 
 ```bash
 pnpm install
 pnpm supabase:start          # Supabase local (Docker)
-```
-
-Copia las variables de entorno y complétalas:
-
-```bash
 cp apps/mobile/.env.example apps/mobile/.env
 cp apps/desktop/.env.example apps/desktop/.env
 ```
 
-| Variable | App | Uso |
-|---|---|---|
-| `EXPO_PUBLIC_SUPABASE_URL` / `EXPO_PUBLIC_SUPABASE_ANON_KEY` | teléfono | Proyecto Supabase. **Debe llevar el prefijo `EXPO_PUBLIC_`**; con otro prefijo la app compila pero nunca conecta. |
-| `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` | web | Proyecto Supabase. |
-| `VITE_DEV_EMAIL` / `VITE_DEV_PASSWORD` | web | Auto-login **solo en `pnpm dev:desktop`**. En el build de producción se eliminan (verificado). |
-| `EXPO_PUBLIC_MS_CLIENT_ID` | teléfono | Opcional: conectar Outlook (ver [guía de correo](docs/guia-conectar-correo.md)). |
-| `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID` | teléfono | Opcional: conectar Gmail. Client ID de un cliente OAuth de tipo **Android** (antes `EXPO_PUBLIC_GOOGLE_CLIENT_ID`, de tipo Web, que no funcionaba). |
-
-**Aplica las migraciones** antes de usar la app:
+Variables (los valores son **de ejemplo**: pon los de tu proyecto y nunca subas el `.env` al repositorio):
 
 ```bash
-supabase migration up        # base local
-supabase db push             # proyecto remoto
+# apps/mobile/.env
+EXPO_PUBLIC_SUPABASE_URL=https://<id-del-proyecto>.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_xxxxxxxxxxxxxxxx     # clave PÚBLICA, nunca la service_role
+EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID=123456789-xxxx.apps.googleusercontent.com   # opcional: Gmail
+EXPO_PUBLIC_MS_CLIENT_ID=00000000-0000-0000-0000-000000000000                    # opcional: Outlook
+EXPO_PUBLIC_URL_PRIVACIDAD=https://<tu-app>.vercel.app/privacidad.html
+EXPO_PUBLIC_URL_TERMINOS=https://<tu-app>.vercel.app/terminos.html
+EXPO_PUBLIC_CORREO_PRIVACIDAD=privacidad@tu-dominio.com
+EXPO_PUBLIC_EXIGIR_ACEPTACION=                                    # 1 para pedir aceptar términos
+
+# apps/desktop/.env
+VITE_SUPABASE_URL=https://<id-del-proyecto>.supabase.co
+VITE_SUPABASE_ANON_KEY=sb_publishable_xxxxxxxxxxxxxxxx
+VITE_DEV_EMAIL=correo-de-prueba@ejemplo.com                       # solo en desarrollo
+VITE_DEV_PASSWORD=una-contraseña-de-prueba                        # solo en desarrollo
 ```
 
-**Proyecto de Supabase nuevo, sin la CLI:** [`supabase/base-completa.sql`](supabase/base-completa.sql) tiene la base entera en un solo archivo: las 36 migraciones en orden y las categorías globales. En Supabase, abre *SQL Editor → New query*, pega el archivo completo y pulsa *Run*. Debe terminar mostrando `migraciones_registradas = 36`.
+- Las variables del teléfono **deben** llevar el prefijo `EXPO_PUBLIC_`; con otro prefijo la app compila, pero nunca conecta.
+- Todo lo `EXPO_PUBLIC_*` queda dentro de la app y es legible: ahí van solo valores públicos.
+- `VITE_DEV_*` solo se leen con `pnpm dev:desktop`; el build de producción los elimina.
+- Los «client id» de Google y Microsoft son públicos; nunca pongas un «client secret».
 
-**Proyecto que ya tiene la base:** las migraciones nuevas van en [`supabase/para-supabase-web/`](supabase/para-supabase-web/), una por archivo y con nombre legible (por ejemplo `migracion-de-rendimiento.sql`). Se pegan igual en el SQL Editor y deben terminar mostrando `aplicada = sí`. Se generan con `bash supabase/preparar-migracion-web.sh "Migración de …" <versiones>`.
+**Base de datos:**
+- Local: `supabase migration up`.
+- Proyecto nuevo, sin la CLI: pega [`supabase/base-completa.sql`](supabase/base-completa.sql) entero en *SQL Editor → New query → Run*. Debe terminar en `migraciones_registradas = 36`.
+- Proyecto que ya tiene la base: pega en orden los archivos de [`supabase/para-supabase-web/`](supabase/para-supabase-web/). Cada uno termina en `aplicada = sí`.
 
-- Es para un proyecto **vacío**. Corre en una sola transacción: si algo falla, no cambia nada.
-- Marca las migraciones como aplicadas, así que después `supabase db push` solo aplicará las nuevas.
-- No trae datos de ninguna persona.
-- Al agregar una migración, regenéralo con `bash supabase/generar-base-completa.sh`.
-- Verificado en una base desechable: queda idéntico a aplicar las migraciones una por una, y pasan las pruebas de base de datos.
-
-Ejecutar:
+**Ejecutar:**
 
 ```bash
 pnpm dev:mobile              # Expo (Expo Go, emulador o web)
-pnpm dev:desktop             # versión web
+pnpm dev:desktop             # web de escritorio
 ```
-
-## Plan de 10 pasos
-
-Los pasos 1 a 5 construyen las ideas de producto y negocio; los pasos 6 a 10 llevan al teléfono todo lo que hoy tiene la web. Ningún paso se da por terminado sin pruebas que lo demuestren. Detalle completo (objetivos, tareas, criterios y seguridad de cada paso) en [`docs/plan-10-pasos-y-paso-1.docx`](docs/plan-10-pasos-y-paso-1.docx).
-
-| # | Paso | Estado |
-|---|---|---|
-| 1 | Presupuestos inteligentes | ✅ Lógica, base y pantalla móvil · ⏳ validar con usuarios si se entiende |
-| 2 | Plan de salida de deudas + score financiero | 🟡 Abono atómico con cuenta de origen (teléfono) · ⏳ pantallas de plan y score |
-| 3 | Recordatorios y alertas reales (notificaciones locales, recurrentes) | 🟡 Notificaciones locales de recordatorios, cuotas, presupuestos y pagos (18-oct) · ⏳ probar en teléfono |
-| 4 | Detección por correo bien hecha (remitentes, OAuth nativo, confirmación atómica) | ⏳ |
-| 5 | Modelo de negocio y hoja de ruta | ⏳ |
-| 6 | Resumen y navegación como en la web | 🟡 Interfaz en curso |
-| 7 | Gastos e ingresos con paridad completa | ⏳ |
-| 8 | Tarjetas y cuentas como en la web | ⏳ |
-| 9 | Captura: OCR, factura y estado de cuenta | ⏳ |
-| 10 | Deudas, recordatorios, categorías y cierre para tiendas | ⏳ |
-
-## Organización del trabajo
-
-El trabajo se reparte entre varios agentes que se coordinan con contratos escritos en `docs/`:
-
-| Área | Responsable | Archivos |
-|---|---|---|
-| Lógica, base de datos y seguridad | Agente de lógica | `packages/core`, `supabase/`, `apps/*/lib` de red |
-| Base visual y animaciones | Agente 2 | `apps/desktop/src/index.css`, `src/components`, `apps/mobile/lib/theme.ts`, `apps/mobile/components` |
-| Pantallas | Agente 3 | `apps/desktop/src/App.tsx`, `src/views`, pantallas de `apps/mobile/app` |
-
-| Documento | Contenido |
-|---|---|
-| [`docs/plan-10-pasos-y-paso-1.docx`](docs/plan-10-pasos-y-paso-1.docx) | Plan completo, informe del Paso 1 y auditoría de seguridad |
-| [`docs/contrato-logica-core.md`](docs/contrato-logica-core.md) | Funciones de core disponibles para la interfaz, errores y límites |
-| [`docs/contrato-ui-web.md`](docs/contrato-ui-web.md) · [`docs/contrato-ui-movil.md`](docs/contrato-ui-movil.md) | Componentes visuales de cada app |
-| [`docs/plan-migracion-interfaz-movil.md`](docs/plan-migracion-interfaz-movil.md) | Plan de la migración visual web → teléfono |
-
-**Rediseño visual en curso:** dock flotante tipo "isla" con las cinco rutas, tema claro/oscuro persistente (con opción "Sistema"), animaciones de entrada y botones con ripple que respetan "reducir movimiento", y fuentes locales (Fraunces, IBM Plex, licencia OFL).
-
-## Funcionalidades
-
-| Módulo | Web | Teléfono |
-|---|---|---|
-| Resumen | Balance del mes, gráfico de 7 días, salud financiera, recomendaciones, actividad | Igual, sin selector de mes (Paso 6) |
-| Gastos | Alta completa, factura adjunta, OCR de recibos, importar estado de cuenta, pestañas por semana, edición en línea, diferido a 1-24 meses | Crear y eliminar (Pasos 7 y 9) |
-| Ingresos | Alta, gráfico por semana o mes | Crear y eliminar (Paso 7) |
-| Tarjetas | Catálogo de 74 productos con imagen real, cupo, estado de cuenta, pago con cuenta de origen | Degradado + logo del banco (Paso 8) |
-| Cuentas | Logo del banco, ocultar saldo, acciones rápidas | Lista + detalle |
-| Deudas | Manuales y automáticas (desde un diferido), abono | Paridad |
-| Recordatorios | CRUD, recurrentes, completado | Paridad |
-| Categorías | CRUD propio; globales de solo lectura; "Otros" con detalle | Paridad |
-| Presupuestos | Lógica lista (Paso 1) | ✅ Pantalla con barras de uso |
-| Correo | — | Gmail / Outlook → bandeja de revisión. Las transferencias entre tus cuentas («enviada» + «recibida») se juntan solas |
-| Transferencias entre cuentas propias (18-oct) | — (pendiente) | Crear, ver, eliminar; no cuentan como gasto ni ingreso; desde la bandeja «Fue entre mis cuentas»; las que se juntaron por error se separan |
-| Google Wallet (18-oct) | — | Con la tarjeta reconocida por sus últimos 4 dígitos, el pago se registra solo (descuenta del cupo o saldo) y avisa; si no, a la bandeja. Se puede apagar. Requiere el APK 1.4.0 para las notificaciones |
-| Notificaciones (18-oct) | — | Locales: pagos registrados o por confirmar, recordatorios y cuotas (0, 1 o 3 días antes), presupuestos al 75 %, 100 % y excedido. *Más → Notificaciones* |
-| Importar estado de cuenta (17-oct) | Al crear una cuenta o tarjeta y desde su detalle: PDF, CSV o foto; duplicados, ingresos y saldo final | Igual (también en la web de Vercel): PDF con texto o con clave y CSV, leídos en el dispositivo con pdf.js empaquetado. Ver [`docs/informe-importar-estado-cuenta.md`](docs/informe-importar-estado-cuenta.md). Requiere el APK 1.3.0 |
-
-## packages/core
-
-Única puerta de entrada a Supabase para las dos apps. Todo se importa desde `"core"`.
-
-**Nuevo en el Paso 1 (y adelanto del Paso 2):**
-
-| Función | Qué hace |
-|---|---|
-| `guardarPresupuesto({ categoriaId, montoLimite, mes })` | Crea o actualiza: uno por usuario, categoría y mes |
-| `listarPresupuestos(mes?)` / `eliminarPresupuesto(id)` | Lectura y borrado |
-| `estadoPresupuestos(mes, presupuestos, gastos, categorias)` | Gastado, restante y porcentaje; nivel `ok` / `cerca` (≥ 80 %) / `excedido` (≥ 100 %) |
-| `sugerirLimite(categoriaId, mes, gastos)` | Promedio de los 3 meses previos con gasto, redondeado a múltiplos de 5 |
-| `generarRecomendaciones({ …, presupuestos })` | Agrega avisos de presupuesto (parámetro opcional) |
-| `planDeudas(deudas, pagoMensual, "bola_de_nieve" \| "avalancha")` | Orden de liquidación, meses e interés total; `viable: false` si el pago no alcanza |
-| `scoreFinanciero(…)` | 0-100: endeudamiento 35 + ahorro 30 + uso de cupo 20 + recordatorios 15 |
-| `calcularEndeudamiento(deudas, ingresoMes, ingresoReferencia?)` | El tercer parámetro evita marcar "bajo" en un mes sin ingresos |
-| `fechaLocal()` / `mesLocal()` | "Hoy" y "mes actual" en la zona horaria del teléfono (no UTC) |
-| `crearFetchConTimeout(opciones)` / `ErrorTiempoAgotado` | `fetch` que corta a los N segundos con un mensaje claro |
-| `LIMITES` | Longitudes y montos máximos, iguales a los de la base |
-| `registrarAbonoDeuda(id, monto, { cuentaId?, fecha? })` | Abono **atómico** en la base: baja el saldo, descuenta de la cuenta de origen, libera cupo si es un diferido en tarjeta y mueve el próximo pago. Si el monto supera el saldo, cobra solo lo pendiente |
-| `listarAbonosDeuda(deudaId?)` | Historial de abonos (solo lectura) |
-| `actualizarIngreso(id, cambios)` | Edita un ingreso validado con zod; la base reajusta el saldo si cambian monto o cuenta |
-| `mensajeError(err)` | Además traduce los fallos de red a "No se pudo conectar con el servidor…" |
-
-**Lo que ya existía:** tipos de dominio, un schema zod por entidad, repositorios (`listar*`, `eliminar*`, mapeo de nombres), casos de uso `crear*`, `balanceGeneral`, y utilidades: semanas fijas del mes, línea de tiempo de una cuenta, colores por banco, agrupación por categoría, formato de montos (`-$50.00`), extracción de mensajes de error de Supabase, normalización de números latinos y el parser de correos bancarios.
 
 ## Base de datos
 
-### Triggers
+**Tablas** (todas con RLS por `usuario_id`; si se borra la persona, se borran en cascada):
 
-| Trigger | Momento | Qué hace |
-|---|---|---|
-| `validar_referencias_propias` | BEFORE INSERT/UPDATE en 7 tablas | **Nuevo.** Rechaza cuentas, categorías, deudas o gastos de otro usuario |
-| `aplicar_gasto_a_cuenta` | AFTER INSERT gastos | Resta el monto del disponible |
-| `revertir_gasto_de_cuenta` | AFTER DELETE gastos | Devuelve el monto sin pasar del cupo |
-| `ajustar_gasto_actualizado` | AFTER UPDATE gastos | Revierte lo viejo y aplica lo nuevo |
-| `aplicar_ingreso_a_cuenta` / `revertir_ingreso_de_cuenta` | ingresos | Suma o resta (no en tarjetas de crédito) |
-| `aplicar_pago_tarjeta` | AFTER INSERT pagos_tarjeta | Sube el cupo y descuenta de la cuenta de origen |
-| `crear_deuda_de_gasto_diferido` | AFTER INSERT gastos | Crea la deuda tipo `diferido` con su cuota mensual |
-| `ajustar_ingreso_actualizado` | AFTER UPDATE ingresos | **Nuevo.** Editar un ingreso revierte el monto/cuenta viejos y aplica los nuevos |
-| `proteger_gasto_diferido` | BEFORE UPDATE gastos | **Nuevo.** Un diferido no se edita en monto, cuenta, método ni plazo (se elimina y se registra de nuevo); un gasto no se vuelve diferido al editarlo |
-
-Los de saldo son `security definer`, fijan `search_path` y filtran por `usuario_id`. Además:
-
-- **`registrar_abono_deuda(...)`** (función, no trigger): abono atómico con la deuda y la cuenta bloqueadas (`for update`); deja constancia en `abonos_deuda`, un historial que la app solo puede leer. Solo la pueden ejecutar usuarios con sesión.
-- **Los pagos de tarjeta no se borran desde la app:** son movimientos de dinero reales. Borrarlos sin revertir dejaba saldos inflados, y revertirlos solos sería incorrecto cuando desaparecen por borrar la tarjeta. Si se necesita anular uno, será con una función explícita.
-
-### RLS
-
-Todas las tablas tienen Row Level Security con `auth.uid() = usuario_id`. Única excepción a propósito: las categorías con `usuario_id` nulo son globales y de solo lectura.
-
-### Migraciones
-
-| Archivo | Qué agrega |
+| Grupo | Tablas |
 |---|---|
-| `20260826120000_gastos` | `categorias`, `gastos`, `presupuestos` |
-| `20260826130000_rls_policies` | `usuario_id` y políticas RLS |
-| `20260826140000_finanzas_completas` | `cuentas`, `ingresos`, `pagos_tarjeta`, `deudas`, `recordatorios` y triggers de saldo |
-| `20260830120000_estilo_tarjeta` | `cuentas.estilo` |
-| `20260830130000_eliminar_cuenta_con_movimientos` | Claves foráneas con SET NULL / CASCADE |
-| `20260830140000_categorias_crud` | Categorías propias por tipo, "Otros" con detalle |
-| `20260830150000_gastos_factura_metodo_pago` | Método de pago, factura, bucket `facturas`, trigger de edición |
-| `20260831120000_banco_diners_club` | Diners Club como banco |
-| `20260831130000_gasto_diferido` | Meses de diferido y deuda automática |
-| `20260831140000_fix_metodo_pago_diferido` | Corrige el CHECK de `metodo_pago` |
-| `20260831150000_pago_tarjeta_origen_y_tipo_diferido` | Cuenta de origen en pagos; tipo de deuda `diferido` |
-| `20260901120000_correo_transacciones_detectadas` | `cuentas.identificador` y cola de revisión del correo |
-| `20261013120000_seguridad_y_presupuestos` | Validación de referencias propias, `search_path` fijo, límites de texto, presupuestos únicos, bucket limitado, timeouts por rol e índices |
-| `20261014120000_abono_deuda_atomico` | Tabla `abonos_deuda` y función `registrar_abono_deuda` |
-| `20261014130000_saldos_confiables` | Edición de ingresos con reajuste, pagos de tarjeta sin borrado, cuenta de origen con SET NULL, diferidos protegidos |
-| `20261014140000_correo_confirmacion_y_privacidad` | Confirmación atómica e idempotente de la bandeja; el asunto se borra al resolver el aviso |
-| `20261014150000_agregar_bancos_pacifico_y_austro` | Banco del Pacífico y Banco del Austro como bancos |
-| `20261015120000_integridad_saldos` | Saldo a favor en tarjetas, edición de gastos pagados por diferencia, diferidos solo en tarjeta y con plazo, deudas protegidas al borrar, avisos resueltos inmutables, categorías borradas pasan a "Otros", abono con mínimo de $0,01 |
-| `20261015150000_categoria_salud` | Categoría global "Salud" |
-| `20261015170000_diferidos_cupo_interes` y `20261015180000_proteger_tasa_diferido` | **Migración de interés diferido:** el diferido reserva todo el capital, el interés se cobra con cada cuota, compras sobre el cupo bloqueadas, tasa protegida |
-| `20261015190000_eliminar_cuenta` | **Migración de eliminar cuenta:** `eliminar_mi_cuenta('ELIMINAR')` borra al usuario y todos sus datos (exigido por Google Play) |
-| `20261015200000_rendimiento` | **Migración de rendimiento:** índices de claves foráneas, RLS con `(select auth.uid())` y `totales_por_mes` |
-| `20261016…` (11 migraciones) | Billeteras y ubicación, Apple Pay, resumen por lugar, casas comerciales y corte, recordatorios de diferidos, Google Wallet, aceptaciones legales, exportar datos, hora del pago, fecha fija en diferidos (ver los informes de `docs/`) |
-| `20261018120000_ajustes_y_transferencias` | `ajustes_usuario` (registro automático), `transferencias` con saldos por disparadores, juntar «enviada» + «recibida» del correo, confirmar un aviso como transferencia y separarla |
-| `20261018130000_registro_automatico_billetera` | Registro automático de pagos con la tarjeta reconocida por sus dígitos, categoría sugerida, lugar por comercio, `avisos_presupuesto` y `revisar_mis_presupuestos`, exportación con las tablas nuevas |
+| Dinero | `cuentas`, `gastos`, `ingresos`, `transferencias`, `pagos_tarjeta`, `deudas`, `abonos_deuda` |
+| Organización | `categorias` (las de `usuario_id` nulo son globales y de solo lectura), `presupuestos`, `avisos_presupuesto`, `recordatorios`, `lugares` |
+| Detección | `transacciones_detectadas` (la bandeja), `claves_captura` (Apple Pay y Google Wallet) |
+| Cuenta | `ajustes_usuario` (registro automático), `aceptaciones_legales` |
 
-### Estado de despliegue
+**Disparadores principales:**
+- `validar_referencias_propias` rechaza cuentas, categorías, deudas, gastos o lugares de otra persona.
+- Saldos: `aplicar/revertir/ajustar_gasto`, `aplicar/revertir_ingreso`, `aplicar_pago_tarjeta`, `aplicar/revertir_transferencia`.
+- Cupos: `validar_cupo_gasto`. Diferidos: crea la deuda y sus recordatorios, y protege el plazo, la tasa y la fecha.
+- Bandeja: `proteger_estado_aviso` (lo resuelto no vuelve atrás y se olvidan los datos sensibles) y `emparejar_transferencia_detectada`.
+- Lugares: `asignar_lugar_gasto`, por cercanía.
 
-Actualizar esta tabla cada vez que se aplique una migración en un entorno.
+**Funciones que llama la app:**
+- Con sesión: `confirmar_transaccion_detectada`, `confirmar_aviso_como_transferencia`, `separar_transferencia`, `registrar_abono_deuda`, `revisar_mis_presupuestos`, `totales_por_mes`, `resumen_por_lugar`, `resumen_por_comercio`, `fusionar_lugares`, `borrar_mis_ubicaciones`, `crear_clave_captura`, `registrar_aceptacion_legal` y `eliminar_mi_cuenta`.
+- Sin sesión (solo con una clave de captura): `registrar_pago_billetera` (atajo de Apple Pay) y `registrar_aviso_billetera` (Android).
+- Solo la administración, desde el SQL Editor: `exportar_datos_persona`.
 
-| Entorno | Migraciones aplicadas | Última | Fecha |
+**Migraciones** (`supabase/migrations`, 36):
+
+| Fecha | Qué agregan |
+|---|---|
+| 26-ago a 1-sep | Tablas base, RLS, cuentas, ingresos, pagos, deudas, recordatorios, categorías propias, factura, diferidos, Diners Club, cola del correo |
+| 13 a 15-oct | Seguridad (referencias propias, límites, timeouts), presupuestos, abono atómico, saldos confiables, confirmación atómica del correo, Pacífico y Austro, saldo a favor, Salud, interés de diferidos, eliminar cuenta, rendimiento |
+| 16-oct | Billeteras y ubicación, borrar ubicaciones, Apple Pay, resumen por lugar, casas comerciales y corte, recordatorios de diferidos, Google Wallet, aceptaciones legales, exportar datos, hora del pago, fecha fija en diferidos |
+| 18-oct | Ajustes y transferencias; registro automático de billetera, categoría sugerida, lugar por comercio y avisos de presupuesto |
+
+**Estado de despliegue:**
+
+| Entorno | Migraciones | Última | Fecha |
 |---|---|---|---|
-| Supabase local (Docker, `127.0.0.1:54321`) | 21 de 23 (faltan eliminar cuenta y rendimiento) | `20261015180000_proteger_tasa_diferido` | 15-oct-2026 |
-| Supabase web (`ikyoawstrwihaqefosbq`) | 36 de 36, más `20261017020000_cupo_en_lote` (no está en el repositorio) | `20261018130000_registro_automatico_billetera` | 18-oct-2026 (el usuario pegó el texto único de `18-10-2026 6AM/` y salió `aplicada = sí`) |
+| Supabase web (`<id-del-proyecto>`) | Las 36, más `20261017020000_cupo_en_lote` | `20261018130000_registro_automatico_billetera` | 18-oct-2026 (texto único de `para-supabase-web/18-10-2026 6AM/`, salió `aplicada = sí`) |
+| Supabase local (Docker) | Sin actualizar desde el 15-oct | `20261015180000_proteger_tasa_diferido` | 15-oct-2026 |
 
-**Aplicado en Supabase web el 18-oct:** un solo archivo, `supabase/para-supabase-web/18-10-2026 6AM/TODO EN UNO - ….sql`, con las 4 migraciones que faltaban en el proyecto web (`hora_del_pago`, `diferido_fecha_fija` y las dos del 18-oct). Termina en `aplicada = sí`, se puede pegar dos veces sin problema y se detiene sin cambiar nada si faltan las del 16-oct anteriores. Verificado en una base como la del proyecto web (hasta `exportar_datos_persona`, más una validación de cupo por sentencia): 0 pruebas fallan. Los archivos de `18-10-2026 5AM/` son lo mismo, en dos partes, para una base que ya tiene todo el 16-oct.
+`cupo_en_lote` está aplicada en el proyecto web, pero **no está en el repositorio**. Hay que agregar su archivo a `supabase/migrations/` y regenerar `base-completa.sql` con `bash supabase/generar-base-completa.sh`.
 
-**Ojo:** el proyecto web tiene registrada `20261017020000_cupo_en_lote`, que **no está en este repositorio** (se aplicó desde fuera). Hay que agregar su archivo a `supabase/migrations/` y regenerar `base-completa.sql`; si no, un proyecto nuevo creado con `base-completa.sql` no la tendrá. Las migraciones del 18-oct no tocan la validación del cupo.
-
-Para comprobarlo en cualquier base: `select version, name from supabase_migrations.schema_migrations order by version;`
+Para revisarlo en cualquier base: `select version, name from supabase_migrations.schema_migrations order by version;`
 
 ## Seguridad
 
-### Hallazgo corregido: falla de autorización en los triggers de saldo
+- **RLS en todas las tablas:** cada persona solo ve y cambia lo suyo.
+- **Referencias propias:** un disparador impide apuntar a la cuenta de otra persona; antes, un saldo ajeno se podía mover (hallazgo corregido el 13-oct).
+- **Sin inyección SQL:** la app no arma SQL, y las funciones usan SQL estático.
+- **Funciones con permisos elevados:** fijan `search_path`, y una prueba lo comprueba en cada corrida. Las funciones internas no se pueden llamar desde afuera.
+- **Clave de captura** (Apple Pay y Google Wallet), con formato `ft_` + 64 caracteres:
+  - Solo sirve para dejar pagos.
+  - La base guarda solo su huella SHA-256.
+  - Tiene un límite de 30 avisos por hora y 200 por día, y se revoca desde la app.
+  - En el teléfono vive en el almacenamiento privado del módulo y nunca vuelve a JavaScript.
+- **Validación doble:** zod en `core` y CHECK en la base:
+  - Descripción: de 1 a 200 caracteres.
+  - Montos: mayores que 0 y hasta $9 999 999 999,99.
+  - Fechas reales.
+  - Últimos dígitos: 3 o 4.
+- **Timeouts:** 15 s para las peticiones, 60 s para las subidas, 20 s para Gmail y Graph, 8 s por consulta con sesión y 3 s sin sesión.
+- **Facturas:** bucket privado, enlaces firmados de 1 hora, máximo 10 MB y solo PDF o imágenes.
+- **Secretos:** el repositorio y su historial no tienen claves (revisado el 18-oct). Los `.env` están en `.gitignore`. La `service_role` nunca va en una app: el verificador de publicación la frena.
+- **Tokens del correo:** solo en el almacenamiento seguro del teléfono; se borran al desconectar o al cerrar sesión.
 
-RLS solo revisa la fila que se inserta, no las filas a las que apunta. Un usuario podía crear un gasto con el `cuenta_id` de **otra persona** y el trigger privilegiado le descontaba el saldo a esa cuenta ajena. Lo mismo pasaba con ingresos y con pagos de tarjeta usando una cuenta ajena como origen.
+## Privacidad y documentos legales
 
-- **Evidencia** (base con las migraciones anteriores): el usuario A bajó el saldo de B de 1000 a 300 y pagó su propia tarjeta con 400 de B.
-- **Atenuante:** hace falta conocer el UUID de la cuenta de la víctima, que la API no le muestra a otros usuarios.
-- **Corrección:** trigger `validar_referencias_propias` en las 7 tablas con referencias, y triggers de saldo que filtran por dueño. Ahora los 12 ataques de prueba fallan con "La cuenta indicada no existe o no es tuya." y el saldo de B queda intacto.
+- **Ley Orgánica de Protección de Datos Personales de Ecuador:**
+  - Inventario de datos: [`docs/legal/registro-tratamiento-datos.md`](docs/legal/registro-tratamiento-datos.md). Una prueba exige que cada tabla aparezca ahí.
+  - Derechos de las personas, con la exportación de datos: [`docs/legal/procedimiento-derechos-titular.md`](docs/legal/procedimiento-derechos-titular.md).
+  - Plan ante incidentes: [`docs/legal/plan-incidentes-seguridad.md`](docs/legal/plan-incidentes-seguridad.md).
+- **Términos y política de privacidad** (`apps/mobile/public/`): son **borradores** para revisar con un abogado. La política va en la versión `2026-10-18`, que incluye Google Wallet, el registro automático, las transferencias y las notificaciones. Qué completar: [`docs/legal/README.md`](docs/legal/README.md).
+- **La aceptación** de términos está lista, pero apagada (`EXPO_PUBLIC_EXIGIR_ACEPTACION`).
+- **Ubicación:** apagada por defecto, solo con la app abierta, redondeada a unos 11 m. Un gasto con fecha de otro día no la guarda por defecto. Se borra con «Borrar mis ubicaciones».
+- **Nunca** se venden datos, ni hay publicidad ni analítica de terceros.
 
-### Inyección SQL
+## Pagos detectados solos
 
-No hay superficie de inyección SQL:
+| Fuente | Cómo llega | Qué pasa |
+|---|---|---|
+| Google Wallet (Android) | El módulo nativo lee **solo** las notificaciones de Google Wallet y las envía con la clave de captura | Con la tarjeta reconocida por sus últimos 4 dígitos y el registro automático encendido, se guarda el gasto y avisa. Si no, va a la bandeja. Sin internet, se envía después con la fecha del pago |
+| Apple Pay (iPhone) | Un atajo de Atajos («Transacción») llama a la base | Igual. Necesita que el atajo mande los dígitos en `p_tarjeta`, por ejemplo «Visa 1234» |
+| Correo (Gmail u Outlook, beta) | El teléfono lee los avisos del banco al buscar | Gastos e ingresos van siempre a la bandeja. Las transferencias «enviada» + «recibida» entre cuentas propias se juntan solas |
 
-- La app no escribe SQL. El cliente de Supabase envía los valores a PostgREST como parámetros, nunca como código.
-- No se usan `.or()`, `.filter()` con texto ni `rpc` con SQL armado (revisado en todo el repositorio).
-- Los triggers usan SQL estático, sin `EXECUTE` con texto concatenado.
-- Prueba S10: la descripción `'); drop table gastos; --` se guarda como texto y la tabla sigue existiendo.
+- **Registro automático:** viene encendido y se apaga en *Conectar Google Wallet* o *Conectar Apple Pay*.
+- **Categoría sugerida:** la de tu último gasto en ese comercio, o por palabras clave.
+- **Lugar:** el del comercio, si ya existe.
 
-### Timeouts
+Guías: [`docs/guia-google-wallet.md`](docs/guia-google-wallet.md), [`docs/guia-atajo-apple-pay.md`](docs/guia-atajo-apple-pay.md) y [`docs/guia-conectar-correo.md`](docs/guia-conectar-correo.md).
 
-| Capa | Límite |
+**Limitaciones del correo:**
+- Los remitentes de Produbanco, Diners Club y Austro todavía no se conocen.
+- Los cuerpos de los avisos reales no están comprobados.
+- No se verifica DKIM/SPF; por eso los gastos pasan por revisión humana.
+- `gmail.readonly` necesita la verificación de Google antes de publicar.
+
+## Notificaciones
+
+Son locales: las arma el teléfono, sin un servidor de avisos. Se eligen en *Más → Notificaciones*.
+
+| Aviso | Cuándo |
 |---|---|
-| Peticiones a Supabase (datos y login) | 15 s |
-| Subida de facturas | 60 s |
-| Gmail y Microsoft Graph | 20 s |
-| Consultas de usuarios autenticados en Postgres | 8 s (`statement_timeout`) |
-| Consultas anónimas | 3 s |
+| Pago registrado solo | Al registrarse un pago de Google Wallet, aunque la app esté cerrada (módulo nativo) |
+| Pago por confirmar | Al llegar un pago a la bandeja, y a las 19:00 si quedan movimientos sin confirmar |
+| Recordatorios y cuotas | El mismo día, 1 o 3 días antes, a la hora elegida |
+| Presupuestos | Al 75 %, al 100 % y al pasarte, una sola vez por nivel y por mes (lo anota la base) |
 
-Al agotarse, el usuario ve "La conexión tardó más de 15 s. Revisa tu internet e inténtalo de nuevo." Hay índices por usuario y fecha para que las consultas normales no se acerquen al límite.
-
-### Validación de datos
-
-Doble barrera: zod en `core` (mensaje claro antes de ir a la red) y CHECK en la base (si alguien llama a la API directo).
-
-| Campo | Regla |
-|---|---|
-| Descripción | 1-200 caracteres, no solo espacios |
-| Nombre (cuenta, deuda, categoría) | 1-80 caracteres |
-| Título de recordatorio | 1-120 caracteres |
-| Montos | > 0 y ≤ 9 999 999 999,99; sin NaN ni infinito |
-| Fechas / meses | `YYYY-MM-DD` / `YYYY-MM` válidos |
-| Identificador de cuenta | 3 o 4 dígitos |
-| Color | `#RRGGBB` |
-| Factura | Dentro de la carpeta del propio usuario |
-| Pago de tarjeta | El origen no puede ser la misma tarjeta |
-
-Los textos que vienen de correos de terceros se recortan antes de guardarse.
-
-### Otras medidas
-
-- **Funciones privilegiadas:** todas las funciones `security definer` (10) fijan `search_path = public, pg_temp`; una prueba lo verifica en cada corrida.
-- **Facturas:** bucket privado, URLs firmadas de 1 hora, máximo 10 MB, solo PDF/JPEG/PNG/WEBP/HEIC y sin permiso para reemplazar archivos.
-- **Credenciales:** las variables `VITE_DEV_*` solo se leen en desarrollo. Un build de producción con una contraseña centinela la contiene 0 veces. La anon key es pública por diseño (la protección es RLS) y la `service_role` nunca debe estar en una app.
-- **Tokens de correo:** solo en `expo-secure-store` del teléfono, nunca en la base.
+Con la pantalla bloqueada, Android oculta los montos si así lo elige la persona. Al cerrar sesión se cancelan.
 
 ## Pruebas y verificación
 
 ```bash
 pnpm --filter core test          # 218 pruebas de lógica
 pnpm --filter mobile test        # 18 pruebas del teléfono
+pnpm --filter desktop test       # 3 pruebas de la web de escritorio
 bash supabase/tests/correr.sh    # 328 pruebas de base de datos (requiere Docker)
+cd apps/mobile && npx tsc --noEmit && cd ../desktop && npx tsc --noEmit && npx tsc --noEmit -p ../../packages/core
 ```
 
-- **Lógica:** cálculos comparados contra resultados hechos a mano: presupuestos, plan de deudas, score, timeouts, fechas locales, mensajes de error y validación.
-- **Base de datos:** el script levanta un Postgres desechable con la misma imagen de Supabase, aplica todas las migraciones desde cero, simula dos usuarios con su JWT (igual que PostgREST) y borra el contenedor al terminar. **Nunca toca tu base local ni la de producción.** Archivos:
-  - `seguridad_y_presupuestos.sql` (36): ataques entre usuarios, flujo de saldos, presupuestos, límites y configuración.
-  - `abono_deuda.sql` (13): abono atómico, recorte al saldo, cuenta de origen, cupo del diferido, permisos.
-  - `saldos_confiables.sql` (13): edición de ingresos, pagos de tarjeta, borrado de cuentas y diferidos.
-  - `correo_bandeja.sql` (10): confirmación atómica e idempotente, aislamiento entre usuarios y borrado de los datos del correo.
-  - `integridad_saldos.sql` (16): saldo a favor, edición de gastos pagados, diferidos, borrado de deudas y categorías, avisos resueltos y borrado de un usuario con abonos.
-  - `diferidos_cupo_interes.sql` (5): cupo, interés de las cuotas y tasa protegida.
-  - `eliminar_cuenta_y_rendimiento.sql` (10): eliminar la cuenta borra todo lo propio y nada ajeno, índices, RLS optimizada y totales por mes.
-  - `transferencias.sql` (29): saldos al crear y borrar, reglas (tarjeta como destino, cupo, misma cuenta, cuentas ajenas), juntar avisos del correo (por separado, juntos, ambiguos, apagado), confirmar desde la bandeja, separar y permisos.
-  - `registro_automatico.sql` (26): pago registrado solo con la tarjeta reconocida, lugar por comercio, categoría aprendida, avisos de presupuesto una vez por nivel, casos que van a la bandeja, notificación atrasada, Apple Pay y funciones internas cerradas.
-  - Y las de billeteras, ubicación, legal, hora del pago y demás migraciones del 16-oct (un archivo por migración).
-  - Concurrencia (1): dos abonos simultáneos de 70 sobre una deuda de 100 dejan la cuenta en −100, no en −140.
-- **Compilación:**
-
-```bash
-cd apps/desktop && npx tsc --noEmit
-npx tsc --noEmit -p ../../packages/core
-cd ../mobile && npx tsc --noEmit
-```
-
-Aún sin verificar: el timeout en un teléfono físico y el upsert de presupuestos desde la app contra el servidor (se probó el SQL equivalente).
-
-## Detección de movimientos por correo
-
-**Función opcional y en beta.** Ya no es un paso del registro: vive en *Más → Correo (beta)* y la app se usa completa sin conectarlo. Solo en el teléfono. Conectas Gmail u Outlook y la app detecta avisos bancarios. **Gastos e ingresos no se guardan solos:** caen en la bandeja de revisión (`transacciones_detectadas`) para confirmar o descartar. La excepción (18-oct, con el registro automático encendido) son las transferencias entre tus cuentas: si llegan «enviada» de una cuenta tuya y «recibida» en otra, por el mismo monto y con hasta 2 días de diferencia, se registran como **una** transferencia; si se juntaron por error, se separan en *Más → Transferencias*.
-
-- OAuth con PKCE y sin secreto en la app (`lib/gmailAuth.ts`, `lib/outlookAuth.ts`); tokens en `expo-secure-store`.
-- El parser (`parsearCorreoBancario` en core) saca tipo, monto, fecha y últimos dígitos de la cuenta. El remitente se reconoce por **dirección exacta o dominio exacto** (antes bastaba con que lo "contuviera").
-- Sin duplicados: `unique (usuario_id, mensaje_id)`, y **confirmar es atómico** (`confirmar_transaccion_detectada`): reintentar nunca duplica el gasto.
-- **Qué se guarda:** monto, fecha, banco y asunto de cada aviso reconocido; el texto del correo se analiza en el teléfono. El asunto se borra al confirmar o descartar.
-- **Desconectar** revoca el permiso ante Google (en Outlook se le indica a la persona dónde quitarlo, porque Microsoft no permite revocarlo desde una app pública), borra los tokens del teléfono y borra todos los avisos guardados. Los gastos ya confirmados se quedan.
-
-**Configuración:**
-
-Paso a paso, con lo que hay que hacer en Azure y en Google Cloud y cómo comprobarlo en un teléfono: [`docs/guia-conectar-correo.md`](docs/guia-conectar-correo.md).
-
-- **Outlook:** Microsoft Entra ID → registro de aplicación → plataforma "Mobile and desktop applications" con redirect `gastosapp://redirect` y «Allow public client flows» en Sí. Pide la cuenta cada vez (`prompt=select_account`).
-- **Gmail:** Google Cloud → habilitar Gmail API → cliente OAuth de tipo **Android** (paquete `com.csebastia.gastosapp` + huella SHA-1 de la firma) con el esquema de URI personalizado habilitado; la app vuelve por `com.csebastia.gastosapp:/oauthredirect`. El tipo «Web» exige un secreto y no sirve. Solo Android por ahora (en iOS y web el botón queda inactivo). `gmail.readonly` es un permiso restringido: para publicar hace falta la verificación de Google, y en modo de prueba el token caduca a los 7 días. La búsqueda deja fuera las pestañas Promociones, Social y Foros.
-
-**Limitaciones actuales (Paso 4):** la lista de remitentes (`REMITENTES_BANCO`) trae solo Pichincha, Banco Guayaquil y Banco del Pacífico (direcciones exactas vistas en una bandeja real el 16-oct); de Produbanco, Diners Club y Banco del Austro no hubo muestras, y su banco se elige a mano en la bandeja; los asuntos se verificaron, pero no el cuerpo de los correos, así que el monto y el tipo de cada banco aún no están comprobados con avisos reales; no se verifica DKIM/SPF (un remitente falsificado con el dominio real pasaría, por eso todo va a revisión humana); no hay sincronización en segundo plano. Cada búsqueda pagina hasta 500 correos y avisa si hubo más.
-
-**Privacidad al cerrar sesión (15-oct):** el permiso de correo es del teléfono, no de la cuenta. Al cerrar sesión se borran los tokens (y se revoca el de Google), y la conexión queda ligada a quien la hizo: si entra otra persona en el mismo teléfono, se olvida. Si el permiso fue retirado (`invalid_grant`), la app borra los tokens y pide reconectar. La revocación ante Google y el ingreso con una cuenta real de Gmail y de Outlook no se han probado todavía: necesitan los Client ID reales (ver la guía).
-
-## Modelo de negocio
-
-Propuesta del Paso 5, como hipótesis a validar con usuarios:
-
-- **Freemium.** Gratis: cuentas, gastos, ingresos y 1 presupuesto. Premium: detección por correo, presupuestos ilimitados, plan de deudas, score, exportación y varios dispositivos.
-- **Otras vías:** alianzas con bancos y cooperativas (comparador de tarjetas con el catálogo de 74 productos), reportes premium, modo pareja/familia.
-- **Hoja de ruta:** MVP (pasos 6-10) → beta cerrada → tiendas → monetización.
-- **Métricas:** retención a 30 días, gastos registrados por semana, conversión a Premium.
-- **Cumplimiento:** Ley Orgánica de Protección de Datos Personales de Ecuador (consentimiento, política de privacidad, borrar la cuenta, que también exige Google Play). Los datos financieros nunca se venden.
-
-## Errores corregidos
-
-**En esta etapa (Paso 1 y auditoría):**
-
-- Un usuario podía mover el saldo de cuentas ajenas (ver [Seguridad](#seguridad)).
-- "Hoy" y "mes actual" se calculaban en UTC: en Ecuador, a las 21:30 del 13 la app decía que era el 14. Corregido en core con `fechaLocal()`; faltan unas 26 pantallas.
-- `sumarMeses` también pasaba por UTC.
-- La contraseña de desarrollo de la web se incrustaba en el JavaScript publicado.
-- Presupuestos sin restricción única; borrar una categoría con presupuesto fallaba; "Borrar todo" omitía dos tablas.
-- `planDeudas` sin deudas devolvía "no viable" (error del código nuevo, encontrado por las pruebas).
-- Saldos (14-oct): el abono desde el teléfono no descontaba de ninguna cuenta; editar un ingreso descuadraba la cuenta; borrar un pago de tarjeta dejaba el cupo inflado; no se podía borrar una cuenta usada para pagar una tarjeta; editar un diferido dejaba la deuda desactualizada.
-- App de teléfono (14-oct): se caía en Expo Go por `expo-linking`/`expo-constants` de otra versión de Expo y por dos copias de `expo-router`; la raíz `/` no tenía pantalla.
-- Integridad (15-oct, revisión con dos agentes de búsqueda de errores): un monto con coma ("12,50") se guardaba como NaN; pagar de más una tarjeta perdía el dinero; editar un gasto ya pagado perdía cupo; un diferido en cuenta de ahorro cobraba dos veces; borrar un diferido con abonos inflaba el cupo; 100,30 − 50,10 − 50,20 mostraba "−$0.00"; el detalle de una cuenta no mostraba los pagos ni los abonos que salían de ella; los errores de validación salían como JSON en inglés; quien iniciaba sesión después en el mismo teléfono seguía leyendo el correo de la persona anterior; la búsqueda de correo leía solo 40 y saltaba los que llegaban mientras buscaba; un recordatorio mensual se quedaba tachado para siempre.
-- Activación y correo (14-oct): conectar el correo era un paso obligado del registro; desconectar no revocaba el permiso ni borraba los datos; confirmar en la bandeja podía duplicar el gasto; el remitente se aceptaba si solo "contenía" el dominio del banco; "Salud financiera" decía "tus ingresos cubren tus gastos" sin ningún ingreso registrado; quedaban fechas en UTC en el teléfono.
-
-**Antes:** el CHECK de `metodo_pago` no aceptaba `diferido`; errores mostrados como `[object Object]`; montos como `$-921.70`; pagar una tarjeta no descontaba de ninguna cuenta; deudas por diferido indistinguibles de préstamos; `.env` móvil con prefijo `VITE_`; `metro.config.js` rompía la resolución en el monorepo; ruta raíz sin pantalla; `expo-secure-store` dejaba en blanco "Correo" en web; la bandeja escondía errores de red.
-
-## Pendientes y riesgos conocidos
-
-| Pendiente | Gravedad | Paso |
-|---|---|---|
-| Pantallas de acceso y privacidad: "Eliminar mi cuenta", "Olvidé mi contraseña" y nueva contraseña, enlace a la política de privacidad y pantalla de error. La lógica ya está en core; la especificación está en `docs/contrato-logica-core.md` (fases 1 y 2) | Alta (Google Play) | Producción |
-| Completar y revisar con un abogado los términos y condiciones y la política de privacidad (`apps/mobile/public/terminos.html` y `privacidad.html`, borradores; qué completar y qué preguntarle al abogado: [`docs/legal/README.md`](docs/legal/README.md)), y configurar Supabase, Vercel y Google Play según [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md) | Alta | Producción |
-| Pantallas de aceptación de términos y privacidad (casilla en el registro y pantalla para cuentas anteriores). La base y la lógica ya están: ver «Documentos legales y aceptación» en `docs/contrato-logica-core.md` | Alta (sin ellas la app no pide ni guarda la aceptación) | Producción |
-| Actualizar Expo SDK 51: Google Play exige Android 15 o más reciente; resuelve también los avisos de dependencias de las herramientas | Alta para la tienda | Producción |
-| Ajustes de interfaz pedidos por la revisión del 15-oct: saldo a favor visible, solo tarjetas en diferidos, confirmar al borrar categorías, semana actual en Gastos y otros (lista en `docs/contrato-logica-core.md`) | Media | 6-10 |
-| Abono con cuenta de origen en la **web** (el teléfono ya lo tiene) | Media | Fase web |
-| Pantalla para editar ingresos (base y `actualizarIngreso` listos) | Media | 7 |
-| Anular un pago de tarjeta por error (hoy no se puede borrar, a propósito) | Baja | 3 |
-| Borrar una deuda con recordatorios falla por la clave foránea (el teléfono ahora muestra el error) | Media | 3 |
-| Correo: remitentes de Produbanco, Diners Club y Austro por conseguir, cuerpos de los avisos reales sin comprobar, crear los Client ID reales (Google Android y Microsoft) y probarlos en un teléfono, verificación de Google para `gmail.readonly` (no promocionarlo hasta resolverlo) | Media | 4 |
-| El nivel de endeudamiento sale 0 % en un mes sin ingresos (core ya acepta un ingreso de referencia; falta usarlo en las pantallas) | Baja | 6 |
-| La web no tiene login ni cierre de sesión; botón "Borrar todo (temporal)" visible | Alta antes de publicar la web | Fase web |
-| Reemplazar `toISOString().slice(…)` por `fechaLocal()` en las pantallas de la **web** (el teléfono ya está; quedan 9 usos en 8 archivos) | Media | Fase web |
-| Políticas RLS con `(select auth.uid())` para rendimiento; límites de intentos de login en Supabase | Baja / Media | 10 |
-| Ícono y pantalla de inicio propios (identificador y actualizaciones ya configurados) | — | 10 |
-| Compilar el APK 1.4.0 y probar en un teléfono: notificaciones nativas de Google Wallet, permiso de Android 13, recordatorios y presupuestos | Alta | 3 |
-| Transferencias en la versión web de escritorio (`apps/desktop`): hoy no se ven ni se registran ahí (su historial de cuentas tampoco muestra pagos de tarjeta ni abonos) | Media | Fase web |
-| Correos reales de transferencias de cada banco, para confirmar «enviada/recibida» y los dígitos | Media | 4 |
-
-## Reglas para contribuir
-
-1. **Nada de SQL armado con texto.** Ni `.or()`/`.filter()` con lo que escribe el usuario, ni `EXECUTE` concatenado. Si hace falta SQL dinámico: `format()` con `%L` / `%I`.
-2. **Toda entrada pasa por un schema de core**, y toda regla importante se repite como CHECK en la base.
-3. **Saldos y cupos solo con triggers.** Ninguna pantalla calcula dinero que se guarde.
-4. **Fechas con `fechaLocal()` / `mesLocal()`**, nunca `toISOString()` para "hoy".
-5. **Errores con `mensajeError(err)`** y campos con `maxLength` según `LIMITES`.
-6. **Nada se da por terminado sin pruebas:** `pnpm --filter core test` y `bash supabase/tests/correr.sh` en verde.
-7. **Secretos fuera del repositorio:** los `.env` están en `.gitignore`; nunca usar `service_role` en una app.
+- **Base de datos:** levanta un Postgres desechable con la imagen de Supabase y aplica todas las migraciones desde cero. Simula usuarios con su JWT y lo borra al terminar: **nunca toca tu base local ni la de producción**. Hay un archivo de pruebas por migración, más una de concurrencia (dos abonos simultáneos).
+- **Lógica:** cálculos comparados contra resultados hechos a mano, validación, fechas locales, correo, ubicación, notificaciones y transferencias.
+- **Empaquetado:** `npx expo export --platform android|web` desde `apps/mobile`, y `pnpm --filter desktop build`.
+- **Módulo nativo (Kotlin):** compila contra Android 34; se comprobó fuera de Gradle el 18-oct. La compilación real es la del APK en EAS.
+- **Aún sin probar en un teléfono real:** el APK 1.4.0, las notificaciones nativas y los avisos reales de Google Wallet y de los bancos.
 
 ## App instalable y actualizaciones
 
-La app de teléfono se instala una vez (**EAS Build**) y recibe los cambios sola (**EAS Update**). Ya están configurados `app.json` (identificador `com.csebastia.gastosapp`, `runtimeVersion`, búsqueda de actualizaciones al abrir), `eas.json` (APK de prueba y AAB para Google Play) y `expo-updates`. Desde `apps/mobile`:
+La app se instala una vez (**EAS Build**) y recibe los cambios sola (**EAS Update**). Desde `apps/mobile`:
 
 ```bash
 pnpm build:apk            # compila el APK instalable
-pnpm update:prueba        # publica un cambio al canal de prueba
+pnpm update:prueba        # publica un cambio de JavaScript al canal de prueba
 pnpm update:produccion    # publica a los usuarios
 ```
 
-Cada comando pasa primero por `scripts/verificar-entorno-publicacion.mjs`, que **frena la publicación** si la URL de Supabase es local o la clave es la `service_role`. Configuración inicial, reglas (primero la base, migraciones compatibles hacia atrás, cambio nativo = nueva versión) y cómo volver atrás: [`docs/actualizaciones.md`](docs/actualizaciones.md).
+- Cada comando pasa primero por `scripts/verificar-entorno-publicacion.mjs`, que **frena la publicación** si la URL de Supabase es local o la clave es la `service_role`.
+- **Cambio nativo = nueva versión:** si se agrega una librería nativa o se toca el módulo, se sube `version` en `app.json` (hoy 1.4.0, que agregó `expo-notifications`) y se compila de nuevo.
+- Más detalle: [`docs/actualizaciones.md`](docs/actualizaciones.md).
+
+## Pendientes y riesgos
+
+| Pendiente | Gravedad |
+|---|---|
+| Compilar el APK 1.4.0 y probar en un teléfono: Google Wallet con y sin dígitos, notificaciones, permiso de Android 13, recordatorios y presupuestos | Alta |
+| Pantallas «Eliminar mi cuenta» (la exige Google Play) y «Olvidé mi contraseña». La lógica ya está en core | Alta |
+| Actualizar Expo SDK 51: Google Play exige Android 15 o más reciente | Alta para la tienda |
+| Completar y revisar con un abogado los términos y la política de privacidad, y configurar Supabase, Vercel y Google Play ([`docs/publicacion-produccion.md`](docs/publicacion-produccion.md)) | Alta |
+| La web de escritorio publicada en Vercel no tiene inicio de sesión (sin sesión se ve vacía) y muestra «Borrar todo (temporal)». No promocionarla hasta agregar login | Alta antes de difundirla |
+| Subir `cupo_en_lote` al repositorio y regenerar `base-completa.sql` | Media |
+| Correo: remitentes de Produbanco, Diners y Austro, cuerpos reales, Client ID reales y verificación de Google | Media |
+| Transferencias, presupuestos y abono con cuenta de origen en la web de escritorio | Media |
+| Reemplazar `toISOString()` por `fechaLocal()` en la web de escritorio | Media |
+| Anular un pago de tarjeta hecho por error (hoy no se puede borrar, a propósito) | Baja |
+| Ícono y pantalla de inicio propios | Baja |
+
+## Reglas para contribuir
+
+1. **Nada de SQL armado con texto.** Si hace falta SQL dinámico: `format()` con `%L` / `%I`.
+2. **Toda entrada pasa por un schema de core**, y toda regla importante se repite como CHECK en la base.
+3. **Saldos y cupos solo con disparadores.** Ninguna pantalla calcula dinero que se guarde.
+4. **Fechas con `fechaLocal()` / `mesLocal()`**, nunca `toISOString()` para «hoy».
+5. **Errores con `mensajeError(err)`** y campos con `maxLength` según `LIMITES`.
+6. **Nada se da por terminado sin pruebas:** `pnpm --filter core test` y `bash supabase/tests/correr.sh` en verde.
+7. **Secretos fuera del repositorio:** nunca un `.env`, una clave ni el id del proyecto en un documento; usa ejemplos como `https://<id-del-proyecto>.supabase.co`.
+8. **Tabla nueva = anotarla** en `docs/legal/registro-tratamiento-datos.md` y en `exportar_datos_persona` (dos pruebas lo exigen).
+9. **Migración nueva = regenerar `base-completa.sql`** y preparar su archivo en `para-supabase-web/`.
+
+## Documentos
+
+| Documento | Contenido |
+|---|---|
+| [`docs/auditoria-app-2026-10-18.md`](docs/auditoria-app-2026-10-18.md) | Auditoría completa: para qué sirve, cómo funciona, datos, seguridad, pruebas y riesgos |
+| [`docs/contrato-logica-core.md`](docs/contrato-logica-core.md) | Funciones de core disponibles para las pantallas |
+| [`docs/informe-transferencias-wallet-notificaciones.md`](docs/informe-transferencias-wallet-notificaciones.md) | Transferencias, Google Wallet, notificaciones y ubicación (18-oct) |
+| [`docs/informe-importar-estado-cuenta.md`](docs/informe-importar-estado-cuenta.md) | Importar el estado de cuenta (17-oct) |
+| `docs/informe-*.md`, `docs/informe-*.docx` | Informes de cada etapa (billeteras, cuentas, isla de detalle, edición, legal, producción…) |
+| [`docs/publicacion-produccion.md`](docs/publicacion-produccion.md) · [`docs/actualizaciones.md`](docs/actualizaciones.md) | Publicar en producción y actualizar la app |
+| [`docs/legal/`](docs/legal/) | Registro de tratamiento, derechos, incidentes y qué preguntar al abogado |
+| [`reports/`](reports/) | Modelo de negocio y un día de uso como cliente |

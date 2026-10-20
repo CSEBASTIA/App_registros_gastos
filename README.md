@@ -55,8 +55,8 @@ Bancos con logo y catálogo: Banco Guayaquil, Pichincha, Produbanco, Diners Club
 
 ## Ejemplos de uso
 
-**Un pago con Google Wallet.** Pagas $12,50 en un supermercado con tu Visa terminada en 4321, que tienes registrada con esos dígitos:
-1. Google Wallet muestra su notificación: «SUPERMAXI · US$12,50 con Visa •••• 4321».
+**Un pago con Google Wallet.** Pagas $12,50 en un supermercado con tu Visa terminada en 1234, que tienes registrada con esos dígitos:
+1. Google Wallet muestra su notificación: «SUPERMAXI · US$12,50 con Visa •••• 1234».
 2. FinTrack lee solo esa notificación y la envía a la base con la clave de captura del teléfono.
 3. La base reconoce la tarjeta por los dígitos, guarda el gasto (categoría «Comida», hora del pago, lugar «Supermaxi» si ya existía) y baja el cupo disponible de esa tarjeta.
 4. Te llega «Registré $12.50 en SUPERMAXI · Con tu tarjeta •••• 4321 · Comida». Tocarla abre el gasto para corregirlo o eliminarlo.

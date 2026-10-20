@@ -12,6 +12,8 @@ export * from "./lib/categorias";
 export * from "./lib/metodoPago";
 export * from "./lib/textoFinanciero";
 export * from "./lib/estadoCuenta";
+export * from "./lib/lecturaPdf";
+export * from "./lib/resumenInicio";
 export * from "./lib/importacionEstadoCuenta";
 export * from "./lib/correoBancario";
 export * from "./lib/sincronizacionCorreo";

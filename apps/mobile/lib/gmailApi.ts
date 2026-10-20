@@ -1,5 +1,7 @@
 import {
   consultaGmail,
+  consultaGmailEstadosDeCuenta,
+  estadosDeCuentaEnCorreos,
   htmlATexto,
   crearFetchConTimeout,
   fechaLocal,
@@ -8,6 +10,7 @@ import {
   TOPE_CORREOS,
   type CorreoRecibido,
   type CorreosTraidos,
+  type EstadoCuentaEnCorreo,
 } from "core";
 import { obtenerAccessToken } from "./gmailAuth";
 
@@ -17,7 +20,8 @@ interface CabeceraGmail {
 }
 interface ParteGmail {
   mimeType?: string;
-  body?: { data?: string };
+  filename?: string;
+  body?: { data?: string; attachmentId?: string; size?: number };
   parts?: ParteGmail[];
 }
 interface MensajeGmail {
@@ -127,16 +131,64 @@ export async function traerCorreosNuevos(desde: Date, tope = TOPE_CORREOS): Prom
   // Si no se pudo leer ninguno, el problema es general (red, permiso): se muestra.
   if (mensajes.length === 0 && fallidos > 0) throw primerError;
 
-  const correos = mensajes.map((m): CorreoRecibido => {
-    const headers = m.payload.headers ?? [];
-    const fecha = fechaLocal(new Date(Number(m.internalDate)));
-    return {
-      mensajeId: m.id,
-      remitente: extraerDireccion(cabecera(headers, "From")),
-      asunto: cabecera(headers, "Subject"),
-      cuerpoTexto: extraerCuerpo(m.payload),
-      fecha,
-    };
-  });
-  return { correos, truncado, fallidos };
+  return { correos: mensajes.map(aCorreo), truncado, fallidos };
+}
+
+function aCorreo(m: MensajeGmail): CorreoRecibido {
+  const headers = m.payload.headers ?? [];
+  return {
+    mensajeId: m.id,
+    remitente: extraerDireccion(cabecera(headers, "From")),
+    asunto: cabecera(headers, "Subject"),
+    cuerpoTexto: extraerCuerpo(m.payload),
+    fecha: fechaLocal(new Date(Number(m.internalDate))),
+    tienePdf: !!partePdf(m.payload),
+  };
+}
+
+/** El primer PDF adjunto del mensaje (busca en las partes anidadas). */
+function partePdf(parte: ParteGmail): ParteGmail | undefined {
+  const esPdf = parte.mimeType === "application/pdf" || /\.pdf$/i.test(parte.filename ?? "");
+  if (esPdf && (parte.body?.attachmentId || parte.body?.data)) return parte;
+  for (const hija of parte.parts ?? []) {
+    const encontrada = partePdf(hija);
+    if (encontrada) return encontrada;
+  }
+  return undefined;
+}
+
+/** base64url (Gmail) → base64 normal (lo que espera el lector de PDF). */
+function base64DeBase64Url(valor: string): string {
+  const base64 = valor.replace(/-/g, "+").replace(/_/g, "/");
+  return base64 + "=".repeat((4 - (base64.length % 4)) % 4);
+}
+
+/** Los estados de cuenta con PDF de los últimos meses (como mucho 15 correos). */
+export async function buscarEstadosDeCuenta(): Promise<EstadoCuentaEnCorreo[]> {
+  const q = encodeURIComponent(consultaGmailEstadosDeCuenta());
+  const lista = await llamarGmail(`/messages?q=${q}&maxResults=15`);
+  const ids: string[] = (lista.messages ?? []).map((m: { id: string }) => m.id);
+  const { resultados, fallidos, primerError } = await enLotes(ids, 5, (id) =>
+    llamarGmail(`/messages/${encodeURIComponent(id)}?format=full`) as Promise<MensajeGmail>
+  );
+  if (resultados.length === 0 && fallidos > 0) throw primerError;
+  return estadosDeCuentaEnCorreos(resultados.map(aCorreo));
+}
+
+/**
+ * Descarga el PDF adjunto de un correo, en base64. Se pide el mensaje de nuevo
+ * porque Gmail cambia el id del adjunto entre una lectura y otra. Nada se
+ * guarda en el teléfono: el PDF pasa directo al lector.
+ */
+export async function descargarPdf(mensajeId: string, tamanoMaximo: number): Promise<{ base64: string; nombre: string }> {
+  const mensaje = (await llamarGmail(`/messages/${encodeURIComponent(mensajeId)}?format=full`)) as MensajeGmail;
+  const parte = partePdf(mensaje.payload);
+  if (!parte) throw new Error("Ese correo ya no tiene el PDF adjunto.");
+  if ((parte.body?.size ?? 0) > tamanoMaximo) throw new Error("El PDF del correo pesa más de 10 MB: no parece un estado de cuenta.");
+  const datos = parte.body?.data ??
+    ((await llamarGmail(
+      `/messages/${encodeURIComponent(mensajeId)}/attachments/${encodeURIComponent(parte.body!.attachmentId!)}`
+    )) as { data?: string }).data;
+  if (!datos) throw new Error("No se pudo descargar el PDF del correo.");
+  return { base64: base64DeBase64Url(datos), nombre: parte.filename || "estado-de-cuenta.pdf" };
 }

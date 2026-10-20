@@ -25,6 +25,7 @@ import {
   type FilasPreparadas,
 } from "core";
 import Tarjeta from "../components/Tarjeta";
+import ResumenEstadoCuenta from "../components/ResumenEstadoCuenta";
 import Boton from "../components/Boton";
 import Campo from "../components/Campo";
 import Casilla from "../components/Casilla";
@@ -306,20 +307,17 @@ export default function ImportarEstadoScreen() {
 
         {(fase === "revisar" || fase === "guardando") && preparadas && resumen && (
           <>
+            <ResumenEstadoCuenta
+              archivo={nombreArchivo}
+              cuenta={cuenta}
+              filas={filas}
+              resumen={resumen}
+              truncado={preparadas.truncado}
+            />
             <Tarjeta>
-              <Text style={styles.tituloCard}>
-                {filas.length} movimiento{filas.length === 1 ? "" : "s"} en {nombreArchivo ?? "el archivo"}
-              </Text>
-              <Text style={styles.texto}>
-                {esCredito ? "Cupo disponible" : "Saldo"}: {formatMonto(cuenta.disponible)} →{" "}
-                <Text style={{ fontFamily: font.semibold }}>{formatMonto(resumen.disponibleDespues)}</Text>
-              </Text>
+              <Text style={styles.tituloCard}>Revisa tu selección</Text>
               <Text style={styles.textoMuted}>
-                Se registrarán {resumen.gastos} gasto{resumen.gastos === 1 ? "" : "s"} ({formatMonto(resumen.totalGastos)})
-                {resumen.ingresos > 0
-                  ? ` y ${resumen.ingresos} ingreso${resumen.ingresos === 1 ? "" : "s"} (${formatMonto(resumen.totalIngresos)})`
-                  : ""}
-                . La categoría se sugiere sola; puedes cambiarla después en cada movimiento.
+                La categoría se sugiere sola; puedes cambiarla después en cada movimiento.
               </Text>
               {saldoFinalEstado !== undefined && !esCredito && (
                 <Text style={styles.textoMuted}>

@@ -202,7 +202,7 @@ Todos se reemplazaron por ejemplos. El identificador del proyecto de EAS y el du
 | H4 | **Expo SDK 51**: Google Play exige Android 15 o más reciente | Alta para la tienda | Actualizar Expo y volver a compilar |
 | H5 | **APK 1.4.0 sin probar** en un teléfono real | Alta | Compilar y seguir la lista de pruebas del informe del 18-oct |
 | H6 | **Documentos legales en borrador:** faltan los datos del responsable, la región de Supabase y los días de respaldo | Alta | Completarlos y revisarlos con un abogado (`docs/legal/README.md`) |
-| H7 | La migración `cupo_en_lote` está aplicada en el proyecto web pero **no está en el repositorio** | Media | Agregarla a `supabase/migrations/` y regenerar `base-completa.sql` |
+| H7 | La migración `cupo_en_lote` está aplicada en el proyecto web pero **no está en el repositorio** | Media | ~~Agregarla a `supabase/migrations/`~~ **Superado el 20-oct:** quedó obsoleta (una tarjeta puede pasarse del cupo) y la `20261019120000_saldos_y_registro_del_correo` la desactiva; no se agrega |
 | H8 | **Registro automático:** si dos tarjetas comparten los últimos 4 dígitos, el pago no se registra solo (va a la bandeja). Si los dígitos anotados son de otra tarjeta, el gasto se carga a la tarjeta equivocada | Media | Se puede apagar; el gasto se corrige desde la notificación. Explicar bien en la pantalla de dígitos |
 | H9 | **Correo:** faltan los remitentes de Produbanco, Diners y Austro; los cuerpos reales no están verificados; no se verifica DKIM/SPF; `gmail.readonly` necesita la verificación de Google | Media | Conseguir avisos reales; seguir con la revisión humana de gastos e ingresos |
 | H10 | La web de escritorio va detrás: no tiene transferencias, presupuestos ni abono con cuenta de origen, y usa `toISOString()` para «hoy» | Media | Igualarla al teléfono o retirarla |
@@ -214,7 +214,7 @@ Todos se reemplazaron por ejemplos. El identificador del proyecto de EAS y el du
 2. Compilar el APK 1.4.0 y probarlo: Google Wallet con y sin dígitos, notificaciones, recordatorios y presupuestos (H5).
 3. Construir «Eliminar mi cuenta» y «Olvidé mi contraseña» (H3).
 4. Actualizar Expo (H4) y completar los documentos legales (H6) antes de Google Play.
-5. Subir `cupo_en_lote` al repositorio (H7).
+5. ~~Subir `cupo_en_lote` al repositorio (H7).~~ Superado el 20-oct: ver H7.
 6. Conseguir avisos reales de los bancos y de Google Wallet para ajustar la lectura (H8, H9).
 
 ## Anexo: cómo repetir esta auditoría

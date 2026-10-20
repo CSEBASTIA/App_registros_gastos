@@ -1,7 +1,8 @@
-// Confirmaciones y avisos que funcionan en el teléfono y en la versión web.
+// Confirmaciones nativas y notificaciones visuales para móvil y web.
 // En react-native-web, `Alert.alert` no muestra nada: ahí se usa el diálogo
 // del navegador.
 import { Alert, Platform } from "react-native";
+import { notificar, type TipoNotificacion } from "./notificaciones";
 
 /** Pregunta antes de una acción que no se puede deshacer. Resuelve `true` si el usuario acepta. */
 export function confirmar(titulo: string, mensaje: string, accion: string, peligro = true): Promise<boolean> {
@@ -16,16 +17,8 @@ export function confirmar(titulo: string, mensaje: string, accion: string, pelig
   });
 }
 
-/** Un aviso con un solo botón. Resuelve cuando el usuario lo cierra. */
-export function avisar(titulo: string, mensaje: string): Promise<void> {
-  if (Platform.OS === "web") {
-    if (typeof window !== "undefined") window.alert(`${titulo}\n\n${mensaje}`);
-    return Promise.resolve();
-  }
-  return new Promise((resolver) => {
-    Alert.alert(titulo, mensaje, [{ text: "Entendido", onPress: () => resolver() }], {
-      cancelable: true,
-      onDismiss: () => resolver(),
-    });
-  });
+/** Notificación breve, expandible y descartable con el gesto de deslizar. */
+export function avisar(titulo: string, mensaje: string, tipo: TipoNotificacion = "info"): Promise<void> {
+  notificar({ titulo, descripcion: mensaje, tipo });
+  return Promise.resolve();
 }

@@ -1,6 +1,6 @@
 import { BlurFade } from "../../components/Motion";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { mensajeError, mesLocal, fechaLocal } from "core";
+import { mensajeError, mesLocal, fechaLocal, etiquetaMes } from "core";
 import ErrorTexto from "../../components/ErrorTexto";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -67,6 +67,8 @@ const ETIQUETA_NIVEL = { bajo: "Bajo", moderado: "Moderado", alto: "Alto" };
 export default function ResumenScreen() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [verTodaActividad, setVerTodaActividad] = useState(false);
+  const [verAnalisis, setVerAnalisis] = useState(false);
   const { color } = useTheme();
   const styles = createStyles(color);
   const router = useRouter();
@@ -255,9 +257,10 @@ export default function ResumenScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={{
-            padding: spacing(5),
+            paddingHorizontal: spacing(5),
+            paddingTop: spacing(3),
             paddingBottom: spacing(8),
-            gap: spacing(4),
+            gap: spacing(3.5),
           }}
         >
           <View style={styles.brandLockup} accessibilityRole="image" accessibilityLabel="fintrack">
@@ -269,11 +272,12 @@ export default function ResumenScreen() {
             <Text style={styles.brandName}>fintrack</Text>
           </View>
           <BlurFade style={styles.intro}>
+            <Text style={styles.eyebrow}>{etiquetaMes(mes)} {mes.slice(0, 4)}</Text>
             <Text accessibilityRole="header" style={styles.screenTitle}>
               Resumen
             </Text>
             <Text style={styles.introTexto}>
-              Ingresos y gastos de este mes, en un solo lugar.
+              Tu mes de un vistazo.
             </Text>
           </BlurFade>
 
@@ -301,7 +305,7 @@ export default function ResumenScreen() {
             </Tarjeta>
           )}
 
-          <View style={styles.hero}>
+          <BlurFade style={styles.hero}>
             <Text style={styles.heroEtiqueta}>Efectivo neto del mes</Text>
             <Text
               numberOfLines={1}
@@ -312,11 +316,12 @@ export default function ResumenScreen() {
               {efectivo.efectivoNeto > 0 ? "+" : efectivo.efectivoNeto < 0 ? "−" : ""}$
               {Math.abs(efectivo.efectivoNeto).toFixed(2)}
             </Text>
+            <View style={styles.heroDivider} />
             <View style={styles.heroStats}>
               <View style={styles.heroStat}>
                 <Ionicons
-                  name="arrow-up-circle"
-                  size={22}
+                  name="arrow-up"
+                  size={16}
                   color={color.success}
                 />
                 <View>
@@ -333,8 +338,8 @@ export default function ResumenScreen() {
               </View>
               <View style={styles.heroStat}>
                 <Ionicons
-                  name="arrow-down-circle"
-                  size={22}
+                  name="arrow-down"
+                  size={16}
                   color={color.danger}
                 />
                 <View>
@@ -361,7 +366,64 @@ export default function ResumenScreen() {
                   : ""}
               </Text>
             )}
+          </BlurFade>
+
+          {(gastosRecientes.length > 0 || ingresosRecientes.length > 0) && (
+            <Boton
+              titulo="Registrar gasto"
+              variante="primario"
+              style={styles.mainAction}
+              onPress={() => router.push("/gasto/nuevo")}
+            />
+          )}
+
+          {veredicto.estado !== "bien" && (gastos.length > 0 || ingresos.length > 0 || deudas.length > 0) && (
+            <View style={[styles.alerta, { backgroundColor: veredicto.estado === "riesgo" ? color.dangerBg : color.warningBg }]}>
+              <Ionicons name="alert-circle-outline" size={19} color={veredicto.estado === "riesgo" ? color.danger : color.warning} />
+              <Text style={[styles.alertaTexto, { color: color.text }]}>{veredicto.titulo}</Text>
+            </View>
+          )}
+
+          <View style={styles.sectionHeading}>
+            <Text style={styles.tituloCard}>Actividad reciente</Text>
+            {actividad.length > 2 && (
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: verTodaActividad }} onPress={() => setVerTodaActividad((actual) => !actual)} style={styles.sectionLink}>
+                <Text style={styles.sectionLinkText}>{verTodaActividad ? "Ver menos" : "Ver más"}</Text>
+              </Pressable>
+            )}
           </View>
+          <Tarjeta style={styles.activityCard}>
+            {actividad.length === 0 ? (
+              <EstadoVacio
+                icono="home-outline"
+                titulo="Sin movimientos todavía"
+                subtitulo="Tus últimos gastos e ingresos aparecerán aquí."
+              />
+            ) : (
+              <View style={styles.activityList}>
+                {(verTodaActividad ? actividad : actividad.slice(0, 2)).map((item, index) => (
+                  <View key={`${item.tipo}-${item.id}`} style={index > 0 && styles.activityDivider}>
+                    <ItemMovimiento item={item} calm />
+                  </View>
+                ))}
+              </View>
+            )}
+          </Tarjeta>
+
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: verAnalisis }}
+            onPress={() => setVerAnalisis((actual) => !actual)}
+            style={({ pressed }) => [styles.analysisToggle, pressed && { opacity: 0.7 }]}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.analysisTitle}>Explora tu análisis</Text>
+              <Text style={styles.analysisSubtitle}>Semana, salud financiera y lugares</Text>
+            </View>
+            <Ionicons name={verAnalisis ? "chevron-up" : "chevron-forward"} size={20} color={color.textMuted} />
+          </Pressable>
+
+          {verAnalisis && <View style={styles.analysisContent}>
 
           <Tarjeta>
             <View style={styles.filaTitulo}>
@@ -518,26 +580,7 @@ export default function ResumenScreen() {
             )}
           </Tarjeta>
 
-          <Tarjeta style={{ padding: 0, paddingVertical: spacing(2) }}>
-            <Text
-              style={[styles.tituloCard, { paddingHorizontal: spacing(4) }]}
-            >
-              Actividad reciente
-            </Text>
-            {actividad.length === 0 ? (
-              <EstadoVacio
-                icono="home-outline"
-                titulo="Sin movimientos todavía"
-                subtitulo="Tus últimos gastos e ingresos aparecerán aquí."
-              />
-            ) : (
-              <View style={{ paddingHorizontal: spacing(4) }}>
-                {actividad.map((item) => (
-                  <ItemMovimiento key={`${item.tipo}-${item.id}`} item={item} />
-                ))}
-              </View>
-            )}
-          </Tarjeta>
+          </View>}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -673,51 +716,52 @@ const createStyles = (color: Colors) =>
       flexDirection: "row",
       alignItems: "center",
       gap: spacing(2),
+      marginBottom: spacing(2),
     },
-    brandIcon: { width: 30, height: 30, borderRadius: 8 },
-    brandName: { fontFamily: font.semibold, fontSize: 16, color: color.text },
-    intro: { gap: spacing(2), marginBottom: spacing(1) },
+    brandIcon: { width: 27, height: 27, borderRadius: 8 },
+    brandName: { fontFamily: font.semibold, fontSize: 18, color: color.text },
+    intro: { gap: spacing(1.5), marginBottom: spacing(2) },
+    eyebrow: { fontFamily: font.semibold, fontSize: 11, letterSpacing: 1.4, textTransform: "uppercase", color: color.textMuted },
     screenTitle: {
-      fontFamily: font.display,
-      fontSize: 30,
-      lineHeight: 36,
+      fontFamily: font.semibold,
+      fontSize: 32,
+      lineHeight: 38,
       color: color.text,
     },
-    introTexto: { fontFamily: font.body, fontSize: 14, color: color.textMuted },
+    introTexto: { fontFamily: font.body, fontSize: 14, lineHeight: 21, color: color.textMuted },
     hero: {
       backgroundColor: color.surface,
       borderWidth: 1,
       borderColor: color.border,
-      borderRadius: radius.md,
-      padding: spacing(5),
+      borderRadius: 24,
+      padding: spacing(6),
       gap: spacing(2),
     },
     heroEtiqueta: {
-      fontFamily: font.semibold,
+      fontFamily: font.medium,
       color: color.textMuted,
-      fontSize: 12,
-      fontWeight: "600",
+      fontSize: 13,
     },
-    heroValor: { fontFamily: font.semibold, color: color.text, fontSize: 34, letterSpacing: -1.5 },
+    heroValor: { fontFamily: font.semibold, color: color.text, fontSize: 37, letterSpacing: -1.5 },
+    heroDivider: { height: 1, backgroundColor: color.border, marginTop: spacing(3), marginBottom: spacing(1) },
     heroStats: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: spacing(5),
-      marginTop: spacing(2),
+      gap: spacing(3),
     },
     heroStat: {
       flexDirection: "row",
       flex: 1,
-      minWidth: 130,
-      alignItems: "center",
-      gap: spacing(2),
+      minWidth: 115,
+      alignItems: "flex-start",
+      gap: spacing(1.5),
     },
     heroStatEtiqueta: {
       fontFamily: font.body,
       color: color.textMuted,
-      fontSize: 11,
+      fontSize: 12,
     },
-    heroStatValor: { fontFamily: font.mono, color: color.text, fontSize: 14 },
+    heroStatValor: { fontFamily: font.mono, color: color.text, fontSize: 16, marginTop: spacing(1) },
     heroNota: {
       fontFamily: font.body,
       color: color.textMuted,
@@ -725,6 +769,19 @@ const createStyles = (color: Colors) =>
       lineHeight: 17,
       marginTop: spacing(3),
     },
+    mainAction: { minHeight: 50, borderRadius: 15 },
+    alerta: { flexDirection: "row", alignItems: "center", gap: spacing(2), borderRadius: radius.sm, padding: spacing(3) },
+    alertaTexto: { fontFamily: font.medium, fontSize: 13, flex: 1 },
+    sectionHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing(3) },
+    sectionLink: { minHeight: 44, justifyContent: "center", paddingHorizontal: spacing(2) },
+    sectionLinkText: { fontFamily: font.semibold, fontSize: 12, color: color.textMuted },
+    activityCard: { padding: 0, paddingVertical: spacing(1), borderRadius: 21 },
+    activityList: { paddingHorizontal: spacing(4) },
+    activityDivider: { borderTopWidth: 1, borderTopColor: color.border },
+    analysisToggle: { flexDirection: "row", alignItems: "center", gap: spacing(3), padding: spacing(4), marginTop: spacing(3), backgroundColor: color.surface, borderWidth: 1, borderColor: color.border, borderRadius: 18, minHeight: 68 },
+    analysisTitle: { fontFamily: font.semibold, fontSize: 14, color: color.text },
+    analysisSubtitle: { fontFamily: font.body, fontSize: 12, color: color.textMuted, marginTop: 3 },
+    analysisContent: { gap: spacing(4) },
     filaTitulo: {
       flexDirection: "row",
       flexWrap: "wrap",
@@ -732,7 +789,7 @@ const createStyles = (color: Colors) =>
       justifyContent: "space-between",
       alignItems: "center",
     },
-    tituloCard: { fontFamily: font.display, fontSize: 20, color: color.text },
+    tituloCard: { fontFamily: font.semibold, fontSize: 18, color: color.text },
     etiquetaMuted: {
       fontFamily: font.body,
       fontSize: 11,

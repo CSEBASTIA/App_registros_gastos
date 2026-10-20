@@ -4,7 +4,7 @@ Los 11 componentes existentes conservan exportación default y props. Boton aña
 - color sigue exportado para compatibilidad (paleta clara). radius, spacing, font y typography son constantes. font: display, body, medium, semibold y mono. Títulos y cuerpo usan IBM Plex Sans; los importes conservan IBM Plex Mono. La raíz carga fuentes locales.
 - components/Motion: BlurFade (children, style, delay en ms), AnimatedBackground (layout {x,y,width,height} o undefined, color, radius opcional). Opacidad/desplazamiento nativos, sin blur de GPU y con movimiento reducido.
 - Tarjeta y EstadoVacio ya tienen entrada animada. Evitar envolver de nuevo todas las tarjetas.
-- El dock participa en layout y reserva su altura + zona segura: no añadir 100px extra a todas las pantallas. Selector de tema accesible desde su asa, con menú modal. Se oculta con el teclado.
+- El dock participa en layout y reserva su altura + zona segura: no añadir 100px extra a todas las pantallas. Selector de tema accesible desde el icono de apariencia, con menú modal. Sus etiquetas pueden ajustarse en varias líneas y el modal usa la altura medida del dock. Se oculta con el teclado.
 - components/AnimatedList: lista virtualizada desacoplada para futuros avisos. No aporta datos ni sistema de notificaciones.
 No se cambian rutas ni operaciones financieras. color.surface2 es la superficie secundaria; conservar acentos de categoría/banco.
 

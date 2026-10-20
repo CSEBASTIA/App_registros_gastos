@@ -16,6 +16,19 @@ export interface LectorPdfRef {
 }
 
 const ESPERA_CARGA_MS = 30_000;
+
+/**
+ * La causa técnica, corta, para que la persona pueda contarla si algo falla
+ * en su teléfono («Invalid PDF structure», «Unexpected token…»). Son mensajes
+ * de pdf.js o del WebView: no traen contenido del estado de cuenta.
+ */
+function detalle(motivo: unknown): string {
+  const texto = String((motivo as { message?: unknown })?.message ?? motivo ?? "")
+    .replace(/s+/g, " ")
+    .trim()
+    .slice(0, 90);
+  return texto ? ` (detalle: ${texto})` : "";
+}
 const ESPERA_LECTURA_MS = 90_000;
 
 type Pendiente = {
@@ -60,12 +73,12 @@ export class ClienteLectorPdf {
     if (m?.tipo === "pagina") {
       this.cargarCodigo()
         .then((c) => this.enviar(JSON.stringify({ tipo: "codigo", ...c })))
-        .catch(() => this.rechazarListo(new Error("No se pudo cargar el lector de PDF de la app.")));
+        .catch((e) => this.rechazarListo(new Error(`No se pudo cargar el lector de PDF de la app.${detalle(e)}`)));
     } else if (m?.tipo === "listo") {
       this.resolverListo();
     } else if (m?.tipo === "resultado" || m?.tipo === "error") {
       if (m.id == null) {
-        this.rechazarListo(new Error("No se pudo iniciar el lector de PDF."));
+        this.rechazarListo(new Error(`No se pudo iniciar el lector de PDF.${detalle(m.mensaje)}`));
         return;
       }
       const p = this.pendientes.get(m.id);
@@ -74,7 +87,7 @@ export class ClienteLectorPdf {
       clearTimeout(p.reloj);
       if (m.tipo === "resultado") p.resolver(m.paginas as FragmentoTextoPdf[][]);
       else if (m.clave === "necesaria" || m.clave === "incorrecta") p.rechazar(new ErrorClavePdf(m.clave));
-      else p.rechazar(new Error("No se pudo leer el PDF. ¿Es el archivo original que envía el banco?"));
+      else p.rechazar(new Error(`No se pudo leer el PDF. ¿Es el archivo original que envía el banco?${detalle(m.mensaje)}`));
     }
   }
 

@@ -77,6 +77,18 @@ function fechaNormalizada(valor: string, referencia: string): string | undefined
   return fechaValida(iso) ? iso : undefined;
 }
 
+/**
+ * La primera fecha válida de un texto («Fecha de emisión: 08/10/2026», «15 OCT
+ * 2026»), en ISO. Sin año, se toma el de `referencia`. Para comprobantes sueltos.
+ */
+export function fechaDeTexto(texto: string, referencia: string = fechaLocal()): string | undefined {
+  for (const m of texto.matchAll(FECHA)) {
+    const iso = fechaNormalizada(m[0], referencia);
+    if (iso) return iso;
+  }
+  return undefined;
+}
+
 function referenciaDe(texto: string, opciones: OpcionesEstadoCuenta): string {
   if (opciones.fechaReferencia && fechaValida(opciones.fechaReferencia)) return opciones.fechaReferencia;
   const corte = texto.match(CORTE);

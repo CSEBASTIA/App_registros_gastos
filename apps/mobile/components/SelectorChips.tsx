@@ -14,6 +14,7 @@ interface Props {
   opciones: Opcion[];
   valor: string;
   onCambiar: (valor: string) => void;
+  suave?: boolean;
 }
 
 /**
@@ -22,8 +23,8 @@ interface Props {
  * traer una librería aparte). Mismo criterio que ya usan las categorías en
  * desktop.
  */
-export default function SelectorChips({ titulo, opciones, valor, onCambiar }: Props) {
-  const { color } = useTheme();
+export default function SelectorChips({ titulo, opciones, valor, onCambiar, suave = false }: Props) {
+  const { color, reduceMotion } = useTheme();
   const styles = makeStyles(color);
   const [layouts, setLayouts] = useState<Record<string, LayoutRectangle>>({});
   const scrollRef = useRef<ScrollView>(null);
@@ -31,12 +32,12 @@ export default function SelectorChips({ titulo, opciones, valor, onCambiar }: Pr
 
   useEffect(() => {
     if (posicionActiva === undefined) return;
-    scrollRef.current?.scrollTo({ x: Math.max(0, posicionActiva - spacing(2)), animated: true });
-  }, [posicionActiva, valor]);
+    scrollRef.current?.scrollTo({ x: Math.max(0, posicionActiva - spacing(2)), animated: !reduceMotion });
+  }, [posicionActiva, valor, reduceMotion]);
 
   return (
     <View style={styles.contenedor}>
-      <Text style={styles.etiqueta}>{titulo}</Text>
+      {titulo ? <Text style={styles.etiqueta}>{titulo}</Text> : null}
       <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator={false}>
       <View style={styles.fila}>
         <AnimatedBackground layout={layouts[valor]} color={color.primaryBg} />
@@ -52,7 +53,7 @@ export default function SelectorChips({ titulo, opciones, valor, onCambiar }: Pr
               style={[
                 styles.chip,
                 activo && {
-                  borderColor: color.primary,
+                  borderColor: suave ? color.primaryBg : color.primary,
                 },
               ]}
             >

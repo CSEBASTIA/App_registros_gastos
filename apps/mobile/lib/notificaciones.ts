@@ -16,9 +16,11 @@ import {
   recordatoriosAProgramar,
   revisarMisPresupuestos,
   textoAvisoPresupuesto,
+  textoNotificacionEstadoCuenta,
   textoNotificacionRegistrado,
   PREFERENCIAS_NOTIFICACIONES_POR_DEFECTO,
   type AvisoRegistrado,
+  type EstadoCuentaEnCorreo,
   type NotificacionProgramada,
   type PreferenciasNotificaciones,
 } from "core";
@@ -250,6 +252,39 @@ export async function avisarRegistradosDelCorreo(registrados: AvisoRegistrado[])
   }
 }
 
+const CLAVE_ESTADOS_AVISADOS = "estados_cuenta_avisados";
+
+/**
+ * «Llegó tu estado de cuenta de Banco Pichincha»: abre la lista de estados del
+ * correo para revisarlo e importarlo. Va con los avisos de la bandeja (algo
+ * por revisar). Un mismo correo avisa una sola vez. Nunca lanza.
+ */
+export async function avisarEstadosDeCuenta(estados: EstadoCuentaEnCorreo[]): Promise<void> {
+  if (!NOTIFICACIONES_DISPONIBLES || estados.length === 0) return;
+  try {
+    const id = await usuarioActual();
+    if (!id) return;
+    const p = await leerPreferenciasNotificaciones(AsyncStorage, id);
+    if (!p.bandeja || (await estadoPermisoNotificaciones()) !== "concedido") return;
+    await prepararNotificaciones();
+    // Las búsquedas se solapan unos minutos: un correo ya avisado no se repite.
+    const avisados: string[] = JSON.parse((await AsyncStorage.getItem(CLAVE_ESTADOS_AVISADOS)) ?? "[]");
+    const nuevos = estados.filter((e) => !avisados.includes(e.mensajeId));
+    if (nuevos.length === 0) return;
+    await AsyncStorage.setItem(CLAVE_ESTADOS_AVISADOS, JSON.stringify([...nuevos.map((e) => e.mensajeId), ...avisados].slice(0, 30)));
+    for (const e of nuevos) {
+      const { titulo, cuerpo, ruta } = textoNotificacionEstadoCuenta(e);
+      await Notifications.scheduleNotificationAsync({
+        identifier: `estado-cuenta-${e.mensajeId}`.slice(0, 120),
+        content: { title: titulo, body: cuerpo, data: { tipo: "estado_cuenta", ruta } },
+        trigger: { channelId: CANALES.bandeja },
+      });
+    }
+  } catch {
+    // Avisar no es parte de leer el correo.
+  }
+}
+
 /** Al cerrar sesión: nada de lo programado para esta persona debe sonar para la siguiente. */
 export async function cancelarNotificaciones(): Promise<void> {
   if (!NOTIFICACIONES_DISPONIBLES) return;
@@ -265,4 +300,42 @@ export async function cancelarNotificaciones(): Promise<void> {
 export function rutaDeNotificacion(r: Notifications.NotificationResponse | null | undefined): string | undefined {
   const ruta = (r?.notification.request.content.data as { ruta?: unknown } | undefined)?.ruta;
   return typeof ruta === "string" && /^\/[a-z/-]*$/.test(ruta) ? ruta : undefined;
+}
+
+// ---------------------------------------------------------------------
+// Avisos en pantalla (los muestra `components/NotificacionSileo`): un aviso
+// breve dentro de la app, distinto de las notificaciones del teléfono de arriba.
+// ---------------------------------------------------------------------
+
+export type TipoNotificacion = "success" | "error" | "warning" | "info";
+
+export type Notificacion = {
+  id: number;
+  tipo: TipoNotificacion;
+  titulo: string;
+  descripcion: string;
+  duracion: number;
+};
+
+type Escucha = (notificacion: Notificacion) => void;
+
+let siguienteId = 0;
+const escuchas = new Set<Escucha>();
+
+export function notificar(
+  notificacion: Omit<Notificacion, "id" | "duracion"> & { duracion?: number },
+) {
+  const mensaje: Notificacion = {
+    ...notificacion,
+    id: ++siguienteId,
+    duracion: notificacion.duracion ?? 3200,
+  };
+  escuchas.forEach((escuchar) => escuchar(mensaje));
+}
+
+export function escucharNotificaciones(escuchar: Escucha): () => void {
+  escuchas.add(escuchar);
+  return () => {
+    escuchas.delete(escuchar);
+  };
 }

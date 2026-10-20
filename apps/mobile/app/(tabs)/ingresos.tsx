@@ -103,8 +103,9 @@ export default function IngresosScreen() {
       .then(() => {
         setDetalle(null);
         cargar();
+        void avisar("Ingreso eliminado", "Se quitó de tu registro.", "success");
       })
-      .catch((err) => avisar("No se pudo eliminar", mensajeError(err)));
+      .catch((err) => avisar("No se pudo eliminar", mensajeError(err), "error"));
   }
 
   if (cargando)

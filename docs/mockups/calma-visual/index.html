@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Fintrack · propuesta visual</title>
+  <style>
+    @font-face { font-family: Plex; src: url("../../../apps/mobile/assets/fonts/IBMPlexSans.ttf") format("truetype"); font-weight: 400; }
+    @font-face { font-family: Plex; src: url("../../../apps/mobile/assets/fonts/IBMPlexSansMedium.ttf") format("truetype"); font-weight: 500; }
+    @font-face { font-family: Plex; src: url("../../../apps/mobile/assets/fonts/IBMPlexSansSemiBold.ttf") format("truetype"); font-weight: 600 800; }
+    @font-face { font-family: Mono; src: url("../../../apps/mobile/assets/fonts/IBMPlexMono.ttf") format("truetype"); }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; }
+    body { display: flex; justify-content: center; align-items: flex-start; background: #dfe1dc; font-family: Plex, Arial, sans-serif; }
+    .phone {
+      --bg: #f6f7f4; --surface: #fff; --text: #202421; --muted: #66706a; --faint: #8a938c;
+      --line: #e6e9e3; --soft: #eff2ed; --green: #257b57; --green-bg: #eaf4ed;
+      --red: #a35d56; --red-bg: #f9eeeb; --accent: #202421; --accent-text: #fff;
+      position: relative; width: 390px; height: 844px; overflow: hidden; background: var(--bg); color: var(--text);
+    }
+    .phone.dark {
+      --bg: #171a18; --surface: #222723; --text: #f1f3ef; --muted: #b9c2ba; --faint: #8f9990;
+      --line: #343b35; --soft: #2d352e; --green: #91d4ad; --green-bg: #273b2e;
+      --red: #dfaaa3; --red-bg: #3b2d2b; --accent: #edf1ea; --accent-text: #1b201c;
+    }
+    .status { height: 35px; padding: 13px 25px 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; font-weight: 600; letter-spacing: .2px; }
+    .status-icons { display: flex; align-items: center; gap: 5px; }
+    .signal { display: flex; align-items: flex-end; gap: 2px; height: 10px; }
+    .signal i { display:block; width:3px; background:var(--text); border-radius:1px; }
+    .signal i:nth-child(1){height:4px}.signal i:nth-child(2){height:6px}.signal i:nth-child(3){height:8px}.signal i:nth-child(4){height:10px}
+    .battery { width: 17px; height: 9px; border: 1.5px solid var(--text); border-radius: 2px; position: relative; margin-left: 3px; }
+    .battery:before { content:""; position:absolute; right:-3px; top:2px; width:2px; height:3px; background:var(--text); border-radius:0 1px 1px 0; }
+    .battery:after { content:""; position:absolute; left:2px; top:2px; width:10px; height:3px; background:var(--text); border-radius:1px; }
+    .topbar { height: 61px; padding: 10px 24px 8px; display:flex; align-items:center; justify-content:space-between; }
+    .brand { display:flex; align-items:center; gap:9px; font-weight:700; font-size:18px; letter-spacing:-.5px; }
+    .brand img { width:27px; height:27px; border-radius:8px; }
+    .icon-button { width:40px; height:40px; display:grid; place-items:center; border:1px solid var(--line); border-radius:14px; background:var(--surface); color:var(--text); }
+    svg { width:20px; height:20px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; }
+    .content { position:absolute; top:96px; bottom:100px; left:0; right:0; overflow:auto; scrollbar-width:none; padding: 10px 22px 26px; }
+    .content::-webkit-scrollbar { display:none; }
+    .eyebrow { font-size:11px; font-weight:600; letter-spacing:1.5px; color:var(--muted); text-transform:uppercase; }
+    h1 { font-size:32px; font-weight:600; letter-spacing:-1.2px; line-height:1.15; margin:7px 0 5px; }
+    .subtitle { font-size:14px; line-height:21px; color:var(--muted); margin:0; }
+    .intro { margin-bottom:23px; }
+    .balance { background:var(--surface); border:1px solid var(--line); border-radius:24px; padding:23px 23px 21px; }
+    .balance-label { font-size:13px; font-weight:500; color:var(--muted); }
+    .balance-value { font-size:37px; line-height:47px; font-weight:600; letter-spacing:-2px; margin-top:7px; white-space:nowrap; }
+    .balance-rule { height:1px; background:var(--line); margin:20px 0 16px; }
+    .balance-stats { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .stat-label { display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-bottom:6px; }
+    .stat-label svg { width:15px; height:15px; }
+    .stat-value { font-family:Mono, monospace; font-size:17px; color:var(--text); letter-spacing:-.4px; }
+    .positive { color:var(--green); }.negative { color:var(--red); }
+    .primary-button { height:50px; border-radius:15px; background:var(--accent); color:var(--accent-text); display:flex; align-items:center; justify-content:center; gap:10px; margin-top:14px; font-size:14px; font-weight:600; }
+    .primary-button svg { width:18px; height:18px; }
+    .section { margin-top:29px; }
+    .section-heading { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    h2 { font-size:18px; font-weight:600; letter-spacing:-.4px; margin:0; }
+    .link { color:var(--muted); font-size:12px; font-weight:600; }
+    .activity { background:var(--surface); border:1px solid var(--line); border-radius:21px; padding:1px 16px; }
+    .activity-row { height:63px; display:flex; align-items:center; gap:12px; }
+    .activity-row + .activity-row { border-top:1px solid var(--line); }
+    .activity-icon { flex:0 0 37px; height:37px; border-radius:13px; background:var(--soft); display:grid; place-items:center; color:var(--muted); }
+    .activity-icon svg { width:18px; height:18px; }
+    .activity-copy { min-width:0; flex:1; }
+    .activity-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .activity-meta { color:var(--muted); font-size:12px; margin-top:2px; }
+    .activity-amount { font-family:Mono, monospace; font-size:13px; white-space:nowrap; }
+    .analysis { display:flex; align-items:center; justify-content:space-between; background:var(--surface); border:1px solid var(--line); border-radius:18px; padding:16px; }
+    .analysis-title { font-size:14px; font-weight:600; }
+    .analysis-sub { font-size:12px; color:var(--muted); margin-top:3px; }
+    .analysis svg { width:18px; color:var(--muted); }
+    .period-row { display:flex; align-items:center; justify-content:space-between; margin:18px 0 14px; }
+    .period { height:41px; padding:0 14px; display:flex; align-items:center; gap:8px; background:var(--surface); border:1px solid var(--line); border-radius:13px; font-size:13px; font-weight:600; }
+    .period svg { width:15px; height:15px; color:var(--muted); }
+    .new-button { height:41px; padding:0 15px; border-radius:13px; background:var(--accent); color:var(--accent-text); display:flex; align-items:center; gap:5px; font-size:13px; font-weight:600; }
+    .new-button svg { width:16px; height:16px; }
+    .weekly { background:var(--surface); border:1px solid var(--line); border-radius:22px; padding:20px 20px 18px; }
+    .weekly-top { display:flex; align-items:center; justify-content:space-between; }
+    .small-tag { color:var(--muted); background:var(--soft); border-radius:99px; padding:5px 9px; font-size:11px; }
+    .weekly-total { font-size:34px; font-weight:600; letter-spacing:-1.8px; margin:7px 0 2px; }
+    .weekly-sub { color:var(--muted); font-size:12px; }
+    .week-pills { display:flex; gap:7px; margin-top:17px; }
+    .week-pill { flex:1; text-align:center; padding:8px 0; border:1px solid var(--line); border-radius:10px; color:var(--muted); font-size:11px; font-weight:600; }
+    .week-pill.active { background:var(--soft); border-color:var(--soft); color:var(--text); }
+    .group-label { margin:14px 0 6px; font-size:11px; color:var(--muted); font-weight:600; letter-spacing:1px; }
+    .expense-row { display:flex; align-items:center; gap:11px; padding:12px 0; border-bottom:1px solid var(--line); }
+    .expense-row:last-child { border-bottom:0; }
+    .expense-icon { flex:0 0 39px; height:39px; border-radius:14px; display:grid; place-items:center; background:var(--soft); color:var(--muted); }
+    .expense-icon svg { width:18px; height:18px; }
+    .expense-info { flex:1; min-width:0; }
+    .expense-name { font-size:14px; font-weight:600; }
+    .expense-meta { color:var(--muted); font-size:12px; margin-top:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .expense-amount { font-family:Mono, monospace; font-size:14px; white-space:nowrap; }
+    .detail-link { margin-top:12px; padding:15px 16px; border:1px solid var(--line); background:var(--surface); border-radius:15px; display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:600; }
+    .detail-link svg { width:17px; color:var(--muted); }
+    .dock-area { position:absolute; left:0; right:0; bottom:0; height:101px; padding:10px 16px 25px; background:linear-gradient(180deg, transparent 0%, var(--bg) 18%, var(--bg) 100%); }
+    .dock { height:66px; display:grid; grid-template-columns:repeat(5,minmax(0,1fr)) 42px; align-items:center; padding:5px; background:var(--surface); border:1px solid var(--line); border-radius:21px; box-shadow:0 4px 18px rgba(25,37,26,.035); }
+    .dock-item { height:55px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; border-radius:16px; color:var(--muted); font-size:10px; font-weight:500; }
+    .dock-item.active { background:var(--soft); color:var(--text); font-weight:600; }
+    .dock-item svg { width:19px; height:19px; }
+    .dock-theme { height:34px; margin-left:3px; border-left:1px solid var(--line); color:var(--muted); display:grid; place-items:center; }
+    .dock-theme svg { width:18px; height:18px; }
+    .home-indicator { position:absolute; width:108px; height:4px; border-radius:4px; background:var(--text); left:141px; bottom:8px; opacity:.8; }
+    #expenses { display:none; }
+    .phone.expenses #summary { display:none; }
+    .phone.expenses #expenses { display:block; }
+  </style>
+</head>
+<body>
+  <svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+    <symbol id="sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></symbol>
+    <symbol id="moon" viewBox="0 0 24 24"><path d="M20.5 14.6A8.5 8.5 0 0 1 9.4 3.5 8.5 8.5 0 1 0 20.5 14.6Z"/></symbol>
+    <symbol id="up" viewBox="0 0 24 24"><path d="M12 19V5m-5 5 5-5 5 5"/></symbol>
+    <symbol id="down" viewBox="0 0 24 24"><path d="M12 5v14m-5-5 5 5 5-5"/></symbol>
+    <symbol id="plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="chevron" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"/></symbol>
+    <symbol id="home" viewBox="0 0 24 24"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Z"/><path d="M9 21v-7h6v7"/></symbol>
+    <symbol id="receipt" viewBox="0 0 24 24"><path d="M5 3h14v18l-3-2-4 2-4-2-3 2V3Z"/><path d="M9 8h6M9 12h6"/></symbol>
+    <symbol id="card" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></symbol>
+    <symbol id="menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+    <symbol id="bag" viewBox="0 0 24 24"><path d="M4 8h16l-1 13H5L4 8Z"/><path d="M9 9V6a3 3 0 0 1 6 0v3"/></symbol>
+    <symbol id="coffee" viewBox="0 0 24 24"><path d="M4 8h13v7a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Zm13 2h2a3 3 0 0 1 0 6h-2M3 21h16"/></symbol>
+    <symbol id="cart" viewBox="0 0 24 24"><path d="M2 4h2l2.5 12h12L21 7H5"/><circle cx="8" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></symbol>
+    <symbol id="calendar" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v4m10-4v4M3 10h18"/></symbol>
+  </svg>
+  <div class="phone" id="phone">
+    <div class="status"><span>9:41</span><span class="status-icons"><span class="signal"><i></i><i></i><i></i><i></i></span><span style="font-size:12px">▰</span><span class="battery"></span></span></div>
+    <div class="topbar"><div class="brand"><img src="../../../apps/mobile/assets/brand/fintrack-app-icon.png" alt=""/>fintrack</div></div>
+    <main class="content" id="summary">
+      <div class="intro"><div class="eyebrow">OCTUBRE 2026</div><h1>Resumen</h1><p class="subtitle">Tu mes de un vistazo.</p></div>
+      <div class="balance"><div class="balance-label">Balance del mes</div><div class="balance-value">+$1,240.50</div><div class="balance-rule"></div><div class="balance-stats"><div><div class="stat-label"><svg class="positive"><use href="#up"/></svg>Ingresos</div><div class="stat-value">$2,850.00</div></div><div><div class="stat-label"><svg class="negative"><use href="#down"/></svg>Gastos</div><div class="stat-value">$1,609.50</div></div></div></div>
+      <div class="primary-button"><svg><use href="#plus"/></svg>Registrar movimiento</div>
+      <section class="section"><div class="section-heading"><h2>Actividad reciente</h2><span class="link">Ver todo</span></div><div class="activity"><div class="activity-row"><div class="activity-icon"><svg><use href="#bag"/></svg></div><div class="activity-copy"><div class="activity-name">Supermercado</div><div class="activity-meta">Alimentación · Hoy</div></div><div class="activity-amount">−$42.80</div></div><div class="activity-row"><div class="activity-icon"><svg><use href="#up"/></svg></div><div class="activity-copy"><div class="activity-name">Ingreso mensual</div><div class="activity-meta">Trabajo · Ayer</div></div><div class="activity-amount positive">+$850.00</div></div></div></section>
+      <section class="section" style="margin-top:25px"><div class="section-heading"><h2>Explora tu análisis</h2></div><div class="analysis"><div><div class="analysis-title">Ver más de este mes</div><div class="analysis-sub">Semana, salud financiera y lugares</div></div><svg><use href="#chevron"/></svg></div></section>
+    </main>
+    <main class="content" id="expenses">
+      <div class="intro" style="margin-bottom:0"><div class="eyebrow">TUS MOVIMIENTOS</div><h1>Gastos</h1><p class="subtitle">Consulta lo que gastaste este mes.</p></div>
+      <div class="period-row"><div class="period"><svg><use href="#calendar"/></svg>Octubre 2026<svg><use href="#chevron"/></svg></div><div class="new-button"><svg><use href="#plus"/></svg>Nuevo gasto</div></div>
+      <div class="weekly"><div class="weekly-top"><span class="balance-label">Total de la semana</span><span class="small-tag">12–18 oct</span></div><div class="weekly-total">$80.30</div><div class="weekly-sub">De $1,609.50 gastados este mes</div><div class="week-pills"><div class="week-pill">Sem 1</div><div class="week-pill">Sem 2</div><div class="week-pill active">Sem 3</div><div class="week-pill">Sem 4</div></div></div>
+      <section class="section"><div class="section-heading"><h2>Movimientos</h2><span class="link">3 gastos</span></div><div class="group-label">VIERNES 16 DE OCTUBRE</div><div class="activity" style="padding:0 16px"><div class="expense-row"><div class="expense-icon"><svg><use href="#cart"/></svg></div><div class="expense-info"><div class="expense-name">Supermercado</div><div class="expense-meta">Alimentación · Cuenta principal</div></div><div class="expense-amount">$42.80</div></div><div class="expense-row"><div class="expense-icon"><svg><use href="#coffee"/></svg></div><div class="expense-info"><div class="expense-name">Café de la tarde</div><div class="expense-meta">Comida · Tarjeta de débito</div></div><div class="expense-amount">$5.50</div></div><div class="expense-row"><div class="expense-icon"><svg><use href="#card"/></svg></div><div class="expense-info"><div class="expense-name">Servicio de internet</div><div class="expense-meta">Hogar · Cuenta principal</div></div><div class="expense-amount">$32.00</div></div></div><div class="detail-link">Ver desglose por categoría<svg><use href="#chevron"/></svg></div></section>
+    </main>
+    <div class="dock-area"><nav class="dock"><div class="dock-item" data-tab="summary"><svg><use href="#home"/></svg>Resumen</div><div class="dock-item"><svg><use href="#up"/></svg>Ingresos</div><div class="dock-item" data-tab="expenses"><svg><use href="#receipt"/></svg>Gastos</div><div class="dock-item"><svg><use href="#card"/></svg>Tarjetas</div><div class="dock-item"><svg><use href="#menu"/></svg>Más</div><div class="dock-theme" title="Apariencia"><svg id="theme-icon"><use href="#sun"/></svg></div></nav><div class="home-indicator"></div></div>
+  </div>
+  <script>
+    const query = new URLSearchParams(location.search);
+    const phone = document.getElementById('phone');
+    if (query.get('screen') === 'expenses') phone.classList.add('expenses');
+    if (query.get('theme') === 'dark') { phone.classList.add('dark'); document.querySelector('#theme-icon use').setAttribute('href', '#moon'); }
+    document.querySelector(`[data-tab="${phone.classList.contains('expenses') ? 'expenses' : 'summary'}"]`).classList.add('active');
+  </script>
+</body>
+</html>

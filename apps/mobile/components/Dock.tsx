@@ -21,6 +21,7 @@ export default function Dock({ state, descriptors, navigation }: BottomTabBarPro
   const { color, mode, preference, setPreference, reduceMotion } = useTheme();
   const insets = useSafeAreaInsets();
   const [expanded, setExpanded] = useState(false);
+  const [dockHeight, setDockHeight] = useState(66);
   const [keyboard, setKeyboard] = useState(false);
   const [layouts, setLayouts] = useState<Record<string, LayoutRectangle>>({});
   const [themeLayouts, setThemeLayouts] = useState<Record<string, LayoutRectangle>>({});
@@ -46,40 +47,8 @@ export default function Dock({ state, descriptors, navigation }: BottomTabBarPro
     return () => animation.stop();
   }, [mode, reduceMotion, themeIconMotion]);
   if (keyboard) return null;
-  return <View style={{ paddingHorizontal: 12, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 12), backgroundColor: color.bg }}>
-    <View style={[styles.island, { backgroundColor: color.surface, borderColor: color.border }]}>
-      <View style={styles.header}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Abrir selector de tema" accessibilityState={{ expanded }} onPress={() => setExpanded(true)} style={styles.handle}><View style={{ width: 30, height: 3, borderRadius: 2, backgroundColor: color.textFaint }} /></Pressable>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={mode === "dark" ? "Cambiar al tema claro" : "Cambiar al tema oscuro"}
-          accessibilityHint="Alterna entre los temas claro y oscuro"
-          onPress={() => setPreference(mode === "dark" ? "light" : "dark")}
-          style={({ pressed }) => [styles.themeToggle, { opacity: pressed ? 0.65 : 1 }]}
-        >
-          <Animated.View
-            style={{
-              opacity: themeIconMotion,
-              transform: [
-                {
-                  rotate: themeIconMotion.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ["-90deg", "0deg"],
-                  }),
-                },
-                {
-                  scale: themeIconMotion.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [0.72, 1],
-                  }),
-                },
-              ],
-            }}
-          >
-            <Ionicons name={mode === "dark" ? "moon" : "sunny"} size={19} color={color.text} />
-          </Animated.View>
-        </Pressable>
-      </View>
+  return <View style={{ paddingHorizontal: 16, paddingTop: 6, paddingBottom: Math.max(insets.bottom, 12), backgroundColor: color.bg }}>
+    <View onLayout={event => setDockHeight(event.nativeEvent.layout.height)} style={[styles.island, { backgroundColor: color.surface, borderColor: color.border }]}>
       <View style={styles.routes}>
         <AnimatedBackground layout={layouts[state.routes[state.index].key]} color={color.primaryBg} radius={14} />
         {state.routes.map((route, index) => {
@@ -90,16 +59,34 @@ export default function Dock({ state, descriptors, navigation }: BottomTabBarPro
             onLongPress={() => navigation.emit({ type: "tabLongPress", target: route.key })}
             style={({ pressed }) => [styles.route, { opacity: pressed ? 0.65 : 1 }]}>
             <Ionicons name={ICONOS[route.name] ?? "ellipse-outline"} size={21} color={selected ? color.primary : color.textMuted} />
-            <Text numberOfLines={1} style={{ fontFamily: selected ? font.semibold : font.medium, fontSize: 11, color: selected ? color.primary : color.textMuted }}>{options.title ?? route.name}</Text>
+            <Text style={{ maxWidth: "100%", textAlign: "center", fontFamily: selected ? font.semibold : font.medium, fontSize: 10, color: selected ? color.primary : color.textMuted }}>{options.title ?? route.name}</Text>
             {options.tabBarBadge != null && <Text style={[styles.badge, { backgroundColor: color.danger, color: color.surface }]}>{options.tabBarBadge}</Text>}
           </Pressable>;
         })}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Apariencia"
+          accessibilityHint="Abre las opciones de tema claro, oscuro o del sistema"
+          accessibilityState={{ expanded }}
+          onPress={() => setExpanded(true)}
+          style={({ pressed }) => [styles.themeToggle, { borderLeftColor: color.border, opacity: pressed ? 0.65 : 1 }]}
+        >
+          <Animated.View style={{
+            opacity: themeIconMotion,
+            transform: [
+              { rotate: themeIconMotion.interpolate({ inputRange: [0, 1], outputRange: ["-90deg", "0deg"] }) },
+              { scale: themeIconMotion.interpolate({ inputRange: [0, 1], outputRange: [0.72, 1] }) },
+            ],
+          }}>
+            <Ionicons name={mode === "dark" ? "moon-outline" : "sunny-outline"} size={19} color={color.textMuted} />
+          </Animated.View>
+        </Pressable>
       </View>
     </View>
     <Modal transparent visible={expanded} animationType="none" onRequestClose={() => setExpanded(false)}>
       <View style={styles.overlay}>
         <Pressable style={StyleSheet.absoluteFill} accessibilityRole="button" accessibilityLabel="Cerrar selector de tema" onPress={() => setExpanded(false)} />
-        <BlurFade style={[styles.panel, { backgroundColor: color.surface, borderColor: color.border, marginBottom: Math.max(insets.bottom, 12) + 118 }]}>
+        <BlurFade style={[styles.panel, { backgroundColor: color.surface, borderColor: color.border, marginBottom: Math.max(insets.bottom, 12) + dockHeight + 16 }]}>
           <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
             <Text accessibilityRole="header" style={{ fontFamily: font.display, fontSize: 22, color: color.text }}>Apariencia</Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Cerrar selector de tema" onPress={() => setExpanded(false)} style={styles.close}><Ionicons name="close" size={22} color={color.textMuted} /></Pressable>
@@ -119,35 +106,32 @@ export default function Dock({ state, descriptors, navigation }: BottomTabBarPro
 const styles = StyleSheet.create({
   island: {
     borderWidth: 1,
-    borderRadius: 26,
-    paddingHorizontal: 6,
-    paddingBottom: 6,
+    borderRadius: 21,
+    padding: 5,
     shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowOpacity: 0.035,
+    shadowRadius: 18,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
+    elevation: 1,
   },
-  header: { height: 44, justifyContent: "center" },
-  handle: { height: 44, alignItems: "center", justifyContent: "center" },
   themeToggle: {
-    position: "absolute",
-    right: 0,
-    top: 0,
+    borderLeftWidth: 1,
+    marginLeft: 2,
     width: 44,
-    height: 44,
+    minHeight: 44,
     alignItems: "center",
     justifyContent: "center",
-    zIndex: 1,
   },
-  routes: { flexDirection: "row", gap: 4 },
+  routes: { flexDirection: "row", alignItems: "center", gap: 2 },
   route: {
     flex: 1,
+    minWidth: 0,
     minHeight: 54,
+    paddingVertical: 6,
     alignItems: "center",
     justifyContent: "center",
-    gap: 4,
-    borderRadius: 14,
+    gap: 3,
+    borderRadius: 16,
   },
   badge: {
     position: "absolute",

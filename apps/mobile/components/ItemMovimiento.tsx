@@ -4,7 +4,7 @@ import type { MovimientoCuenta } from "core";
 import { useTheme, font, radius, spacing, type Colors } from "../lib/theme";
 
 /** Paralelo a `ItemMovimiento.tsx` de desktop. */
-export default function ItemMovimiento({ item }: { item: MovimientoCuenta }) {
+export default function ItemMovimiento({ item, calm = false }: { item: MovimientoCuenta; calm?: boolean }) {
   const { color: tema } = useTheme();
   const styles = makeStyles(tema);
   // `sentido` dice si suma o resta (un pago enviado o un abono resta aunque no sea "gasto").
@@ -26,7 +26,7 @@ export default function ItemMovimiento({ item }: { item: MovimientoCuenta }) {
           {item.subtitulo}
         </Text>
       </View>
-      <Text style={[styles.monto, { color: esIngreso ? tema.success : tema.danger }]}>
+      <Text style={[styles.monto, { color: esIngreso ? tema.success : calm ? tema.text : tema.danger }]}>
         {esIngreso ? "+" : "-"}${item.monto.toFixed(2)}
       </Text>
     </View>

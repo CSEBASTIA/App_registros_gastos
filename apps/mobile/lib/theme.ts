@@ -2,15 +2,15 @@ import { createContext, createElement, useContext, useEffect, useState, type Rea
 import { AccessibilityInfo, useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 export const lightColor = {
- bg: "#ffffff", surface: "#ffffff", surface2: "#f5f5f5", border: "#dedede",
- text: "#111111", textMuted: "#62666c", textFaint: "#85898f", primary: "#111111", primaryBg: "#f1f1f1",
- danger: "#c23b34", dangerBg: "#fbeae9", success: "#157a4b", successBg: "#e5f4ec", warning: "#a5690a", warningBg: "#f8ecda",
+ bg: "#f6f7f4", surface: "#ffffff", surface2: "#eff2ed", border: "#e2e7df",
+ text: "#202421", textMuted: "#66706a", textFaint: "#7b857d", primary: "#202421", primaryBg: "#eff2ed",
+ danger: "#a35d56", dangerBg: "#f9eeeb", success: "#257b57", successBg: "#eaf4ed", warning: "#956414", warningBg: "#f8f0dc",
 };
 export type Colors = typeof lightColor;
 export const darkColor: Colors = {
- bg: "#171717", surface: "#202020", surface2: "#2a2a2a", border: "#3b3b3b",
- text: "#f5f5f5", textMuted: "#c1c1c1", textFaint: "#989898", primary: "#f2f2f2", primaryBg: "#353535",
- danger: "#ffaaa4", dangerBg: "#452827", success: "#7fd6a6", successBg: "#203c30", warning: "#edc17e", warningBg: "#423522",
+ bg: "#171a18", surface: "#222723", surface2: "#2d352e", border: "#343b35",
+ text: "#f1f3ef", textMuted: "#b9c2ba", textFaint: "#9ba69c", primary: "#edf1ea", primaryBg: "#2d352e",
+ danger: "#dfaaa3", dangerBg: "#3b2d2b", success: "#91d4ad", successBg: "#273b2e", warning: "#edc17e", warningBg: "#423522",
 };
 export const color = lightColor;
 export const radius = { sm: 10, md: 16, lg: 22, pill: 999 };

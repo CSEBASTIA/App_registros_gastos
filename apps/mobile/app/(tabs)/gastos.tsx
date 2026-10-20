@@ -25,7 +25,7 @@ import {
   agruparPorCategoriaODetalle,
   listarLugares,
   filasDetalleGasto,
-  ETIQUETA_BILLETERA,
+  etiquetaMes,
   type Gasto,
   type Lugar,
   type Categoria,
@@ -50,6 +50,7 @@ function mesActual() {
 export default function GastosScreen() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [verDesglose, setVerDesglose] = useState(false);
   const { color } = useTheme();
   const styles = createStyles(color);
   const router = useRouter();
@@ -133,8 +134,9 @@ export default function GastosScreen() {
       .then(() => {
         setDetalle(null);
         cargar();
+        void avisar("Gasto eliminado", "Se quitó de tu registro.", "success");
       })
-      .catch((err) => avisar("No se pudo eliminar", mensajeError(err)));
+      .catch((err) => avisar("No se pudo eliminar", mensajeError(err), "error"));
   }
 
   function accionesDe(g: Gasto): AccionIsla[] {
@@ -215,122 +217,63 @@ export default function GastosScreen() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
           contentContainerStyle={{
-            padding: spacing(5),
+            paddingHorizontal: spacing(5),
+            paddingTop: spacing(3),
             paddingBottom: spacing(8),
-            gap: spacing(4),
+            gap: spacing(3.5),
           }}
         >
-          <BlurFade style={{ gap: spacing(2) }}>
+          <BlurFade style={styles.intro}>
+            <Text style={styles.eyebrow}>TUS MOVIMIENTOS</Text>
             <Text accessibilityRole="header" style={styles.screenTitle}>
               Gastos
             </Text>
             <Text style={styles.screenIntro}>
-              Entendé en qué se va tu dinero.
+              Consulta lo que gastaste este mes.
             </Text>
           </BlurFade>
           {error && <ErrorTexto>{error}</ErrorTexto>}
           <View style={styles.encabezado}>
-            <SelectorMes mes={mes} onCambiar={cambiarMes} />
+            <View style={styles.monthSelector}><SelectorMes mes={mes} onCambiar={cambiarMes} compact /></View>
             <Boton
-              titulo="+ Nuevo"
+              titulo="Nuevo gasto"
               variante="primario"
+              style={styles.newAction}
               onPress={() =>
                 router.push({ pathname: "/gasto/nuevo", params: { mes, semana: String(semanaActiva) } })
               }
             />
           </View>
 
-          <SelectorChips
-            titulo="Semana"
-            valor={String(semanaActiva)}
-            onCambiar={(v) => setSemanaActiva(Number(v))}
-            opciones={semanas.map((semana) => ({
-              valor: String(semana.numero),
-              etiqueta:
-                "Semana " +
-                semana.numero +
-                " (" +
-                semana.desde +
-                "–" +
-                semana.hasta +
-                ")",
-            }))}
-          />
-
-          <Tarjeta>
-            <Text style={styles.tituloCard}>
-              Gastos por categoría — Semana {semanaActiva}
+          <BlurFade style={styles.weeklyCard}>
+            <View style={styles.weeklyHeading}>
+              <Text style={styles.etiqueta}>Total de la semana</Text>
+              <Text style={styles.weekRange}>{rango.desde}–{rango.hasta} {etiquetaMes(mes).slice(0, 3).toLowerCase()}</Text>
+            </View>
+            <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65} style={styles.valorGrande}>
+              ${totalSemana.toFixed(2)}
             </Text>
-            <GraficoBarras
-              datos={datosGrafico}
-              mensajeVacio="Sin gastos en este período."
+            <Text style={styles.weeklySub}>De ${totalMes.toFixed(2)} gastados este mes</Text>
+            <SelectorChips
+              titulo=""
+              suave
+              valor={String(semanaActiva)}
+              onCambiar={(v) => setSemanaActiva(Number(v))}
+              opciones={semanas.map((semana) => ({ valor: String(semana.numero), etiqueta: `Sem ${semana.numero}` }))}
             />
-          </Tarjeta>
+          </BlurFade>
 
-          <Tarjeta>
-            <View style={styles.filaTotal}>
-              <Text style={styles.etiqueta}>Total Semana {semanaActiva}</Text>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.65}
-                style={styles.valorGrande}
-              >
-                ${totalSemana.toFixed(2)}
-              </Text>
-            </View>
-            {desglose.map((d) => (
-              <View key={d.clave} style={styles.filaDesglose}>
-                <View
-                  style={{
-                    flexDirection: "row",
-                    alignItems: "center",
-                    gap: spacing(2),
-                    flex: 1,
-                  }}
-                >
-                  <View style={[styles.punto, { backgroundColor: d.color }]} />
-                  <Text style={styles.desgloseNombre} numberOfLines={1}>
-                    {d.etiqueta}
-                  </Text>
-                </View>
-                <Text style={styles.desglosePct}>
-                  {totalSemana > 0
-                    ? ((d.monto / totalSemana) * 100).toFixed(0)
-                    : 0}
-                  %
-                </Text>
-                <Text style={styles.desgloseMonto}>${d.monto.toFixed(2)}</Text>
-              </View>
-            ))}
-            <View
-              style={[
-                styles.filaTotal,
-                {
-                  borderTopWidth: 1,
-                  borderTopColor: color.border,
-                  paddingTop: spacing(3),
-                },
-              ]}
-            >
-              <Text style={styles.etiqueta}>Acumulado del mes</Text>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.65}
-                style={styles.valorMedio}
-              >
-                ${totalMes.toFixed(2)}
-              </Text>
-            </View>
-          </Tarjeta>
+          <View style={styles.sectionHeading}>
+            <Text style={styles.tituloCard}>Movimientos</Text>
+            <Text style={styles.sectionCount}>{gastosSemana.length} {gastosSemana.length === 1 ? "gasto" : "gastos"}</Text>
+          </View>
 
-          <Tarjeta style={{ padding: 0, paddingVertical: spacing(2) }}>
+          <Tarjeta style={styles.listCard}>
             {gastosSemana.length === 0 ? (
               <EstadoVacio
                 icono="document-text-outline"
                 titulo="Todavía no hay gastos en esta semana"
-                subtitulo="Agregalos con el botón + Nuevo."
+                subtitulo="Agregalos con el botón Nuevo gasto."
               />
             ) : (
               <View style={{ paddingHorizontal: spacing(4) }}>
@@ -349,58 +292,25 @@ export default function GastosScreen() {
                           pressed && { opacity: 0.7 },
                         ]}
                       >
+                        <View style={styles.gastoIcono}>
+                          <Ionicons name="receipt-outline" size={18} color={cat?.color ?? color.textMuted} />
+                        </View>
                         <View style={styles.gastoInfo}>
-                          <Text style={styles.gastoDescripcion} numberOfLines={2}>
+                          <Text style={styles.gastoDescripcion} numberOfLines={1}>
                             {g.descripcion}
                           </Text>
-                          <Text style={styles.gastoMeta}>
+                          <Text style={styles.gastoMeta} numberOfLines={1}>
                             {cat?.nombre ?? "Sin categoría"}
                             {cat?.nombre === "Otros" && g.categoriaDetalle
                               ? ` · ${g.categoriaDetalle}`
                               : ""}
                             {" · "}
-                            {cuentaDe(g.cuentaId)?.nombre ?? "Sin cuenta"} ·{" "}
-                            {g.fecha}
+                            {cuentaDe(g.cuentaId)?.nombre ?? "Sin cuenta"}
                           </Text>
-                          {(g.billetera || g.lugarId) && (
-                            <Text style={styles.gastoMeta} numberOfLines={1}>
-                              {g.billetera ? ETIQUETA_BILLETERA[g.billetera] : ""}
-                              {g.billetera && g.lugarId ? " · " : ""}
-                              {g.lugarId ? lugares.find((l) => l.id === g.lugarId)?.nombre ?? "" : ""}
-                            </Text>
-                          )}
                         </View>
                         <Text style={styles.gastoMonto}>
                           ${g.monto.toFixed(2)}
                         </Text>
-                      </Pressable>
-                      {g.ubicacion && (
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel={`Abrir en Mapas dónde pagaste ${g.descripcion}`}
-                          hitSlop={4}
-                          onPress={() => abrirEnMapas(g.ubicacion!).catch(() => undefined)}
-                          style={({ pressed }) => [styles.botonEliminar, pressed && { backgroundColor: color.primaryBg }]}
-                        >
-                          <Ionicons name="location-outline" size={18} color={color.primary} />
-                        </Pressable>
-                      )}
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Eliminar gasto ${g.descripcion}`}
-                        accessibilityHint="Solicita confirmación antes de eliminarlo."
-                        hitSlop={4}
-                        onPress={() => confirmarEliminar(g)}
-                        style={({ pressed }) => [
-                          styles.botonEliminar,
-                          pressed && { backgroundColor: color.dangerBg },
-                        ]}
-                      >
-                        <Ionicons
-                          name="trash-outline"
-                          size={18}
-                          color={color.danger}
-                        />
                       </Pressable>
                     </View>
                   );
@@ -408,6 +318,38 @@ export default function GastosScreen() {
               </View>
             )}
           </Tarjeta>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: verDesglose }}
+            onPress={() => setVerDesglose((actual) => !actual)}
+            style={({ pressed }) => [styles.breakdownToggle, pressed && { opacity: 0.7 }]}
+          >
+            <Text style={styles.breakdownToggleText}>{verDesglose ? "Ocultar desglose por categoría" : "Ver desglose por categoría"}</Text>
+            <Ionicons name={verDesglose ? "chevron-up" : "chevron-forward"} size={18} color={color.textMuted} />
+          </Pressable>
+
+          {verDesglose && <View style={styles.breakdownContent}>
+            <Tarjeta>
+              <Text style={styles.tituloCard}>Gastos por categoría · Semana {semanaActiva}</Text>
+              <GraficoBarras datos={datosGrafico} mensajeVacio="Sin gastos en este período." />
+            </Tarjeta>
+            <Tarjeta>
+              {desglose.map((d) => (
+                <View key={d.clave} style={styles.filaDesglose}>
+                  <View style={styles.desgloseInfo}>
+                    <View style={[styles.punto, { backgroundColor: d.color }]} />
+                    <Text style={styles.desgloseNombre} numberOfLines={1}>{d.etiqueta}</Text>
+                  </View>
+                  <Text style={styles.desglosePct}>{totalSemana > 0 ? ((d.monto / totalSemana) * 100).toFixed(0) : 0}%</Text>
+                  <Text style={styles.desgloseMonto}>${d.monto.toFixed(2)}</Text>
+                </View>
+              ))}
+              <View style={styles.monthTotal}>
+                <Text style={styles.etiqueta}>Acumulado del mes</Text>
+                <Text style={styles.valorMedio}>${totalMes.toFixed(2)}</Text>
+              </View>
+            </Tarjeta>
+          </View>}
         </ScrollView>
       </KeyboardAvoidingView>
       {detalle && (
@@ -438,10 +380,12 @@ export default function GastosScreen() {
 
 const createStyles = (color: Colors) =>
   StyleSheet.create({
+    intro: { gap: spacing(1.5), marginBottom: spacing(1) },
+    eyebrow: { fontFamily: font.semibold, fontSize: 11, letterSpacing: 1.4, color: color.textMuted },
     screenTitle: {
-      fontFamily: font.display,
-      fontSize: 30,
-      lineHeight: 36,
+      fontFamily: font.semibold,
+      fontSize: 32,
+      lineHeight: 38,
       color: color.text,
     },
     screenIntro: {
@@ -454,26 +398,32 @@ const createStyles = (color: Colors) =>
     encabezado: {
       flexDirection: "row",
       flexWrap: "wrap",
-      gap: spacing(3),
+      gap: spacing(2),
       justifyContent: "space-between",
       alignItems: "center",
     },
-    tituloCard: { fontFamily: font.display, fontSize: 20, color: color.text },
-    filaTotal: {
-      flexDirection: "row",
-      flexWrap: "wrap",
-      gap: spacing(3),
-      justifyContent: "space-between",
-      alignItems: "center",
-    },
+    monthSelector: { backgroundColor: color.surface, borderWidth: 1, borderColor: color.border, borderRadius: 13 },
+    newAction: { minHeight: 44, borderRadius: 13, paddingHorizontal: spacing(3) },
+    weeklyCard: { backgroundColor: color.surface, borderWidth: 1, borderColor: color.border, borderRadius: 22, padding: spacing(5), gap: spacing(2) },
+    weeklyHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: spacing(2) },
+    weekRange: { fontFamily: font.medium, fontSize: 11, color: color.textMuted, backgroundColor: color.surface2, borderRadius: radius.pill, paddingHorizontal: spacing(2.5), paddingVertical: spacing(1.5) },
+    weeklySub: { fontFamily: font.body, fontSize: 12, color: color.textMuted, marginBottom: spacing(2) },
+    sectionHeading: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: spacing(3) },
+    sectionCount: { fontFamily: font.semibold, fontSize: 12, color: color.textMuted },
+    tituloCard: { fontFamily: font.semibold, fontSize: 18, color: color.text },
     etiqueta: {
-      fontFamily: font.semibold,
-      fontSize: 12,
+      fontFamily: font.medium,
+      fontSize: 13,
       color: color.textMuted,
-      fontWeight: "600",
     },
-    valorGrande: { fontFamily: font.mono, fontSize: 20, color: color.text },
+    valorGrande: { fontFamily: font.semibold, fontSize: 34, letterSpacing: -1.4, color: color.text },
     valorMedio: { fontFamily: font.mono, fontSize: 16, color: color.text },
+    listCard: { padding: 0, borderRadius: 21 },
+    breakdownToggle: { backgroundColor: color.surface, borderWidth: 1, borderColor: color.border, borderRadius: 15, minHeight: 50, paddingHorizontal: spacing(4), flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+    breakdownToggleText: { fontFamily: font.semibold, fontSize: 13, color: color.text },
+    breakdownContent: { gap: spacing(4) },
+    desgloseInfo: { flexDirection: "row", alignItems: "center", gap: spacing(2), flex: 1 },
+    monthTotal: { borderTopWidth: 1, borderTopColor: color.border, paddingTop: spacing(3), flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
     filaDesglose: {
       flexDirection: "row",
       alignItems: "center",
@@ -504,25 +454,20 @@ const createStyles = (color: Colors) =>
     filaGastoContenedor: {
       flexDirection: "row",
       alignItems: "center",
-      borderTopWidth: 1,
-      borderTopColor: color.border,
+      borderBottomWidth: 1,
+      borderBottomColor: color.border,
     },
     filaGasto: {
       flex: 1,
       flexDirection: "row",
       alignItems: "center",
-      gap: spacing(2),
+      gap: spacing(3),
       paddingVertical: spacing(3),
       minWidth: 0,
+      minHeight: 64,
     },
+    gastoIcono: { width: 38, height: 38, borderRadius: 13, backgroundColor: color.surface2, alignItems: "center", justifyContent: "center" },
     gastoInfo: { flex: 1, minWidth: 0 },
-    botonEliminar: {
-      width: 44,
-      height: 44,
-      alignItems: "center",
-      justifyContent: "center",
-      borderRadius: radius.pill,
-    },
     gastoDescripcion: {
       fontFamily: font.semibold,
       fontSize: 14,
@@ -531,7 +476,7 @@ const createStyles = (color: Colors) =>
     },
     gastoMeta: {
       fontFamily: font.body,
-      fontSize: 13,
+      fontSize: 12,
       color: color.textMuted,
       marginTop: 2,
     },

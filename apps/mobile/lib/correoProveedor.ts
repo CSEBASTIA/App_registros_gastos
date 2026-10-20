@@ -7,18 +7,21 @@ import {
   contarTransaccionesPendientes,
   desdeParaSincronizar,
   eliminarTransaccionesDetectadas,
+  estadosDeCuentaEnCorreos,
   getSupabaseClient,
   insertarTransaccionesDetectadas,
   listarCuentas,
   registrarAvisosDelCorreo,
   type CorreosTraidos,
+  type EstadoCuentaEnCorreo,
   type ResultadoSincronizacion,
 } from "core";
 import * as outlook from "./outlookAuth";
 import * as gmail from "./gmailAuth";
-import { traerCorreosNuevos as traerDeOutlook } from "./graphMail";
-import { traerCorreosNuevos as traerDeGmail } from "./gmailApi";
-import { avisarPresupuestos, avisarRegistradosDelCorreo } from "./notificaciones";
+import * as graphMail from "./graphMail";
+import * as gmailApi from "./gmailApi";
+import { avisarEstadosDeCuenta, avisarPresupuestos, avisarRegistradosDelCorreo } from "./notificaciones";
+import { TAMANO_MAXIMO_ESTADO } from "./archivosImportacion";
 import { ubicarComerciosRegistrados } from "./ubicarComercios";
 
 /** Marca de la última búsqueda completa (ISO). Se borra al desconectar o cerrar sesión. */
@@ -139,7 +142,23 @@ export async function desconectarProveedorActivo(): Promise<{
 export async function traerCorreosDelProveedorActivo(desde: Date): Promise<CorreosTraidos> {
   const proveedor = await proveedorConectado();
   if (!proveedor) throw new Error("El correo no está conectado.");
-  return proveedor === "gmail" ? traerDeGmail(desde) : traerDeOutlook(desde);
+  return proveedor === "gmail" ? gmailApi.traerCorreosNuevos(desde) : graphMail.traerCorreosNuevos(desde);
+}
+
+async function apiDelProveedorActivo() {
+  const proveedor = await proveedorConectado();
+  if (!proveedor) throw new Error("Conecta tu correo (Más → Correo) para traer los estados de cuenta que te manda el banco.");
+  return proveedor === "gmail" ? gmailApi : graphMail;
+}
+
+/** Los estados de cuenta en PDF que llegaron al correo en los últimos meses (del más nuevo al más viejo). */
+export async function buscarEstadosDeCuentaEnCorreo(): Promise<EstadoCuentaEnCorreo[]> {
+  return (await apiDelProveedorActivo()).buscarEstadosDeCuenta();
+}
+
+/** El PDF adjunto de ese correo, en base64, directo al lector: no se guarda en el teléfono. */
+export async function descargarPdfDelCorreo(mensajeId: string): Promise<{ base64: string; nombre: string }> {
+  return (await apiDelProveedorActivo()).descargarPdf(mensajeId, TAMANO_MAXIMO_ESTADO);
 }
 
 /**
@@ -151,7 +170,9 @@ export async function traerCorreosDelProveedorActivo(desde: Date): Promise<Corre
  * llegaban mientras tanto se saltaban para siempre), y solo se avanza si se
  * pudieron leer todos los correos.
  */
-export async function sincronizarCorreo(): Promise<ResultadoSincronizacion & { marca: string | null }> {
+export async function sincronizarCorreo(): Promise<
+  ResultadoSincronizacion & { marca: string | null; estadosDeCuenta: EstadoCuentaEnCorreo[] }
+> {
   const inicio = new Date();
   const relectura = (await AsyncStorage.getItem(CLAVE_VERSION_LECTOR)) !== VERSION_LECTOR;
   const desde = relectura
@@ -159,6 +180,8 @@ export async function sincronizarCorreo(): Promise<ResultadoSincronizacion & { m
     : desdeParaSincronizar(await AsyncStorage.getItem(CLAVE_ULTIMA_SYNC), inicio);
 
   const { correos, truncado, fallidos } = await traerCorreosDelProveedorActivo(desde);
+  // En la relectura (cambio de versión) no se avisa de estados viejos.
+  const estadosDeCuenta = relectura ? [] : estadosDeCuentaEnCorreos(correos);
   if (relectura) await borrarAvisosPendientesDelCorreo();
   const avisos = avisosDeCorreos(correos, await listarCuentas());
   const { enviados, descartados } = await insertarTransaccionesDetectadas(avisos);
@@ -171,14 +194,15 @@ export async function sincronizarCorreo(): Promise<ResultadoSincronizacion & { m
     await AsyncStorage.setItem(CLAVE_ULTIMA_SYNC, marca);
     if (relectura) await AsyncStorage.setItem(CLAVE_VERSION_LECTOR, VERSION_LECTOR);
   }
-  return { revisados: correos.length, enviados, descartados, truncado, fallidos, registrados, porRevisar, marca };
+  return { revisados: correos.length, enviados, descartados, truncado, fallidos, registrados, porRevisar, estadosDeCuenta, marca };
 }
 
 /**
  * Después de una búsqueda: avisa lo que se registró solo, le busca el lugar a
  * los consumos y revisa los presupuestos. Nunca lanza.
  */
-export async function despuesDeSincronizar(r: ResultadoSincronizacion): Promise<void> {
+export async function despuesDeSincronizar(r: ResultadoSincronizacion & { estadosDeCuenta?: EstadoCuentaEnCorreo[] }): Promise<void> {
+  if (r.estadosDeCuenta?.length) await avisarEstadosDeCuenta(r.estadosDeCuenta);
   const registrados = r.registrados ?? [];
   if (!registrados.some((x) => x.resultado === "registrado")) return;
   await avisarRegistradosDelCorreo(registrados);

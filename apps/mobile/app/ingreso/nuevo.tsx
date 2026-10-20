@@ -27,6 +27,7 @@ import ErrorTexto from "../../components/ErrorTexto";
 import SelectorChips from "../../components/SelectorChips";
 import { spacing, useTheme, font, type Colors } from "../../lib/theme";
 import { BlurFade } from "../../components/Motion";
+import { avisar } from "../../lib/dialogo";
 
 // Fecha en la zona horaria del teléfono (toISOString es UTC).
 const hoy = () => fechaLocal();
@@ -89,6 +90,7 @@ export default function NuevoIngreso() {
         cuentaId: cuentaId || undefined,
         fecha,
       });
+      await avisar("Ingreso guardado", "El ingreso se agregó a tu resumen.", "success");
       router.back();
     } catch (err) {
       setError(mensajeError(err));

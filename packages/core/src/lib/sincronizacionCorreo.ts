@@ -2,10 +2,11 @@
  * Piezas de la sincronización con el correo que no dependen del proveedor
  * (Gmail / Outlook) ni de la plataforma, para poder probarlas.
  */
-import type { ClaseAviso, Cuenta } from "../types/domain";
+import type { Banco, ClaseAviso, Cuenta } from "../types/domain";
 import type { AvisoRegistrado, TransaccionDetectadaInsert } from "../repositories/transaccionesDetectadas.repo";
-import { parsearCorreoBancario, type CorreoParseado } from "./correoBancario";
+import { bancoDeNombre, bancoDeRemitente, parsearCorreoBancario, type CorreoParseado } from "./correoBancario";
 import { formatMonto } from "./formatMonto";
+import { ETIQUETA_BANCO } from "./marcas";
 
 export interface CorreoRecibido {
   mensajeId: string;
@@ -13,6 +14,8 @@ export interface CorreoRecibido {
   asunto: string;
   cuerpoTexto: string;
   fecha: string; // YYYY-MM-DD, día local de recepción
+  /** Trae un PDF adjunto (Gmail lo sabe por las partes del mensaje; Outlook, por `hasAttachments`). */
+  tienePdf?: boolean;
 }
 
 export interface CorreosTraidos {
@@ -280,4 +283,59 @@ export function resumenSincronizacion(r: ResultadoSincronizacion): string {
   if (r.truncado) partes.push(`Había más de ${TOPE_CORREOS} correos: se revisaron los más recientes.`);
   if (r.fallidos > 0) partes.push(`No se pudieron leer ${r.fallidos} correo(s); se volverán a intentar en la próxima búsqueda.`);
   return partes.join(" ");
+}
+
+// ---------------------------------------------------------------------
+// Estados de cuenta que el banco manda como PDF adjunto
+// ---------------------------------------------------------------------
+
+/** Un correo que trae el estado de cuenta en PDF. El PDF no se guarda: se descarga al importarlo. */
+export interface EstadoCuentaEnCorreo {
+  mensajeId: string;
+  remitente: string;
+  fecha: string;
+  banco?: Banco;
+  /** El remitente es una dirección conocida de ese banco (si no, se avisa: podría ser un correo falso). */
+  remitenteConocido: boolean;
+}
+
+const HABLA_DE_ESTADO = /\b(estado\s+de\s+(?:cuenta|cta\.?)|extracto\s+(?:bancario|de\s+cuenta)|resumen\s+de\s+(?:tu\s+|su\s+)?(?:cuenta|tarjeta))\b/i;
+
+/** Cuántos días atrás se buscan estados de cuenta en el correo (uno por mes, unos 4 meses). */
+export const DIAS_ESTADOS_EN_CORREO = 120;
+
+/** Búsqueda de Gmail para los estados de cuenta con PDF de los últimos `dias`. */
+export function consultaGmailEstadosDeCuenta(dias: number = DIAS_ESTADOS_EN_CORREO): string {
+  return `has:attachment filename:pdf newer_than:${Math.max(1, Math.round(dias))}d ("estado de cuenta" OR "estado de cta" OR extracto)`;
+}
+
+/**
+ * Los correos que traen un estado de cuenta en PDF (el asunto o el cuerpo lo
+ * dicen y hay un PDF adjunto), del más nuevo al más viejo.
+ */
+export function estadosDeCuentaEnCorreos(correos: CorreoRecibido[]): EstadoCuentaEnCorreo[] {
+  return correos
+    .filter((c) => c.tienePdf && (HABLA_DE_ESTADO.test(c.asunto) || HABLA_DE_ESTADO.test(c.cuerpoTexto.slice(0, 3000))))
+    .map((c) => {
+      const porRemitente = bancoDeRemitente(c.remitente);
+      const banco = porRemitente ?? bancoDeNombre(`${c.asunto} ${c.remitente.split("@")[1] ?? ""}`);
+      return {
+        mensajeId: c.mensajeId,
+        remitente: c.remitente,
+        fecha: c.fecha,
+        ...(banco ? { banco } : {}),
+        remitenteConocido: !!porRemitente,
+      };
+    })
+    .sort((a, b) => b.fecha.localeCompare(a.fecha));
+}
+
+/** «Llegó tu estado de cuenta de Banco Pichincha»: abre la lista de estados del correo. */
+export function textoNotificacionEstadoCuenta(e: EstadoCuentaEnCorreo): { titulo: string; cuerpo: string; ruta: string } {
+  const de = e.banco && e.banco !== "otro" ? ` de ${ETIQUETA_BANCO[e.banco]}` : "";
+  return {
+    titulo: `Llegó tu estado de cuenta${de}`,
+    cuerpo: "Tócalo para revisar los movimientos e importarlos. El PDF se lee en tu teléfono.",
+    ruta: "/estados-correo",
+  };
 }

@@ -183,8 +183,11 @@ export default function NuevoGasto() {
       // Si con este gasto un presupuesto llegó al 75 %, al 100 % o se pasó, avisa (sin esperar).
       avisarPresupuestos(fecha);
       const aviso = lugar.motivo ? MENSAJE_SIN_UBICACION[lugar.motivo] : undefined;
-      // El gasto ya se guardó: es un aviso, no un error.
-      if (aviso) await avisar("Gasto guardado", aviso);
+      await avisar(
+        "Gasto guardado",
+        aviso ?? "El gasto se agregó a tu resumen.",
+        aviso ? "warning" : "success",
+      );
       router.back();
     } catch (err) {
       setError(mensajeError(err));

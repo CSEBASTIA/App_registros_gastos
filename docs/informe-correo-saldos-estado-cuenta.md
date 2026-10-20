@@ -64,7 +64,7 @@
 
 **Base:** la **Migración de saldos y registro del correo** (`20261019120000_saldos_y_registro_del_correo.sql`) trae:
 - `validar_saldo_cuenta` + `trg_validar_saldo_cuenta`, sobre `cuentas`.
-- Fuera `trg_03_validar_cupo_gasto` y los disparadores de la «Migración de cupo en lote» (si alguien la aplicó).
+- Fuera `trg_03_validar_cupo_gasto` y los disparadores de la «Migración de cupo en lote» (que está aplicada en Supabase web).
 - `validar_transferencia` sin el rechazo por cupo.
 - En `transacciones_detectadas`: `clase`, `contraparte_cuenta_id` (con índice) y `comision`. En `lugares`: `direccion`.
 - `registrar_avisos_correo()`: *security definer*, solo para usuarios con sesión y solo procesa los avisos de quien llama. Cada aviso va en su propio bloque: si uno falla, queda en la Bandeja y los demás siguen.
@@ -113,7 +113,7 @@
 ## 6. Lo que te toca
 
 1. **Aplicar la base** en Supabase → SQL Editor → New query. Pegar entero `supabase/para-supabase-web/20-10-2026 2AM/1 - cuentas, gastos, transferencias, pagos_tarjeta, transacciones_detectadas, lugares (saldos y registro del correo).sql` y darle Run. Nombre: **«gastos-app — Migración de saldos y registro del correo · 20-10-2026 2AM»**. Debe terminar en «aplicada = sí».
-   - **No apliques** la «Migración de cupo en lote» (`17-10-2026 2AM`, que quedó sin subir en la carpeta principal): iba en contra de lo que pediste. Si ya la aplicaste, esta migración la desactiva.
+   - Tu Supabase web ya tiene la «Migración de cupo en lote» (del 18-oct), que va en contra de lo que pediste. Esta migración la desactiva: se probó sobre una base igual a la tuya y no queda ningún disparador de cupo. Sus archivos se quitaron del repositorio.
 2. **Anota los últimos dígitos** de cada tarjeta y cuenta en su detalle (cada tarjeta de crédito y cada cuenta de ahorro). Sin ellos, lo que llegue por correo va a la Bandeja en vez de registrarse solo.
 3. **Publicar la app.** Si tienes el APK 1.4.0, basta una actualización (`eas update`). Si tienes uno anterior, hay que compilar el 1.4.0. La web de Vercel toma el cambio cuando esta rama llegue a `main`.
 4. Abrir la app con el correo conectado: la primera búsqueda vuelve a leer los últimos 30 días.

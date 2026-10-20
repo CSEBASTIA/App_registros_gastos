@@ -16,6 +16,7 @@ import {
   sincronizarNotificaciones,
 } from "../lib/notificaciones";
 import { sincronizarCorreoSiToca } from "../lib/correoProveedor";
+import NotificacionSileo from "../components/NotificacionSileo";
 
 // Sin sesión, RLS bloquea toda lectura y escritura: la app se ve vacía y
 // guardar un gasto falla. Por eso el login va activo también en desarrollo.
@@ -221,6 +222,7 @@ function ThemedLayout() {
         <ActivityIndicator color={color.primary} />
       </View>
     )}
+    <NotificacionSileo />
     </Animated.View>
     </AceptacionContext.Provider>
   );

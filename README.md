@@ -8,7 +8,7 @@ Bancos con logo y catálogo: Banco Guayaquil, Pichincha, Produbanco, Diners Club
 
 > **Estado (18-oct-2026)**
 > - Teléfono: versión **1.4.0**. Falta compilar el APK y probarlo en un teléfono real.
-> - Base de Supabase web: **al día**, con 36 migraciones del repositorio más `cupo_en_lote` (ver [Base de datos](#base-de-datos)).
+> - Base de Supabase web: 36 migraciones del repositorio más `cupo_en_lote`. **Falta aplicar** la «Migración de saldos y registro del correo» (`para-supabase-web/20-10-2026 2AM/`), que además desactiva `cupo_en_lote` (ver [Base de datos](#base-de-datos)).
 > - Pruebas en verde: **328** de base de datos, **224** de lógica, **18** del teléfono y **3** de la web de escritorio. Sin errores de tipos en ninguna parte.
 > - Auditoría completa: [`docs/auditoria-app-2026-10-18.md`](docs/auditoria-app-2026-10-18.md). Lo que falta para publicar: [Pendientes](#pendientes-y-riesgos).
 
@@ -242,7 +242,7 @@ pnpm dev:desktop             # web de escritorio
 | Supabase web (`<id-del-proyecto>`) | Las 36, más `20261017020000_cupo_en_lote` | `20261018130000_registro_automatico_billetera` | 18-oct-2026 (texto único de `para-supabase-web/18-10-2026 6AM/`, salió `aplicada = sí`) |
 | Supabase local (Docker) | Sin actualizar desde el 15-oct | `20261015180000_proteger_tasa_diferido` | 15-oct-2026 |
 
-`cupo_en_lote` está aplicada en el proyecto web, pero **no está en el repositorio**. Hay que agregar su archivo a `supabase/migrations/` y regenerar `base-completa.sql` con `bash supabase/generar-base-completa.sh`.
+`cupo_en_lote` está aplicada en el proyecto web pero **no se agrega al repositorio**: quedó obsoleta el 20-oct, porque ahora una tarjeta sí puede pasarse del cupo (queda en rojo, sobreendeudada). La `20261019120000_saldos_y_registro_del_correo` borra sus disparadores; se probó sobre una base con las 36 migraciones más `cupo_en_lote` (sale `aplicada = sí` y no queda ningún disparador de cupo). Falta aplicarla: `para-supabase-web/20-10-2026 2AM/`.
 
 Para revisarlo en cualquier base: `select version, name from supabase_migrations.schema_migrations order by version;`
 
@@ -351,7 +351,7 @@ pnpm update:produccion    # publica a los usuarios
 | Actualizar Expo SDK 51: Google Play exige Android 15 o más reciente | Alta para la tienda |
 | Completar y revisar con un abogado los términos y la política de privacidad, y configurar Supabase, Vercel y Google Play ([`docs/publicacion-produccion.md`](docs/publicacion-produccion.md)) | Alta |
 | La web de escritorio publicada en Vercel no tiene inicio de sesión (sin sesión se ve vacía) y muestra «Borrar todo (temporal)». No promocionarla hasta agregar login | Alta antes de difundirla |
-| Subir `cupo_en_lote` al repositorio y regenerar `base-completa.sql` | Media |
+| Aplicar en Supabase web la «Migración de saldos y registro del correo» (`para-supabase-web/20-10-2026 2AM/`; desactiva `cupo_en_lote`) | Alta |
 | Correo: remitentes de Produbanco, Diners y Austro, cuerpos reales, Client ID reales y verificación de Google | Media |
 | Transferencias, presupuestos y abono con cuenta de origen en la web de escritorio | Media |
 | Reemplazar `toISOString()` por `fechaLocal()` en la web de escritorio | Media |

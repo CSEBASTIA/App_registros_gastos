@@ -110,3 +110,15 @@ test("mensajeError: los errores de inicio de sesión de Supabase salen en españ
   // Un mensaje desconocido sigue pasando tal cual.
   assert.equal(mensajeError(authError("algo_nuevo", "Mensaje nuevo")), "Mensaje nuevo");
 });
+
+test("mensajeError: un fallo del servidor nunca muestra su texto interno", () => {
+  const fallo = (status: number, code: string | undefined, message: string) => Object.assign(new Error(message), { name: "AuthApiError", code, status });
+  const generico = "El servidor tuvo un problema. Inténtalo de nuevo en unos minutos.";
+  assert.equal(mensajeError(fallo(500, "unexpected_failure", "Database error querying schema")), generico);
+  assert.equal(mensajeError(fallo(500, undefined, 'pq: password authentication failed for user "usuario_prueba" at 10.0.0.1:5432')), generico);
+  assert.equal(mensajeError(fallo(503, undefined, "upstream connect error")), generico);
+  // Lo conocido se sigue traduciendo aunque venga con 429.
+  assert.match(mensajeError(fallo(429, "over_request_rate_limit", "Request rate limit reached")), /Demasiados intentos/);
+  // Sin red sigue siendo "sin conexión".
+  assert.match(mensajeError(Object.assign(new Error("Failed to fetch"), { status: 0 })), /conexión a internet/);
+});

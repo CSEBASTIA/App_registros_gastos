@@ -1,6 +1,8 @@
 import { BlurFade } from "../../components/Motion";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { mensajeError, mesLocal, fechaLocal, etiquetaMes } from "core";
+import SelectorChips from "../../components/SelectorChips";
+import { cambiarTarjetaFavorita, leerTarjetasFavoritas } from "../../lib/tarjetasFavoritas";
 import ErrorTexto from "../../components/ErrorTexto";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -31,8 +33,16 @@ import {
   generarRecomendaciones,
   formatMonto,
   listarLugares,
+  listarPresupuestos,
+  contarTransaccionesPendientes,
+  estadoPresupuestos,
+  comparacionMensual,
+  resumenTarjetas,
+  resumenAhorro,
+  resumenDiferidos,
   sumarMontos,
   type Gasto,
+  type Presupuesto,
   type Lugar,
   type Ingreso,
   type Categoria,
@@ -64,6 +74,22 @@ const DIAS_SEMANA = ["D", "L", "M", "M", "J", "V", "S"];
 
 const ETIQUETA_NIVEL = { bajo: "Bajo", moderado: "Moderado", alto: "Alto" };
 
+/** Las 4 partes del Resumen: una a la vez, para no recorrer una página larga. */
+type Parte = "general" | "tarjetas" | "presupuesto" | "ahorro";
+const PARTES: { valor: Parte; etiqueta: string }[] = [
+  { valor: "general", etiqueta: "General" },
+  { valor: "tarjetas", etiqueta: "Tarjetas" },
+  { valor: "presupuesto", etiqueta: "Presupuesto" },
+  { valor: "ahorro", etiqueta: "Ahorro" },
+];
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+/** "2026-10-28" → "28 oct" */
+const diaMes = (iso: string) => `${Number(iso.slice(8, 10))} ${MESES_CORTOS[Number(iso.slice(5, 7)) - 1]}`;
+/** -12.5 → "-12.50" (sin signo de dólar, para las tablas). */
+const cifra = (n: number) => formatMonto(n).replace("$", "");
+const cambioTexto = (c?: number) => (c === undefined ? "—" : `${c > 0 ? "+" : c < 0 ? "−" : ""}${Math.abs(c)} %`);
+
 export default function ResumenScreen() {
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,6 +113,11 @@ export default function ResumenScreen() {
   const [deudas, setDeudas] = useState<Deuda[]>([]);
   const [pagosTarjeta, setPagosTarjeta] = useState<PagoTarjeta[]>([]);
   const [lugares, setLugares] = useState<Lugar[]>([]);
+  const [presupuestos, setPresupuestos] = useState<Presupuesto[]>([]);
+  const [pendientes, setPendientes] = useState(0);
+  const [favoritas, setFavoritas] = useState<string[]>([]);
+  const [parte, setParte] = useState<Parte>("general");
+  const [eligiendoFavoritas, setEligiendoFavoritas] = useState(false);
 
   const cargar = useCallback(() => {
     let activo = true;
@@ -106,6 +137,9 @@ export default function ResumenScreen() {
           setDeudas([]);
           setPagosTarjeta([]);
           setLugares([]);
+          setPresupuestos([]);
+          setPendientes(0);
+          setFavoritas([]);
           setCargando(false);
           return;
         }
@@ -136,6 +170,10 @@ export default function ResumenScreen() {
         setLugares([]);
         // Aparte: sin la migración de lugares, el resto del resumen sigue funcionando.
         listarLugares().then((l) => activo && setLugares(l)).catch(() => activo && setLugares([]));
+        // Igual con presupuestos, la bandeja y las favoritas: si fallan, solo falta esa parte.
+        listarPresupuestos(mesActual()).then((p) => activo && setPresupuestos(p)).catch(() => activo && setPresupuestos([]));
+        contarTransaccionesPendientes().then((n) => activo && setPendientes(n)).catch(() => activo && setPendientes(0));
+        leerTarjetasFavoritas().then((f) => activo && setFavoritas(f));
       } catch (err) {
         if (activo) setError(mensajeError(err));
       } finally {
@@ -197,6 +235,36 @@ export default function ResumenScreen() {
     color,
   ).slice(0, 8), [gastosRecientes, ingresosRecientes, categorias, color]);
   const veredicto = veredictoFinanciero(balance, endeudamiento);
+
+  const hoy = fechaLocal();
+  const tarjetasCredito = cuentas.filter((c) => c.tipo === "credito");
+  const tarjetas = useMemo(() => resumenTarjetas(cuentas, gastos, mes, favoritas, hoy), [cuentas, gastos, mes, favoritas, hoy]);
+  const estadosPresupuesto = useMemo(() => estadoPresupuestos(mes, presupuestos, gastos, categorias), [mes, presupuestos, gastos, categorias]);
+  const totalPresupuesto = useMemo(() => {
+    const limite = sumarMontos(estadosPresupuesto.map((e) => e.presupuesto.montoLimite));
+    const gastado = sumarMontos(estadosPresupuesto.map((e) => e.gastado));
+    return { limite, gastado, porcentaje: limite > 0 ? Math.round((gastado / limite) * 100) : 0 };
+  }, [estadosPresupuesto]);
+  const comparacion = useMemo(() => comparacionMensual(gastos, ingresos, mes), [gastos, ingresos, mes]);
+  const ahorro = useMemo(() => resumenAhorro(cuentas, gastos, ingresos, mes), [cuentas, gastos, ingresos, mes]);
+  const diferidos = useMemo(() => resumenDiferidos(deudas, cuentas, gastos), [deudas, cuentas, gastos]);
+
+  // «Para revisar»: lo que pide hacer algo, como mucho 3 avisos.
+  const porRevisar = [
+    ...cuentas
+      .filter((c) => c.tipo === "credito" && c.disponible < 0)
+      .map((c) => ({ clave: `cupo-${c.id}`, tono: "malo" as const, icono: "alert-circle-outline" as const, texto: `${c.nombre} pasó el cupo: ${formatMonto(c.disponible)}`, ruta: `/tarjeta/${c.id}` })),
+    ...estadosPresupuesto
+      .filter((e) => e.nivel === "excedido")
+      .map((e) => ({ clave: `pres-${e.presupuesto.id}`, tono: "aviso" as const, icono: "pie-chart-outline" as const, texto: `${e.categoriaNombre}: te pasaste del presupuesto por ${formatMonto(-e.restante)}`, ruta: "/presupuestos" })),
+    ...(pendientes > 0
+      ? [{ clave: "bandeja", tono: "neutro" as const, icono: "file-tray-outline" as const, texto: pendientes + " " + (pendientes === 1 ? "transacción por revisar" : "transacciones por revisar") + " en la bandeja", ruta: "/bandeja" }]
+      : []),
+  ].slice(0, 3);
+
+  async function marcarFavorita(id: string, favorita: boolean) {
+    setFavoritas(await cambiarTarjetaFavorita(id, favorita));
+  }
 
   if (cargando)
     return (
@@ -281,6 +349,15 @@ export default function ResumenScreen() {
             </Text>
           </BlurFade>
 
+          <SelectorChips
+            titulo=""
+            suave
+            valor={parte}
+            onCambiar={(v) => setParte(v as Parte)}
+            opciones={PARTES}
+          />
+
+          {parte === "general" && <>
           {/* Primer uso: sin ningún movimiento todavía, lo único que muestra
               valor es anotar el primero. Cuentas y tarjetas pueden esperar. */}
           {gastosRecientes.length === 0 && ingresosRecientes.length === 0 && (
@@ -368,14 +445,57 @@ export default function ResumenScreen() {
             )}
           </BlurFade>
 
-          {(gastosRecientes.length > 0 || ingresosRecientes.length > 0) && (
-            <Boton
-              titulo="Registrar gasto"
-              variante="primario"
-              style={styles.mainAction}
-              onPress={() => router.push("/gasto/nuevo")}
-            />
+          {porRevisar.length > 0 && (
+            <View style={{ gap: spacing(2) }}>
+              {porRevisar.map((aviso) => (
+                <Pressable
+                  key={aviso.clave}
+                  accessibilityRole="button"
+                  onPress={() => router.push(aviso.ruta)}
+                  style={({ pressed }) => [
+                    styles.aviso,
+                    {
+                      backgroundColor:
+                        aviso.tono === "malo" ? color.dangerBg : aviso.tono === "aviso" ? color.warningBg : color.surface,
+                    },
+                    pressed && { opacity: 0.7 },
+                  ]}
+                >
+                  <Ionicons
+                    name={aviso.icono}
+                    size={18}
+                    color={aviso.tono === "malo" ? color.danger : aviso.tono === "aviso" ? color.warning : color.textMuted}
+                  />
+                  <Text style={styles.avisoTexto}>{aviso.texto}</Text>
+                  <Ionicons name="chevron-forward" size={16} color={color.textMuted} />
+                </Pressable>
+              ))}
+            </View>
           )}
+
+          <View style={styles.acciones}>
+            {(
+              [
+                { etiqueta: "Gasto", icono: "remove", ruta: "/gasto/nuevo", ayuda: "Registrar gasto" },
+                { etiqueta: "Ingreso", icono: "add", ruta: "/ingreso/nuevo", ayuda: "Registrar ingreso" },
+                { etiqueta: "Subir PDF", icono: "document-attach-outline", ruta: "/importar-estado", ayuda: "Subir estado de cuenta o comprobante en PDF" },
+                { etiqueta: "Presupuesto", icono: "pie-chart-outline", ruta: "/presupuestos", ayuda: "Presupuestos" },
+              ] as const
+            ).map((a) => (
+              <Pressable
+                key={a.etiqueta}
+                accessibilityRole="button"
+                accessibilityLabel={a.ayuda}
+                onPress={() => router.push(a.ruta)}
+                style={({ pressed }) => [styles.accion, pressed && { opacity: 0.7 }]}
+              >
+                <View style={styles.accionIcono}>
+                  <Ionicons name={a.icono} size={20} color={color.text} />
+                </View>
+                <Text style={styles.accionTexto}>{a.etiqueta}</Text>
+              </Pressable>
+            ))}
+          </View>
 
           {veredicto.estado !== "bien" && (gastos.length > 0 || ingresos.length > 0 || deudas.length > 0) && (
             <View style={[styles.alerta, { backgroundColor: veredicto.estado === "riesgo" ? color.dangerBg : color.warningBg }]}>
@@ -581,6 +701,203 @@ export default function ResumenScreen() {
           </Tarjeta>
 
           </View>}
+          </>}
+
+          {parte === "tarjetas" && (
+            <>
+              <View style={styles.sectionHeading}>
+                <Text style={styles.tituloCard}>Tus tarjetas favoritas</Text>
+                {tarjetasCredito.length > 0 && (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ expanded: eligiendoFavoritas }}
+                    onPress={() => setEligiendoFavoritas((v) => !v)}
+                    style={styles.sectionLink}
+                  >
+                    <Text style={styles.sectionLinkText}>{eligiendoFavoritas ? "Listo" : "★ Elegir"}</Text>
+                  </Pressable>
+                )}
+              </View>
+              {tarjetasCredito.length === 0 ? (
+                <Tarjeta>
+                  <EstadoVacio
+                    icono="card-outline"
+                    titulo="Todavía no tienes tarjetas"
+                    subtitulo="Agrega tus tarjetas de crédito para ver aquí cuánto gastas con cada una."
+                  />
+                  <Boton titulo="Agregar tarjeta" onPress={() => router.push("/tarjetas")} />
+                </Tarjeta>
+              ) : eligiendoFavoritas ? (
+                <Tarjeta style={{ gap: spacing(1) }}>
+                  <Text style={styles.introTexto}>Marca con estrella las que quieres ver aquí (hasta 4).</Text>
+                  {tarjetasCredito.map((t) => {
+                    const marcada = favoritas.includes(t.id);
+                    return (
+                      <Pressable
+                        key={t.id}
+                        accessibilityRole="checkbox"
+                        accessibilityState={{ checked: marcada }}
+                        // En web `accessibilityState.checked` no llega al DOM; `aria-checked` sí (como en Casilla).
+                        aria-checked={marcada}
+                        onPress={() => marcarFavorita(t.id, !marcada)}
+                        style={({ pressed }) => [styles.filaFavorita, pressed && { opacity: 0.7 }]}
+                      >
+                        <Ionicons name={marcada ? "star" : "star-outline"} size={20} color={marcada ? color.warning : color.textMuted} />
+                        <Text style={styles.avisoTexto}>
+                          {t.nombre}
+                          {t.identificador ? `  ••${t.identificador}` : ""}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </Tarjeta>
+              ) : (
+                <>
+                  {favoritas.length === 0 && (
+                    <Text style={styles.introTexto}>Te muestro las que más usaste este mes. Toca «Elegir» para escoger las tuyas.</Text>
+                  )}
+                  <View style={styles.rejilla}>
+                    {tarjetas.map((t) => (
+                      <Pressable
+                        key={t.cuenta.id}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t.cuenta.nombre}, gastado este mes ${formatMonto(t.gastadoMes)}${t.sobreendeudada ? ", pasó el cupo" : ""}`}
+                        onPress={() => router.push(`/tarjeta/${t.cuenta.id}`)}
+                        style={({ pressed }) => [styles.tarjetaMini, t.sobreendeudada && { borderColor: color.danger }, pressed && { opacity: 0.7 }]}
+                      >
+                        <View style={styles.filaTitulo}>
+                          <Text style={styles.tarjetaNombre} numberOfLines={1}>{t.cuenta.nombre}</Text>
+                          {t.cuenta.identificador ? <Text style={styles.etiquetaMuted}>••{t.cuenta.identificador}</Text> : null}
+                        </View>
+                        <Text style={styles.heroStatEtiqueta}>Gastado este mes</Text>
+                        <Text style={styles.tarjetaMonto}>{formatMonto(t.gastadoMes)}</Text>
+                        {t.usado !== undefined && <BarraProgreso porcentaje={t.usado} />}
+                        <Text style={[styles.etiquetaMuted, t.sobreendeudada && { color: color.danger }]}>
+                          {t.sobreendeudada
+                            ? `⚠ Pasó el cupo${t.cuenta.cupoTotal ? ` de ${formatMonto(t.cuenta.cupoTotal)}` : ""}`
+                            : `Te quedan ${formatMonto(t.cuenta.disponible)} de cupo`}
+                        </Text>
+                        {t.pago || t.corte ? (
+                          <Text style={styles.etiquetaMuted}>{t.pago ? `Pagar hasta el ${diaMes(t.pago)}` : `Corta el ${diaMes(t.corte!)}`}</Text>
+                        ) : null}
+                      </Pressable>
+                    ))}
+                  </View>
+                </>
+              )}
+            </>
+          )}
+
+          {parte === "presupuesto" && (
+            <>
+              <View style={styles.sectionHeading}>
+                <Text style={styles.tituloCard}>Presupuesto del mes</Text>
+                <Pressable accessibilityRole="button" onPress={() => router.push("/presupuestos")} style={styles.sectionLink}>
+                  <Text style={styles.sectionLinkText}>{estadosPresupuesto.length ? "Ver todos" : "Crear"}</Text>
+                </Pressable>
+              </View>
+              <Tarjeta style={{ gap: spacing(3) }}>
+                {estadosPresupuesto.length === 0 ? (
+                  <EstadoVacio
+                    icono="pie-chart-outline"
+                    titulo="Sin presupuestos este mes"
+                    subtitulo="Ponle un límite a lo que más gastas (comida, transporte…) y aquí verás cómo vas."
+                  />
+                ) : (
+                  <>
+                    <View style={styles.filaTitulo}>
+                      <Text style={styles.tarjetaNombre}>Total</Text>
+                      <Text style={styles.etiquetaMuted}>
+                        {formatMonto(totalPresupuesto.gastado)} de {formatMonto(totalPresupuesto.limite)} · {totalPresupuesto.porcentaje} %
+                      </Text>
+                    </View>
+                    <BarraProgreso porcentaje={totalPresupuesto.porcentaje} />
+                    {estadosPresupuesto.slice(0, 4).map((e) => (
+                      <View key={e.presupuesto.id} style={{ gap: spacing(1.5) }}>
+                        <View style={styles.filaTitulo}>
+                          <Text style={styles.avisoTexto}>{e.categoriaNombre}</Text>
+                          <Text style={[styles.etiquetaMuted, e.nivel === "excedido" && { color: color.danger }]}>
+                            {Math.round(e.porcentaje)} % ·{" "}
+                            {e.restante >= 0 ? `quedan ${formatMonto(e.restante)}` : `te pasaste ${formatMonto(-e.restante)}`}
+                          </Text>
+                        </View>
+                        <BarraProgreso porcentaje={e.porcentaje} />
+                      </View>
+                    ))}
+                  </>
+                )}
+              </Tarjeta>
+
+              <Text style={[styles.tituloCard, { marginTop: spacing(3) }]}>Ingresos y gastos</Text>
+              <Tarjeta>
+                <TablaResumen
+                  etiqueta={`Ingresos y gastos de ${etiquetaMes(mes)} y ${etiquetaMes(comparacion.mesAnterior)}`}
+                  columnas={["", etiquetaMes(mes).slice(0, 3), etiquetaMes(comparacion.mesAnterior).slice(0, 3), "Cambio"]}
+                  filas={comparacion.filas.map((f) => ({
+                    clave: f.concepto,
+                    celdas: [
+                      { texto: f.concepto, fuerte: f.concepto === "Balance" },
+                      { texto: cifra(f.actual), fuerte: f.concepto === "Balance", tono: f.concepto === "Balance" && f.actual < 0 ? "malo" : undefined },
+                      cifra(f.anterior),
+                      { texto: cambioTexto(f.cambio), tono: f.mejora === undefined ? undefined : f.mejora ? "bueno" : "malo" },
+                    ],
+                  }))}
+                />
+              </Tarjeta>
+            </>
+          )}
+
+          {parte === "ahorro" && (
+            <>
+              <Text style={[styles.tituloCard, { marginTop: spacing(3) }]}>Ahorro y diferidos</Text>
+              <Tarjeta style={{ gap: spacing(4) }}>
+                <TablaResumen
+                  etiqueta="Ahorro"
+                  columnas={["Ahorro", "Saldo"]}
+                  anchos={[2, 1.2]}
+                  filas={[
+                    ...ahorro.cuentas.map((a) => ({
+                      clave: a.cuenta.id,
+                      celdas: [`${a.cuenta.nombre}${a.cuenta.identificador ? ` ••${a.cuenta.identificador}` : ""}`, cifra(a.saldo)],
+                    })),
+                    ...(ahorro.cuentas.length > 1
+                      ? [{ clave: "total", celdas: [{ texto: "Total ahorrado", fuerte: true }, { texto: cifra(ahorro.totalAhorrado), fuerte: true }] }]
+                      : []),
+                    {
+                      clave: "quedo",
+                      celdas: [
+                        "Te quedó este mes",
+                        { texto: cifra(ahorro.teQuedo), tono: ahorro.teQuedo < 0 ? ("malo" as const) : ahorro.teQuedo > 0 ? ("bueno" as const) : undefined },
+                      ],
+                    },
+                    { clave: "tasa", celdas: [{ texto: "Tasa de ahorro", fuerte: true }, { texto: ahorro.tasa === undefined ? "—" : `${ahorro.tasa} %`, fuerte: true }] },
+                  ]}
+                />
+                {ahorro.cuentas.length === 0 && (
+                  <Text style={styles.etiquetaMuted}>Agrega una cuenta de ahorro en Más → Cuentas para ver aquí su saldo.</Text>
+                )}
+                {diferidos.filas.length === 0 ? (
+                  <Text style={styles.introTexto}>No tienes compras diferidas pendientes.</Text>
+                ) : (
+                  <TablaResumen
+                    etiqueta="Diferidos"
+                    columnas={["Diferidos", "Cuota", "Faltan"]}
+                    filas={[
+                      ...diferidos.filas.map((f) => ({
+                        clave: f.deuda.id,
+                        celdas: [
+                          `${f.deuda.nombre}${f.tarjeta ? ` · ${f.tarjeta}` : ""}`,
+                          cifra(f.cuota),
+                          `${f.cuotasRestantes} de ${f.cuotasTotales}`,
+                        ],
+                      })),
+                      { clave: "total", celdas: [{ texto: "Cuotas de este mes", fuerte: true }, { texto: cifra(diferidos.cuotasDelMes), fuerte: true }, ""] },
+                    ]}
+                  />
+                )}
+              </Tarjeta>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -709,6 +1026,86 @@ function veredictoFinanciero(
   };
 }
 
+type CeldaTabla = { texto: string; tono?: "bueno" | "malo"; fuerte?: boolean };
+type FilaTabla = { clave: string; celdas: (CeldaTabla | string)[] };
+
+/** Tabla local para mantener todo el cambio dentro de la pantalla Resumen. */
+function TablaResumen({
+  columnas,
+  filas,
+  anchos,
+  etiqueta,
+}: {
+  columnas: string[];
+  filas: FilaTabla[];
+  anchos?: number[];
+  etiqueta: string;
+}) {
+  const { color } = useTheme();
+  const styles = crearEstilosTabla(color);
+  const flex = anchos ?? columnas.map((_, i) => (i === 0 ? 2 : 1.2));
+  const celda = (valor: CeldaTabla | string): CeldaTabla =>
+    typeof valor === "string" ? { texto: valor } : valor;
+
+  return (
+    <View accessibilityLabel={etiqueta}>
+      <View style={[styles.fila, styles.encabezado]}>
+        {columnas.map((titulo, i) => (
+          <Text key={i} style={[styles.titulo, { flex: flex[i] }, i > 0 && styles.derecha]} numberOfLines={1}>
+            {titulo}
+          </Text>
+        ))}
+      </View>
+      {filas.map((fila, indice) => (
+        <View
+          key={fila.clave}
+          accessible
+          accessibilityLabel={fila.celdas
+            .map((valor, i) => {
+              const prefijo = i > 0 && columnas[i] ? columnas[i] + ": " : "";
+              return prefijo + celda(valor).texto;
+            })
+            .filter((texto) => texto.trim())
+            .join(", ")}
+          style={[styles.fila, indice < filas.length - 1 && styles.divisor]}
+        >
+          {fila.celdas.map((valor, i) => {
+            const { texto, tono, fuerte } = celda(valor);
+            return (
+              <Text
+                key={i}
+                numberOfLines={1}
+                style={[
+                  i === 0 ? styles.nombre : styles.cifra,
+                  { flex: flex[i] },
+                  i > 0 && styles.derecha,
+                  fuerte && styles.fuerte,
+                  tono === "bueno" && { color: color.success },
+                  tono === "malo" && { color: color.danger },
+                ]}
+              >
+                {texto}
+              </Text>
+            );
+          })}
+        </View>
+      ))}
+    </View>
+  );
+}
+
+const crearEstilosTabla = (color: Colors) =>
+  StyleSheet.create({
+    fila: { flexDirection: "row", alignItems: "center", gap: spacing(2), paddingVertical: spacing(2.5) },
+    encabezado: { paddingVertical: spacing(1.5), borderBottomWidth: 1, borderBottomColor: color.border },
+    divisor: { borderBottomWidth: 1, borderBottomColor: color.border },
+    titulo: { fontFamily: font.body, fontSize: 12, color: color.textMuted },
+    nombre: { fontFamily: font.body, fontSize: 14, color: color.text },
+    cifra: { fontFamily: font.mono, fontSize: 13, color: color.text },
+    derecha: { textAlign: "right" },
+    fuerte: { fontFamily: font.semibold },
+  });
+
 const createStyles = (color: Colors) =>
   StyleSheet.create({
     contenedor: { flex: 1, backgroundColor: color.bg },
@@ -834,4 +1231,15 @@ const createStyles = (color: Colors) =>
       marginTop: 2,
     },
     recomendacion: { padding: spacing(3), borderRadius: radius.sm },
+    aviso: { flexDirection: "row", alignItems: "center", gap: spacing(2), borderRadius: radius.sm, paddingVertical: spacing(3), paddingHorizontal: spacing(3), borderWidth: 1, borderColor: color.border },
+    avisoTexto: { flex: 1, fontFamily: font.medium, fontSize: 13, color: color.text },
+    acciones: { flexDirection: "row", justifyContent: "space-between", gap: spacing(2) },
+    accion: { flex: 1, alignItems: "center", gap: spacing(1.5), minHeight: 44 },
+    accionIcono: { width: 48, height: 48, borderRadius: 16, backgroundColor: color.surface, borderWidth: 1, borderColor: color.border, alignItems: "center", justifyContent: "center" },
+    accionTexto: { fontFamily: font.medium, fontSize: 12, color: color.textMuted },
+    filaFavorita: { flexDirection: "row", alignItems: "center", gap: spacing(3), minHeight: 44 },
+    rejilla: { flexDirection: "row", flexWrap: "wrap", gap: spacing(3) },
+    tarjetaMini: { flexGrow: 1, flexBasis: 150, gap: spacing(1.5), padding: spacing(4), backgroundColor: color.surface, borderWidth: 1, borderColor: color.border, borderRadius: 18 },
+    tarjetaNombre: { flex: 1, fontFamily: font.semibold, fontSize: 14, color: color.text },
+    tarjetaMonto: { fontFamily: font.mono, fontSize: 18, color: color.text },
   });

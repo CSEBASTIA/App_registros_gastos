@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { cicloTarjeta, corteDeGasto, fechaDelDia, pagoDeCorte, textoDias } from "../src/lib/corteTarjeta.ts";
+import { cicloTarjeta, corteDeGasto, fechaDelDia, pagoDeCorte, pagoQueToca, textoDias } from "../src/lib/corteTarjeta.ts";
 import { esCasaComercial, inicialesDeEntidad, OPCIONES_CASA_COMERCIAL, ETIQUETA_BANCO, GRADIENTE_BANCO } from "../src/lib/marcas.ts";
 import { cuentaSchema, fechasTarjetaSchema } from "../src/schemas/cuenta.schema.ts";
 import { setSupabaseClient } from "../src/client.ts";
@@ -46,6 +46,18 @@ test("cicloTarjeta: corte, inicio del ciclo, pago y días que faltan", () => {
   assert.equal(textoDias(0), "hoy");
   assert.equal(textoDias(1), "mañana");
   assert.equal(textoDias(4), "en 4 días");
+});
+
+test("pagoQueToca: el del último corte mientras no venza; después, el del corte en curso", () => {
+  // Corte el 15, pago el 1.
+  assert.deepEqual(pagoQueToca(15, 1, "2026-10-20"), { corte: "2026-10-15", pago: "2026-11-01", diasHastaPago: 12 });
+  assert.deepEqual(pagoQueToca(15, 1, "2026-11-01"), { corte: "2026-10-15", pago: "2026-11-01", diasHastaPago: 0 });
+  assert.deepEqual(pagoQueToca(15, 1, "2026-11-02"), { corte: "2026-11-15", pago: "2026-12-01", diasHastaPago: 29 });
+  // El día del corte, el anterior ya se pagó: toca el de hoy.
+  assert.deepEqual(pagoQueToca(15, 1, "2026-10-15"), { corte: "2026-10-15", pago: "2026-11-01", diasHastaPago: 17 });
+  // Corte el 5, pago el 25 del mismo mes.
+  assert.deepEqual(pagoQueToca(5, 25, "2026-10-20"), { corte: "2026-10-05", pago: "2026-10-25", diasHastaPago: 5 });
+  assert.deepEqual(pagoQueToca(5, 25, "2026-10-26"), { corte: "2026-11-05", pago: "2026-11-25", diasHastaPago: 30 });
 });
 
 test("casas comerciales: etiquetas, colores e iniciales para el ícono sin logo", () => {

@@ -6,6 +6,17 @@ const FALLO_DE_RED = /^(TypeError: )?(Failed to fetch|Network request failed|Loa
 export const MENSAJE_SIN_CONEXION =
   "No se pudo conectar con el servidor. Revisa tu conexión a internet e inténtalo de nuevo.";
 
+export const MENSAJE_FALLO_DEL_SERVIDOR = "El servidor tuvo un problema. Inténtalo de nuevo en unos minutos.";
+
+/**
+ * Un fallo del servidor (HTTP 5xx) puede traer detalles internos en el texto:
+ * usuarios de la base, direcciones IP, consultas. Nunca se muestran.
+ */
+function esFalloDelServidor(err: unknown): boolean {
+  const estado = Number((err as { status?: unknown } | null)?.status);
+  return Number.isFinite(estado) && estado >= 500;
+}
+
 interface ProblemaZod {
   code: string;
   message: string;
@@ -132,5 +143,8 @@ export function mensajeError(err: unknown): string {
   }
 
   if (FALLO_DE_RED.test(mensaje.trim())) return MENSAJE_SIN_CONEXION;
-  return mensajeDePostgres(codigo) ?? mensajeDeAuth(codigo, mensaje) ?? mensaje;
+  const conocido = mensajeDePostgres(codigo) ?? mensajeDeAuth(codigo, mensaje);
+  if (conocido) return conocido;
+  if (esFalloDelServidor(err)) return MENSAJE_FALLO_DEL_SERVIDOR;
+  return mensaje;
 }

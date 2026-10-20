@@ -77,6 +77,27 @@ export function cicloTarjeta(diaCorte: number, hoy: string, diaPago?: number): C
   return ciclo;
 }
 
+export interface PagoQueToca {
+  /** El corte cuyo pago toca (el último si todavía no venció, o el del ciclo en curso). */
+  corte: string;
+  pago: string;
+  diasHastaPago: number;
+}
+
+/**
+ * El pago que toca hacer, visto desde `hoy`: el del último corte si todavía no
+ * venció (corte el 15, pago el 1: el 20 de octubre toca pagar el 1 de
+ * noviembre lo del corte del 15 de octubre, no el 1 de diciembre); si ya
+ * venció, el del corte en curso.
+ */
+export function pagoQueToca(diaCorte: number, diaPago: number, hoy: string): PagoQueToca {
+  const corteEnCurso = corteDeGasto(hoy, diaCorte);
+  const ultimoCorte = cortePrevio(corteEnCurso, diaCorte);
+  const pagoUltimo = pagoDeCorte(ultimoCorte, diaPago);
+  const [corte, pago] = pagoUltimo >= hoy ? [ultimoCorte, pagoUltimo] : [corteEnCurso, pagoDeCorte(corteEnCurso, diaPago)];
+  return { corte, pago, diasHastaPago: diasEntre(hoy, pago) };
+}
+
 /** "hoy", "mañana" o "en N días". */
 export function textoDias(dias: number): string {
   if (dias === 0) return "hoy";

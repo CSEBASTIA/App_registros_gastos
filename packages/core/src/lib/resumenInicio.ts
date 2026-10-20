@@ -5,7 +5,7 @@
  */
 import type { Cuenta, Deuda, Gasto, Ingreso } from "../types/domain";
 import { sumarMontos } from "./montos";
-import { cicloTarjeta } from "./corteTarjeta";
+import { cicloTarjeta, pagoQueToca } from "./corteTarjeta";
 
 /** "2026-10" → "2026-09" (enero → diciembre del año anterior). */
 export function mesAnterior(mes: string): string {
@@ -81,7 +81,8 @@ export function resumenTarjetas(cuentas: Cuenta[], gastos: Gasto[], mes: string,
   const tarjetas = cuentas.filter((c) => c.tipo === "credito");
   const resumen = (cuenta: Cuenta): ResumenTarjeta => {
     const gastadoMes = sumarMontos(gastos.filter((g) => g.cuentaId === cuenta.id && g.fecha.startsWith(mes)).map((g) => g.monto));
-    const ciclo = cuenta.diaCorte ? cicloTarjeta(cuenta.diaCorte, hoy, cuenta.diaPago) : undefined;
+    const ciclo = cuenta.diaCorte ? cicloTarjeta(cuenta.diaCorte, hoy) : undefined;
+    const pago = cuenta.diaCorte && cuenta.diaPago ? pagoQueToca(cuenta.diaCorte, cuenta.diaPago, hoy).pago : undefined;
     return {
       cuenta,
       gastadoMes,
@@ -90,7 +91,7 @@ export function resumenTarjetas(cuentas: Cuenta[], gastos: Gasto[], mes: string,
         : {}),
       sobreendeudada: cuenta.disponible < 0,
       ...(ciclo ? { corte: ciclo.corte } : {}),
-      ...(ciclo?.pago ? { pago: ciclo.pago } : {}),
+      ...(pago ? { pago } : {}),
     };
   };
   const elegidas = favoritas

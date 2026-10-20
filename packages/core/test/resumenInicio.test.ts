@@ -73,6 +73,18 @@ test("tarjetas: las favoritas en su orden; sin favoritas, las dos con más gasto
   assert.deepEqual(resumenTarjetas(cuentas, gastos, "2026-10", [], "2026-10-20").map((t) => t.cuenta.id), ["visa", "master"]);
 });
 
+test("tarjetas: el pago que toca es el del último corte si todavía no venció", () => {
+  // Corte el 15, pago el 1: el 20 de octubre se paga el 1 de noviembre (corte del 15 de octubre).
+  const master = cuenta({ id: "master", tipo: "credito", cupoTotal: 500, disponible: 380, diaCorte: 15, diaPago: 1 });
+  const [enOctubre] = resumenTarjetas([master], [], "2026-10", ["master"], "2026-10-20");
+  assert.equal(enOctubre.corte, "2026-11-15");
+  assert.equal(enOctubre.pago, "2026-11-01");
+  // Pasado el 1 de noviembre, ya toca el pago del corte del 15 de noviembre.
+  assert.equal(resumenTarjetas([master], [], "2026-11", ["master"], "2026-11-02")[0].pago, "2026-12-01");
+  // El mismo día del pago todavía cuenta.
+  assert.equal(resumenTarjetas([master], [], "2026-11", ["master"], "2026-11-01")[0].pago, "2026-11-01");
+});
+
 test("ahorro: saldo de las cuentas de ahorro y la tasa de lo que te quedó", () => {
   const r = resumenAhorro(
     [cuenta({ id: "a", tipo: "ahorro", disponible: 875.32 }), cuenta({ id: "e", tipo: "efectivo", disponible: 50 })],

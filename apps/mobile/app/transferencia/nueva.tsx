@@ -55,7 +55,10 @@ export default function NuevaTransferencia() {
   const hayTarjetas = cuentas.some((c) => c.tipo === "credito" && c.id !== origen);
   const montoNumerico = parsearMonto(monto);
   const montoValido = Number.isFinite(montoNumerico) && montoNumerico > 0;
+  // Un avance desde una tarjeta puede pasarse del cupo (queda sobreendeudada);
+  // una cuenta de ahorro, de débito o el efectivo no puede quedar en negativo.
   const superaCupo = cuentaOrigen?.tipo === "credito" && montoValido && montoNumerico > cuentaOrigen.disponible;
+  const saldoInsuficiente = !!cuentaOrigen && cuentaOrigen.tipo !== "credito" && montoValido && montoNumerico > cuentaOrigen.disponible;
 
   function elegirOrigen(id: string) {
     setOrigen(id);
@@ -72,8 +75,8 @@ export default function NuevaTransferencia() {
       setError("Escribe un monto válido, por ejemplo 12,50.");
       return;
     }
-    if (superaCupo) {
-      setError(`El monto supera el cupo disponible de la tarjeta (${formatMonto(cuentaOrigen!.disponible)}).`);
+    if (saldoInsuficiente) {
+      setError(`No alcanza el saldo de «${cuentaOrigen!.nombre}» (${formatMonto(cuentaOrigen!.disponible)}): una cuenta no puede quedar en negativo.`);
       return;
     }
     setGuardando(true);
@@ -162,7 +165,14 @@ export default function NuevaTransferencia() {
                 </Text>
               </View>
             )}
-            {superaCupo && <ErrorTexto>El monto supera el cupo disponible de la tarjeta.</ErrorTexto>}
+            {superaCupo && (
+              <Text style={[styles.ayudaTexto, { color: color.danger }]}>
+                ⚠ Pasa el cupo disponible de la tarjeta: quedará sobreendeudada.
+              </Text>
+            )}
+            {saldoInsuficiente && (
+              <ErrorTexto>{`No alcanza el saldo de «${cuentaOrigen!.nombre}»: una cuenta no puede quedar en negativo.`}</ErrorTexto>
+            )}
           </>
         )}
 

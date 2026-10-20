@@ -8,8 +8,11 @@ import type { TransaccionEstadoCuenta } from "./estadoCuenta";
 import { sumarMontos } from "./montos";
 import { formatMonto } from "./formatMonto";
 
-/** Un estado de cuenta real trae decenas de filas; muchas más es casi seguro otro archivo. */
-export const TOPE_FILAS_IMPORTACION = 300;
+/**
+ * Un estado de cuenta real trae decenas o cientos de filas (uno de ahorro de un
+ * mes puede pasar de 300); muchas más es casi seguro otro archivo.
+ */
+export const TOPE_FILAS_IMPORTACION = 1000;
 
 export interface FilaImportacion {
   id: number;
@@ -51,9 +54,10 @@ function contarPorClave(movimientos: Pick<Gasto, "fecha" | "monto">[]): Map<stri
  * Convierte lo leído del estado de cuenta en filas para revisar:
  * - En una tarjeta de crédito, los pagos/abonos se omiten (se registran con
  *   «Pagar tarjeta», que también descuenta de la cuenta de origen).
- * - En ahorro/débito, esas filas se proponen como ingreso pero sin marcar: el
- *   lector se pensó para tarjetas y «pago realizado» en una cuenta de ahorro
- *   puede ser una salida. La persona decide.
+ * - En ahorro/débito, si el estado dice con sus columnas (DÉBITO / CRÉDITO) o
+ *   con el saldo de cada fila que entró dinero, es un ingreso y sale marcado.
+ *   Si solo lo sugieren las palabras («abono», «pago recibido»), sale como
+ *   ingreso pero sin marcar: puede ser una salida. La persona decide.
  * - Una fila con la misma fecha y monto que un movimiento ya registrado sale
  *   desmarcada como «posible duplicado». Cada movimiento existente cubre una
  *   sola fila: dos cafés iguales en el estado y uno registrado → solo uno se
@@ -79,7 +83,7 @@ export function prepararFilasImportacion(
       truncado = true;
       break;
     }
-    const tipo = t.posiblePago ? "ingreso" : "gasto";
+    const tipo = t.sentido ? (t.sentido === "entrada" ? "ingreso" : "gasto") : t.posiblePago ? "ingreso" : "gasto";
     const clave = claveMovimiento(t.fecha, t.monto);
     const quedan = libres[tipo].get(clave) ?? 0;
     const posibleDuplicado = quedan > 0;
@@ -91,7 +95,7 @@ export function prepararFilasImportacion(
       monto: t.monto,
       tipo,
       categoriaSugerida: t.categoriaSugerida,
-      seleccionada: tipo === "gasto" && !posibleDuplicado,
+      seleccionada: (tipo === "gasto" || t.sentido === "entrada") && !posibleDuplicado,
       posibleDuplicado,
     });
   }
@@ -177,28 +181,28 @@ export function movimientosParaGuardar(
 }
 
 /**
- * Si los gastos a una tarjeta superan su cupo disponible, el mensaje para la
- * persona; si caben, `undefined`. Hace falta revisarlo ANTES de guardar en
- * lote: la base valida el cupo fila por fila antes de insertar, pero descuenta
- * el cupo recién al terminar la escritura, así que en un lote cada fila ve el
- * cupo inicial y juntas podrían pasarse.
+ * Si con lo elegido una cuenta de ahorro, de débito o el efectivo quedaría en
+ * negativo, el mensaje para la persona; si no, `undefined`. Una tarjeta de
+ * crédito sí puede pasarse del cupo (sobreendeudamiento): no frena nada.
+ * Se guardan primero los ingresos y después los gastos, así la cuenta nunca
+ * pasa por un saldo menor que el final.
  */
-export function cupoInsuficiente(
+export function saldoQuedariaNegativo(
   gastos: Pick<Gasto, "monto" | "cuentaId">[],
+  ingresos: Pick<Ingreso, "monto" | "cuentaId">[],
   cuentas: Pick<Cuenta, "id" | "nombre" | "tipo" | "disponible">[]
 ): string | undefined {
-  const porCuenta = new Map<string, number[]>();
-  for (const g of gastos) {
-    if (g.cuentaId) porCuenta.set(g.cuentaId, [...(porCuenta.get(g.cuentaId) ?? []), g.monto]);
-  }
-  for (const [id, montos] of porCuenta) {
+  const movimientos = new Map<string, number[]>();
+  for (const g of gastos) if (g.cuentaId) movimientos.set(g.cuentaId, [...(movimientos.get(g.cuentaId) ?? []), -g.monto]);
+  for (const i of ingresos) if (i.cuentaId) movimientos.set(i.cuentaId, [...(movimientos.get(i.cuentaId) ?? []), i.monto]);
+  for (const [id, montos] of movimientos) {
     const cuenta = cuentas.find((c) => c.id === id);
-    if (!cuenta || cuenta.tipo !== "credito") continue;
-    const total = sumarMontos(montos);
-    if (total > cuenta.disponible) {
+    if (!cuenta || cuenta.tipo === "credito") continue;
+    const final = sumarMontos([cuenta.disponible, ...montos]);
+    if (final < 0) {
       return (
-        `Estos gastos suman ${formatMonto(total)} y el cupo disponible de «${cuenta.nombre}» es ${formatMonto(cuenta.disponible)}. ` +
-        "Desmarca algunos o revisa el cupo de la tarjeta."
+        `Con lo marcado, «${cuenta.nombre}» quedaría en ${formatMonto(final)}, y una cuenta no puede quedar en negativo ` +
+        "(solo una tarjeta de crédito). Desmarca algunos gastos o marca los ingresos que faltan."
       );
     }
   }

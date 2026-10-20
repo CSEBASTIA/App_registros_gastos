@@ -132,6 +132,7 @@ export default function LugarScreen() {
     <ScrollView style={styles.contenedor} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: spacing(5), paddingBottom: spacing(8), gap: spacing(4) }}>
       <BlurFade style={{ gap: spacing(2) }}>
         <Text accessibilityRole="header" style={styles.screenTitle}>{lugar.nombre}</Text>
+        {lugar.direccion && <Text style={styles.meta}>Ubicado en {lugar.direccion}</Text>}
         <SelectorMes mes={mes} onCambiar={setMes} />
       </BlurFade>
 

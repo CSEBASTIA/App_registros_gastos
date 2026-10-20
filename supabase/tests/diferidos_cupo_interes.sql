@@ -12,12 +12,15 @@ insert into cuentas (id, nombre, tipo, cupo_total, disponible) values
 insert into cuentas (id, nombre, tipo, disponible) values
   ('a7100000-0000-4000-8000-000000000002', 'Ahorro', 'ahorro', 200);
 
-do $$ begin
+-- Una compra diferida puede pasarse del cupo (la tarjeta queda sobreendeudada);
+-- se borra enseguida (sin abonos devuelve todo el cupo) para seguir con 130.
+do $$ declare g uuid; d numeric; begin
   insert into gastos (monto, descripcion, cuenta_id, metodo_pago, meses_diferido)
-    values (131, 'Excede', 'a7100000-0000-4000-8000-000000000001', 'diferido', 3);
-  insert into resultados_diferido values ('Cupo insuficiente bloquea la compra', false, 'se permitió');
-exception when invalid_parameter_value then
-  insert into resultados_diferido values ('Cupo insuficiente bloquea la compra', true, sqlerrm);
+    values (131, 'Excede', 'a7100000-0000-4000-8000-000000000001', 'diferido', 3) returning id into g;
+  select disponible into d from cuentas where id = 'a7100000-0000-4000-8000-000000000001';
+  delete from gastos where id = g;
+  insert into resultados_diferido values ('Pasar el cupo deja la tarjeta en negativo (sobreendeudada)',
+    d = -1 and (select disponible from cuentas where id = 'a7100000-0000-4000-8000-000000000001') = 130, 'cupo ' || d);
 end $$;
 
 insert into gastos (id, monto, descripcion, cuenta_id, metodo_pago, meses_diferido, tasa_interes, fecha)
@@ -38,12 +41,12 @@ do $$ declare d deudas; disponible numeric; begin
     format('cupo %s, fecha %s, cuota %s, interés %s', disponible, d.proximo_pago, d.cuota_mensual, d.interes_cuota_pendiente));
 end $$;
 
-do $$ begin
+do $$ declare g uuid; d numeric; begin
   insert into gastos (monto, descripcion, cuenta_id)
-    values (30.01, 'Otro consumo', 'a7100000-0000-4000-8000-000000000001');
-  insert into resultados_diferido values ('Cupo posterior bloqueado', false, 'se permitió');
-exception when invalid_parameter_value then
-  insert into resultados_diferido values ('Cupo posterior bloqueado', true, sqlerrm);
+    values (30.01, 'Otro consumo', 'a7100000-0000-4000-8000-000000000001') returning id into g;
+  select disponible into d from cuentas where id = 'a7100000-0000-4000-8000-000000000001';
+  delete from gastos where id = g;
+  insert into resultados_diferido values ('Un consumo posterior que pasa el cupo queda en negativo', d = -0.01, 'cupo ' || d);
 end $$;
 
 select registrar_abono_deuda((select id from deudas where gasto_id = 'a7200000-0000-4000-8000-000000000001'),

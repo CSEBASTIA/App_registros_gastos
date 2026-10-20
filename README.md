@@ -292,10 +292,11 @@ Para revisarlo en cualquier base: `select version, name from supabase_migrations
 
 Guías: [`docs/guia-google-wallet.md`](docs/guia-google-wallet.md), [`docs/guia-atajo-apple-pay.md`](docs/guia-atajo-apple-pay.md) y [`docs/guia-conectar-correo.md`](docs/guia-conectar-correo.md).
 
+**Correo (desde el 19-oct):** la app busca sola al abrirse (como mucho cada 10 minutos). Con formatos reales de Banco Guayaquil (consumo con tarjeta, «Gracias por el pago de tu tarjeta», comprobantes de pago de tarjeta propia y de transferencia interbancaria) y de Banco Pichincha (pago con tarjeta de débito, transferencias), registra solos los consumos, los pagos de tarjeta y las transferencias entre tus cuentas que reconoce por los últimos dígitos; lo demás va a la bandeja. Ver [`docs/informe-correo-saldos-estado-cuenta.md`](docs/informe-correo-saldos-estado-cuenta.md).
+
 **Limitaciones del correo:**
-- Los remitentes de Produbanco, Diners Club y Austro todavía no se conocen.
-- Los cuerpos de los avisos reales no están comprobados.
-- No se verifica DKIM/SPF; por eso los gastos pasan por revisión humana.
+- Los remitentes de Produbanco, Diners Club y Austro todavía no se conocen; DeUna (Peigo) no se lee.
+- No se verifica DKIM/SPF: por eso solo se registra solo lo que va a una cuenta que la persona identificó con sus dígitos; lo demás pasa por revisión humana.
 - `gmail.readonly` necesita la verificación de Google antes de publicar.
 
 ## Notificaciones

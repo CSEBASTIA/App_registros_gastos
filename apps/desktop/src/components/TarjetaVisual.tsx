@@ -34,6 +34,13 @@ export default function TarjetaVisual({
 
   const imagen = imagenDe(cuenta.estilo);
   const producto = productoDe(cuenta.estilo);
+  // Solo una tarjeta puede quedar en negativo: se pasó del cupo (sobreendeudamiento).
+  const sobreendeudada = cuenta.disponible < 0;
+  const alerta = sobreendeudada && (
+    <div className="tarjeta-visual-alerta" role="status">
+      <span aria-hidden="true">⚠</span> Sobreendeudada: te pasaste {formatMonto(-cuenta.disponible)} del cupo
+    </div>
+  );
 
   if (imagen) {
     const clasesImagen = [
@@ -41,6 +48,7 @@ export default function TarjetaVisual({
       compacta ? "tarjeta-visual-compacta-imagen" : "",
       seleccionada ? "tarjeta-visual-seleccionada" : "",
       onClick ? "tarjeta-visual-clicable" : "",
+      sobreendeudada ? "tarjeta-visual-sobreendeudada" : "",
     ]
       .filter(Boolean)
       .join(" ");
@@ -59,6 +67,7 @@ export default function TarjetaVisual({
           {!compacta && (
             <>
               <span className="tarjeta-visual-imagen-tipo">{producto?.nombre ?? "Tarjeta de crédito"}</span>
+              {alerta}
               {cuenta.cupoTotal ? (
                 <div className="tarjeta-visual-imagen-cupo">
                   <div className="tarjeta-visual-cupo-linea">
@@ -84,6 +93,7 @@ export default function TarjetaVisual({
     compacta ? "tarjeta-visual-compacta" : "",
     seleccionada ? "tarjeta-visual-seleccionada" : "",
     onClick ? "tarjeta-visual-clicable" : "",
+    sobreendeudada ? "tarjeta-visual-sobreendeudada" : "",
   ]
     .filter(Boolean)
     .join(" ");
@@ -91,7 +101,7 @@ export default function TarjetaVisual({
   return (
     <div
       className={clases}
-      style={{ background: cssGradiente(GRADIENTE_BANCO[cuenta.banco]) }}
+      style={{ background: cssGradiente(sobreendeudada ? ["#c23b34", "#7a1714"] : GRADIENTE_BANCO[cuenta.banco]) }}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
@@ -105,6 +115,7 @@ export default function TarjetaVisual({
 
       <div className="tarjeta-visual-nombre">{cuenta.nombre}</div>
       <div className="tarjeta-visual-tipo">Tarjeta de crédito</div>
+      {!compacta && alerta}
 
       {cuenta.cupoTotal ? (
         !compacta && (

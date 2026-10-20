@@ -8,6 +8,18 @@ export interface TransaccionEstadoCuenta {
   monto: number;
   categoriaSugerida: "Ocio" | "Salud" | "Otros";
   posiblePago: boolean;
+  /**
+   * Si salió o entró dinero, cuando el estado lo dice con seguridad (columnas
+   * DÉBITO / CRÉDITO, o el saldo de cada fila). Sin esto, se adivina por las
+   * palabras de la descripción (`posiblePago`).
+   */
+  sentido?: "salida" | "entrada";
+}
+
+/** Saldos que declara el estado de cuenta (para compararlos con la cuenta de la app). */
+export interface SaldosEstadoCuenta {
+  anterior?: number;
+  final?: number;
 }
 
 export interface OpcionesEstadoCuenta {
@@ -16,6 +28,8 @@ export interface OpcionesEstadoCuenta {
 }
 
 const PAGO = /\b(pago\s+(recibido|realizado)|abono|reembolso|reverso|devoluci[oó]n|cr[eé]dito\s+por)\b/i;
+// En una cuenta de ahorro: palabras de dinero que entra (solo si las columnas no lo dicen).
+const ENTRADA = /\b(dep[oó]sito|recibida|acreditaci[oó]n|intereses?\s+ganados?)\b/i;
 const IGNORAR = /^(saldo|total|subtotal|p[aá]gina|resumen|cupo|l[ií]mite|disponible|fecha de corte|pr[oó]ximo|intereses?|tasa)\b/i;
 // Meses con letras («15-OCT-2026», «12 oct.»): en español y las abreviaturas
 // en inglés que imprimen algunos sistemas bancarios.
@@ -159,12 +173,85 @@ export function paginaSinTexto(fragmentos: Pick<FragmentoTextoPdf, "texto">[]): 
   return fragmentos.map((f) => f.texto).join("").trim().length < 8;
 }
 
+const numeroDeSaldo = (m: RegExpMatchArray | null): number | undefined => {
+  if (!m) return undefined;
+  const n = normalizarNumero(m[1].replace(/[$\s]/g, ""));
+  return Number.isFinite(n) ? n : undefined;
+};
+
+/** «SALDO ANTERIOR 100.00» y «SALDO ACTUAL 123.45» (o «saldo final»), si el estado los trae. */
+export function saldosDelEstado(texto: string): SaldosEstadoCuenta {
+  return {
+    anterior: numeroDeSaldo(texto.match(/saldo\s+anterior\s*:?\s*(-?\$?\s?\d[\d.,]*\d)/i)),
+    final: numeroDeSaldo(texto.match(/saldo\s+(?:actual|final)\s*:?\s*(-?\$?\s?\d[\d.,]*\d)/i)),
+  };
+}
+
+/**
+ * Columnas de un estado de cuenta de ahorro o débito: «FECHA … DESCRIPCION
+ * DEBITO CREDITO SALDO». Con ellas se sabe si cada fila fue salida o entrada
+ * (antes se tomaba el primer monto de la fila: en «0.00 10.00 11.06» era el
+ * 0.00 de la columna de débito, y los depósitos se perdían).
+ */
+interface Columnas {
+  debitoPrimero: boolean;
+  conSaldo: boolean;
+  /** Cuántas columnas de números (oficina, documento, referencia) van antes de la descripción: no son parte de ella. */
+  numerosAntes: number;
+}
+
+function columnasDe(lineas: string[]): Columnas | undefined {
+  const encabezado = lineas.find((l) => /fecha/i.test(l) && /d[eé]bitos?\b/i.test(l) && /cr[eé]ditos?\b/i.test(l));
+  if (!encabezado) return undefined;
+  const debito = encabezado.search(/d[eé]bitos?\b/i);
+  const credito = encabezado.search(/cr[eé]ditos?\b/i);
+  return {
+    debitoPrimero: debito < credito,
+    conSaldo: /saldo/i.test(encabezado),
+    numerosAntes: (/ofic/i.test(encabezado) ? 1 : 0) + (/n\.?\s?doc|documento|referencia|\bref\b/i.test(encabezado) ? 1 : 0),
+  };
+}
+
+const iguales = (a: number, b: number) => Math.abs(a - b) < 0.005;
+
+/**
+ * Salida o entrada de una fila con columnas. `montos` son los números de la
+ * fila en orden; `saldoPrevio`, el saldo de la fila anterior (o el saldo
+ * anterior del estado). Devuelve el monto del movimiento y el saldo nuevo.
+ */
+function leerFilaConColumnas(
+  montos: number[],
+  columnas: Columnas,
+  saldoPrevio: number | undefined,
+  pareceEntrada: boolean
+): { monto: number; sentido: "salida" | "entrada"; saldo?: number } | undefined {
+  const saldo = columnas.conSaldo && montos.length >= 2 ? montos[montos.length - 1] : undefined;
+  const movimientos = saldo !== undefined ? montos.slice(0, -1) : montos;
+  if (movimientos.length >= 2) {
+    const [a, b] = movimientos.slice(-2);
+    const [debito, credito] = columnas.debitoPrimero ? [a, b] : [b, a];
+    if (debito > 0 && credito === 0) return { monto: debito, sentido: "salida", saldo };
+    if (credito > 0 && debito === 0) return { monto: credito, sentido: "entrada", saldo };
+    return undefined;
+  }
+  const monto = movimientos[0];
+  if (!monto) return undefined;
+  // Una sola columna con número: el saldo dice hacia dónde fue.
+  if (saldo !== undefined && saldoPrevio !== undefined) {
+    if (iguales(saldoPrevio - monto, saldo)) return { monto, sentido: "salida", saldo };
+    if (iguales(saldoPrevio + monto, saldo)) return { monto, sentido: "entrada", saldo };
+  }
+  return { monto, sentido: pareceEntrada ? "entrada" : "salida", saldo };
+}
+
 /** Lee texto extraído de PDF/OCR o CSV de cualquier banco sin depender de su nombre. */
 export function parseEstadoCuenta(texto: string, opciones: OpcionesEstadoCuenta = {}): TransaccionEstadoCuenta[] {
   const referencia = referenciaDe(texto, opciones);
   const tabla = parsearTabla(texto, referencia);
   if (tabla) return tabla;
   const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const columnas = columnasDe(lineas);
+  let saldoPrevio = columnas ? saldosDelEstado(texto).anterior : undefined;
   const encabezado = lineas.find((l) => /fecha/i.test(l) && /consumo|compra|transacci[oó]n/i.test(l));
   const consumoSegundo = !!encabezado && /fecha.*(?:proceso|registro|movimiento).*fecha.*(?:consumo|compra|transacci[oó]n)/i.test(encabezado);
   const fechasDe = (linea: string) => {
@@ -194,7 +281,21 @@ export function parseEstadoCuenta(texto: string, opciones: OpcionesEstadoCuenta 
       }
     }
     if (!monto || monto.index === undefined) continue;
-    const item = movimiento(fechaNormalizada(elegida[0], referencia), resto.slice(0, monto.index).trim(), monto[1]);
+    let descripcion = resto.slice(0, monto.index).trim();
+    if (columnas) {
+      if (columnas.numerosAntes) {
+        const sinNumeros = descripcion.replace(new RegExp(`^(?:\\d+\\s+){1,${columnas.numerosAntes}}`), "");
+        if (sinNumeros.length >= 2) descripcion = sinNumeros;
+      }
+      const montos = [...resto.matchAll(MONTO)].map((m) => Math.abs(normalizarNumero(m[1].replace(/[$\s]/g, ""))));
+      const fila = leerFilaConColumnas(montos, columnas, saldoPrevio, PAGO.test(descripcion) || ENTRADA.test(descripcion));
+      if (fila?.saldo !== undefined) saldoPrevio = fila.saldo;
+      if (!fila) continue;
+      const item = movimiento(fechaNormalizada(elegida[0], referencia), descripcion, String(fila.monto));
+      if (item) resultado.push({ ...item, sentido: fila.sentido, posiblePago: fila.sentido === "entrada" });
+      continue;
+    }
+    const item = movimiento(fechaNormalizada(elegida[0], referencia), descripcion, monto[1]);
     if (item) resultado.push(item);
   }
   return resultado;

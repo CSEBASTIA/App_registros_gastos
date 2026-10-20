@@ -13,8 +13,16 @@ function filaALugar(row: LugarRow): Lugar {
     latitud: Number(row.latitud),
     longitud: Number(row.longitud),
     radioM: row.radio_m,
+    direccion: row.direccion ?? undefined,
     createdAt: row.created_at,
   };
+}
+
+/** Guarda la dirección de un lugar propio (RLS impide tocar los ajenos). Sin la migración del correo no hace nada. */
+export async function guardarDireccionLugar(id: string, direccion: string): Promise<void> {
+  const limpia = z.string().trim().min(1).max(200).parse(direccion);
+  const { error } = await getSupabaseClient().from("lugares").update({ direccion: limpia }).eq("id", id);
+  if (error && error.code !== "PGRST204" && error.code !== "42703") throw error;
 }
 
 /**

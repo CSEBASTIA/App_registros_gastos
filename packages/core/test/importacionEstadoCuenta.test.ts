@@ -1,8 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { lineasDeTextoPdf, paginaSinTexto, parseEstadoCuenta, type TransaccionEstadoCuenta } from "../src/lib/estadoCuenta.ts";
+import { lineasDeTextoPdf, paginaSinTexto, parseEstadoCuenta, saldosDelEstado, type TransaccionEstadoCuenta } from "../src/lib/estadoCuenta.ts";
 import {
-  cupoInsuficiente,
+  saldoQuedariaNegativo,
   movimientosParaGuardar,
   prepararFilasImportacion,
   rangoDeFilas,
@@ -80,6 +80,20 @@ test("prepararFilasImportacion: en ahorro un abono es ingreso pero sale sin marc
   assert.equal(pagosOmitidos, 0);
   assert.equal(filas[0].tipo, "ingreso");
   assert.equal(filas[0].seleccionada, false);
+});
+
+test("prepararFilasImportacion: en ahorro, lo que las columnas dicen que entró es ingreso y sale marcado", () => {
+  const { filas } = prepararFilasImportacion(
+    [
+      tx("2026-09-07", "TRANSFERENCIA INTERNET", 10, { sentido: "entrada", posiblePago: true }),
+      tx("2026-09-07", "TRANSFERENCIA INTERNET", 2.5, { sentido: "salida" }),
+    ],
+    "ahorro"
+  );
+  assert.deepEqual(filas.map((f) => [f.tipo, f.seleccionada]), [
+    ["ingreso", true],
+    ["gasto", true],
+  ]);
 });
 
 test("prepararFilasImportacion: marca posibles duplicados uno a uno (fecha + monto en centavos)", () => {
@@ -182,7 +196,7 @@ test("movimientosParaGuardar: sin categoría «Otros» de gastos avisa en vez de
 
 // --- Guardado ----------------------------------------------------------------
 
-test("importarMovimientos: una sola escritura por tabla y cuenta lo guardado", async () => {
+test("importarMovimientos: una sola escritura por tabla, primero los ingresos, y cuenta lo guardado", async () => {
   const inserts = clienteFalso();
   const { filas } = prepararFilasImportacion(
     [tx("2026-10-01", "A", 1), tx("2026-10-02", "B", 2), tx("2026-10-03", "ABONO", 3, { posiblePago: true })],
@@ -191,9 +205,10 @@ test("importarMovimientos: una sola escritura por tabla y cuenta lo guardado", a
   filas[2].seleccionada = true;
   const r = await importarMovimientos(movimientosParaGuardar(filas, { id: CUENTA, tipo: "ahorro" }, CATEGORIAS));
   assert.deepEqual(r, { gastos: 2, ingresos: 1 });
-  assert.deepEqual(inserts.map((i) => [i.tabla, i.filas.length]), [["gastos", 2], ["ingresos", 1]]);
-  assert.equal(inserts[0].filas[0].cuenta_id, CUENTA);
-  assert.equal(inserts[0].filas[0].categoria_id, OTROS);
+  // Ingresos antes que gastos: la cuenta (saldo 0) nunca pasa por negativo.
+  assert.deepEqual(inserts.map((i) => [i.tabla, i.filas.length]), [["ingresos", 1], ["gastos", 2]]);
+  assert.equal(inserts[1].filas[0].cuenta_id, CUENTA);
+  assert.equal(inserts[1].filas[0].categoria_id, OTROS);
 });
 
 test("importarMovimientos: si una fila es inválida no se guarda nada", async () => {
@@ -211,14 +226,14 @@ test("importarMovimientos: si una fila es inválida no se guarda nada", async ()
   assert.equal(inserts.length, 0);
 });
 
-test("importarMovimientos: si fallan los ingresos avisa que los gastos sí quedaron", async () => {
-  clienteFalso("ingresos");
+test("importarMovimientos: si fallan los gastos avisa que los ingresos sí quedaron", async () => {
+  clienteFalso("gastos");
   await assert.rejects(
     importarMovimientos({
       gastos: [{ monto: 5, descripcion: "A", categoriaId: OTROS, cuentaId: CUENTA, fecha: "2026-10-01" }],
       ingresos: [{ monto: 9, descripcion: "B", cuentaId: CUENTA, fecha: "2026-10-01" }],
     }),
-    (err: unknown) => err instanceof ErrorImportacionParcial && err.gastosGuardados === 1 && /solo se enviarán los ingresos/.test(err.message)
+    (err: unknown) => err instanceof ErrorImportacionParcial && err.ingresosGuardados === 1 && /solo se enviarán los gastos/.test(err.message)
   );
 });
 
@@ -236,31 +251,35 @@ test("importarMovimientos: nada elegido o demasiadas filas se rechazan antes de 
   assert.equal(inserts.length, 0);
 });
 
-test("cupoInsuficiente: avisa si los gastos a una tarjeta pasan su cupo (sumando en centavos)", () => {
-  const visa = { id: CUENTA, nombre: "Visa", tipo: "credito" as const, disponible: 0.3 };
-  assert.equal(cupoInsuficiente([{ monto: 0.1, cuentaId: CUENTA }, { monto: 0.2, cuentaId: CUENTA }], [visa]), undefined);
+test("saldoQuedariaNegativo: una cuenta de ahorro no puede quedar en negativo; una tarjeta sí (sumando en centavos)", () => {
+  const ahorro = { id: CUENTA, nombre: "Ahorro", tipo: "ahorro" as const, disponible: 0.3 };
+  assert.equal(saldoQuedariaNegativo([{ monto: 0.1, cuentaId: CUENTA }, { monto: 0.2, cuentaId: CUENTA }], [], [ahorro]), undefined);
   assert.match(
-    cupoInsuficiente([{ monto: 0.2, cuentaId: CUENTA }, { monto: 0.2, cuentaId: CUENTA }], [visa]) ?? "",
-    /suman \$0\.40 y el cupo disponible de «Visa» es \$0\.30/
+    saldoQuedariaNegativo([{ monto: 0.2, cuentaId: CUENTA }, { monto: 0.2, cuentaId: CUENTA }], [], [ahorro]) ?? "",
+    /«Ahorro» quedaría en -\$0\.10/
   );
-  // En ahorro no hay cupo: puede quedar en negativo, como al registrar a mano.
-  assert.equal(cupoInsuficiente([{ monto: 50, cuentaId: CUENTA }], [{ ...visa, tipo: "ahorro" }]), undefined);
-  assert.equal(cupoInsuficiente([{ monto: 50 }], [visa]), undefined);
+  // Los ingresos del mismo estado cuentan: el estado nunca deja la cuenta en negativo.
+  assert.equal(saldoQuedariaNegativo([{ monto: 0.4, cuentaId: CUENTA }], [{ monto: 0.1, cuentaId: CUENTA }], [ahorro]), undefined);
+  // Una tarjeta puede pasarse del cupo (sobreendeudamiento): no frena.
+  assert.equal(saldoQuedariaNegativo([{ monto: 50, cuentaId: CUENTA }], [], [{ ...ahorro, tipo: "credito" }]), undefined);
+  assert.equal(saldoQuedariaNegativo([{ monto: 50 }], [], [ahorro]), undefined);
 });
 
-test("importarMovimientos: si el lote pasa el cupo de la tarjeta no guarda nada", async () => {
-  const inserts = clienteFalso(undefined, [filaCuenta("credito", 100)]);
+test("importarMovimientos: una tarjeta puede pasarse del cupo; una cuenta de ahorro en negativo no guarda nada", async () => {
+  const gastos = [
+    { monto: 60, descripcion: "A", categoriaId: OTROS, cuentaId: CUENTA, metodoPago: "credito" as const, fecha: "2026-10-01" },
+    { monto: 60, descripcion: "B", categoriaId: OTROS, cuentaId: CUENTA, metodoPago: "credito" as const, fecha: "2026-10-02" },
+  ];
+  const enTarjeta = clienteFalso(undefined, [filaCuenta("credito", 100)]);
+  assert.deepEqual(await importarMovimientos({ gastos, ingresos: [] }), { gastos: 2, ingresos: 0 });
+  assert.deepEqual(enTarjeta.map((i) => [i.tabla, i.filas.length]), [["gastos", 2]]);
+
+  const enAhorro = clienteFalso(undefined, [filaCuenta("ahorro", 100, "Ahorro")]);
   await assert.rejects(
-    importarMovimientos({
-      gastos: [
-        { monto: 60, descripcion: "A", categoriaId: OTROS, cuentaId: CUENTA, metodoPago: "credito", fecha: "2026-10-01" },
-        { monto: 60, descripcion: "B", categoriaId: OTROS, cuentaId: CUENTA, metodoPago: "credito", fecha: "2026-10-02" },
-      ],
-      ingresos: [],
-    }),
-    /suman \$120\.00 y el cupo disponible de «Visa» es \$100\.00/
+    importarMovimientos({ gastos: gastos.map(({ metodoPago: _, ...g }) => g), ingresos: [] }),
+    /«Ahorro» quedaría en -\$20\.00/
   );
-  assert.equal(inserts.length, 0);
+  assert.equal(enAhorro.length, 0);
 });
 
 test("textoResultadoImportacion: singular, plural y nada", () => {
@@ -301,6 +320,51 @@ test("lineasDeTextoPdf: una fila con alturas casi iguales (700,9 y 701,1) no se 
   ]);
   assert.deepEqual(lineas, ["02/10/2026 SUPERMAXI 45,30", "03/10/2026 FYBECA 8,00"]);
 });
+test("parseEstadoCuenta: estado de ahorro con columnas DEBITO CREDITO SALDO (formato de Banco Pichincha)", () => {
+  // Estructura de un estado real de 11 páginas; números de documento y montos inventados.
+  const texto = [
+    "ESTADO DE CUENTA",
+    "FECHA ÚLTIMO CORTE (FACTURA) 04-09-2026",
+    "FECHA ESTE CORTE 08-10-2026",
+    "(Según ART.4, Del Reglamento de Comprobantes de Venta, Retención y SALDO ANTERIOR 5.00",
+    "001-170-000000000 DEPÓSITO / CRÉDITOS (2) 15.00",
+    "CHEQUES / DÉBITOS (2) 11.30",
+    "OFICINA: CENTRO SALDO ACTUAL 8.70",
+    "Página 2 de 11",
+    "FECHA OFIC. N.DOC. DESCRIPCION DEBITO CREDITO SALDO",
+    "07-sep. 12 1000001 TRANSFERENCIA INTERNET 2.50 0.00 2.50",
+    "07-sep. 12 1000002 TRANSFERENCIA INTERBANCARIA RECIBIDA 0.00 10.00 12.50",
+    "4",
+    "15-sep. 12 1000003 CONSUMO TD TIENDA 12 8.80 0.00 3.70",
+    "08-oct. 12 1000004 TRANSFERENCIA INTERNET 0.00 5.00 8.70",
+    "Daremos por recibida su conformidad al presente estado de cuenta",
+  ].join("\n");
+  const t = parseEstadoCuenta(texto);
+  assert.deepEqual(
+    t.map((x) => [x.fecha, x.descripcion, x.monto, x.sentido]),
+    [
+      ["2026-09-07", "TRANSFERENCIA INTERNET", 2.5, "salida"],
+      ["2026-09-07", "TRANSFERENCIA INTERBANCARIA RECIBIDA", 10, "entrada"],
+      ["2026-09-15", "CONSUMO TD TIENDA 12", 8.8, "salida"],
+      ["2026-10-08", "TRANSFERENCIA INTERNET", 5, "entrada"],
+    ]
+  );
+  assert.deepEqual(saldosDelEstado(texto), { anterior: 5, final: 8.7 });
+});
+
+test("parseEstadoCuenta: con una sola columna de monto y el saldo, el saldo dice si entró o salió", () => {
+  const texto = [
+    "SALDO ANTERIOR 100.00",
+    "FECHA DESCRIPCION DEBITO/CREDITO SALDO",
+    "01/10/2026 COMPRA SUPERMAXI 20.00 80.00",
+    "02/10/2026 DEPOSITO EN EFECTIVO 50.00 130.00",
+  ].join("\n");
+  assert.deepEqual(parseEstadoCuenta(texto).map((x) => [x.monto, x.sentido]), [
+    [20, "salida"],
+    [50, "entrada"],
+  ]);
+});
+
 test("paginaSinTexto: una página escaneada casi no trae texto", () => {
   assert.equal(paginaSinTexto([{ texto: " " }, { texto: "1" }]), true);
   assert.equal(paginaSinTexto([{ texto: "02/10/2026 SUPERMAXI 45,30" }]), false);

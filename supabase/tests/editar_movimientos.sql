@@ -59,17 +59,19 @@ do $$ declare cat uuid; otra uuid; g uuid; r gastos; n int; begin
   end;
 end $$;
 
--- E05: subir un gasto con tarjeta por encima del cupo se rechaza
-do $$ declare cat uuid; g uuid; begin
+-- E05: subir un gasto con tarjeta por encima del cupo se permite (la tarjeta
+-- queda sobreendeudada, en negativo) y bajarlo lo devuelve
+do $$ declare cat uuid; g uuid; antes numeric; arriba numeric; despues numeric; begin
   select id into cat from categorias where nombre = 'Comida' and usuario_id is null;
   insert into gastos (monto, descripcion, categoria_id, cuenta_id, metodo_pago, fecha)
     values (10, 'Cena', cat, '7d400000-0000-4000-8000-000000000003', 'credito', '2026-10-16') returning id into g;
-  begin
-    update gastos set monto = 1000 where id = g;
-    insert into resultados values ('E05 editar por encima del cupo de la tarjeta se rechaza', false, 'se permitió');
-  exception when invalid_parameter_value then
-    insert into resultados values ('E05 editar por encima del cupo de la tarjeta se rechaza', true, sqlerrm);
-  end;
+  select disponible into antes from cuentas where id = '7d400000-0000-4000-8000-000000000003';
+  update gastos set monto = 1000 where id = g;
+  select disponible into arriba from cuentas where id = '7d400000-0000-4000-8000-000000000003';
+  update gastos set monto = 10 where id = g;
+  select disponible into despues from cuentas where id = '7d400000-0000-4000-8000-000000000003';
+  insert into resultados values ('E05 editar por encima del cupo deja la tarjeta en negativo; bajarlo la devuelve',
+    arriba = antes - 990 and arriba < 0 and despues = antes, format('%s → %s → %s', antes, arriba, despues));
 end $$;
 
 -- E06: editar un ingreso (monto, cuenta y fecha) reajusta los saldos

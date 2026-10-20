@@ -16,7 +16,9 @@ import {
   recordatoriosAProgramar,
   revisarMisPresupuestos,
   textoAvisoPresupuesto,
+  textoNotificacionRegistrado,
   PREFERENCIAS_NOTIFICACIONES_POR_DEFECTO,
+  type AvisoRegistrado,
   type NotificacionProgramada,
   type PreferenciasNotificaciones,
 } from "core";
@@ -219,6 +221,32 @@ export async function avisarPresupuestos(fecha?: string): Promise<void> {
     await avisarPresupuestosAhora(mes);
   } catch {
     // No es parte de guardar el gasto.
+  }
+}
+
+/**
+ * Lo que se registró solo desde el correo: «Registré $12,34 en TIENDA PRUEBA S A ·
+ * Con tu tarjeta •••• 1234». Igual que los pagos de Google Wallet, con el
+ * aviso «Pagos registrados». Nunca lanza.
+ */
+export async function avisarRegistradosDelCorreo(registrados: AvisoRegistrado[]): Promise<void> {
+  const nuevos = registrados.filter((r) => r.resultado === "registrado");
+  if (!NOTIFICACIONES_DISPONIBLES || nuevos.length === 0) return;
+  try {
+    const id = await usuarioActual();
+    if (!id) return;
+    const p = await leerPreferenciasNotificaciones(AsyncStorage, id);
+    if (!p.pagos || (await estadoPermisoNotificaciones()) !== "concedido") return;
+    await prepararNotificaciones();
+    for (const r of nuevos) {
+      const { titulo, cuerpo, ruta } = textoNotificacionRegistrado(r);
+      await Notifications.scheduleNotificationAsync({
+        content: { title: titulo, body: cuerpo, data: { tipo: "pago", ruta } },
+        trigger: { channelId: CANALES.pagos },
+      });
+    }
+  } catch {
+    // Avisar no es parte de registrar.
   }
 }
 

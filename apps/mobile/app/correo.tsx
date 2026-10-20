@@ -14,6 +14,7 @@ import { mensajeError, resumenSincronizacion } from "core";
 import Tarjeta from "../components/Tarjeta";
 import Boton from "../components/Boton";
 import ErrorTexto from "../components/ErrorTexto";
+import RegistroAutomatico from "../components/RegistroAutomatico";
 import { spacing, useTheme, font, type Colors } from "../lib/theme";
 import { BlurFade } from "../components/Motion";
 import {
@@ -22,6 +23,7 @@ import {
   proveedorConectado,
   conectarProveedor,
   desconectarYBorrarCorreo,
+  despuesDeSincronizar,
   sincronizarCorreo,
   CLAVE_ULTIMA_SYNC,
   type ProveedorCorreo,
@@ -109,6 +111,8 @@ export default function CorreoScreen() {
       const r = await sincronizarCorreo();
       if (r.marca) setUltimaSync(r.marca);
       setResultado(resumenSincronizacion(r));
+      // Avisa lo registrado, le busca el lugar a los consumos y revisa presupuestos.
+      void despuesDeSincronizar(r);
     } catch (err) {
       setError(mensajeError(err));
       // Si el permiso venció, los tokens ya se borraron: refleja "sin conectar".
@@ -168,17 +172,28 @@ export default function CorreoScreen() {
             <Text style={styles.tituloCard}>Qué lee y qué guarda</Text>
           </View>
           <Text style={styles.textoMuted}>
-            • Solo busca cuando tocás «Buscar ahora», y solo correos recientes
-            (desde la última búsqueda; la primera vez, 14 días). El permiso de
-            Google o Microsoft técnicamente permite leer tu bandeja.
+            • Busca sola al abrir la app (como mucho cada 10 minutos) y cuando
+            tocás «Buscar ahora», solo en correos recientes (desde la última
+            búsqueda; la primera vez, 14 días). El permiso de Google o Microsoft
+            técnicamente permite leer tu bandeja.
           </Text>
           <Text style={styles.textoMuted}>
             • El texto del correo se analiza en tu teléfono. De cada aviso
-            reconocido se guarda monto, fecha, banco y asunto; el asunto se
-            borra al confirmarlo o descartarlo.
+            reconocido se guarda monto, fecha, hora, banco, comercio, últimos
+            dígitos y asunto; el asunto, el comercio y los dígitos se borran del
+            aviso al resolverlo.
           </Text>
           <Text style={styles.textoMuted}>
-            • Nada se convierte en gasto sin que lo confirmes en la Bandeja.
+            • Se registran solos los consumos con tarjeta, los pagos de tarjeta y
+            las transferencias entre tus cuentas que reconozco por los últimos
+            dígitos de la cuenta o tarjeta (anótalos en su detalle), y te aviso
+            con una notificación. Lo demás espera tu confirmación en la Bandeja.
+            Se apaga en «Registrar solo cuando reconozco la tarjeta».
+          </Text>
+          <Text style={styles.textoMuted}>
+            • Si activaste «Guardar la ubicación de mis pagos», busco el comercio
+            en OpenStreetMap cerca de donde estás para darle lugar y dirección al
+            gasto (solo se envía el nombre del comercio y la zona).
           </Text>
           <Text style={styles.textoMuted}>
             • Al desconectar se quita el permiso y se borran estos datos. Los
@@ -283,6 +298,7 @@ export default function CorreoScreen() {
             />
           </Tarjeta>
         )}
+        {conectado && <RegistroAutomatico />}
 
         {error && <ErrorTexto>{error}</ErrorTexto>}
       </ScrollView>

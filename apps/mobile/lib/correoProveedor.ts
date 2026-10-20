@@ -3,11 +3,14 @@ import * as SecureStore from "expo-secure-store";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import {
   avisosDeCorreos,
+  borrarAvisosPendientesDelCorreo,
+  contarTransaccionesPendientes,
   desdeParaSincronizar,
   eliminarTransaccionesDetectadas,
   getSupabaseClient,
   insertarTransaccionesDetectadas,
   listarCuentas,
+  registrarAvisosDelCorreo,
   type CorreosTraidos,
   type ResultadoSincronizacion,
 } from "core";
@@ -15,9 +18,24 @@ import * as outlook from "./outlookAuth";
 import * as gmail from "./gmailAuth";
 import { traerCorreosNuevos as traerDeOutlook } from "./graphMail";
 import { traerCorreosNuevos as traerDeGmail } from "./gmailApi";
+import { avisarPresupuestos, avisarRegistradosDelCorreo } from "./notificaciones";
+import { ubicarComerciosRegistrados } from "./ubicarComercios";
 
 /** Marca de la última búsqueda completa (ISO). Se borra al desconectar o cerrar sesión. */
 export const CLAVE_ULTIMA_SYNC = "correo_ultima_sync";
+
+/**
+ * Versión del lector de correos con la que se leyó la bandeja. Al cambiar, los
+ * avisos pendientes del correo se borran y se vuelven a leer los últimos
+ * `DIAS_RELECTURA` días: el lector de antes dejaba, por ejemplo, un consumo con
+ * la fecha de corte de la tarjeta (un mes en el futuro), o no reconocía los
+ * avisos de Pichincha. Los confirmados y descartados no se tocan.
+ */
+const CLAVE_VERSION_LECTOR = "correo_version_lector";
+const VERSION_LECTOR = "2026-10-19";
+const DIAS_RELECTURA = 30;
+/** Al abrir la app se busca solo si la última búsqueda fue hace más de esto. */
+const ESPERA_ENTRE_BUSQUEDAS_MS = 10 * 60 * 1000;
 
 export type ProveedorCorreo = "gmail" | "outlook";
 
@@ -125,25 +143,76 @@ export async function traerCorreosDelProveedorActivo(desde: Date): Promise<Corre
 }
 
 /**
- * Busca avisos bancarios nuevos y los deja en la Bandeja. La marca guardada
- * es la hora en que EMPEZÓ la búsqueda (antes era la hora en que terminó: los
- * correos que llegaban mientras tanto se saltaban para siempre), y solo se
- * avanza si se pudieron leer todos los correos.
+ * Busca avisos bancarios nuevos: lo que el lector reconoce con seguridad
+ * (consumos con tarjeta, pagos de tarjeta y transferencias entre tus cuentas,
+ * con las cuentas identificadas por sus últimos dígitos) la base lo registra
+ * solo; el resto queda en la Bandeja. La marca guardada es la hora en que
+ * EMPEZÓ la búsqueda (antes era la hora en que terminó: los correos que
+ * llegaban mientras tanto se saltaban para siempre), y solo se avanza si se
+ * pudieron leer todos los correos.
  */
 export async function sincronizarCorreo(): Promise<ResultadoSincronizacion & { marca: string | null }> {
   const inicio = new Date();
-  const desde = desdeParaSincronizar(await AsyncStorage.getItem(CLAVE_ULTIMA_SYNC), inicio);
+  const relectura = (await AsyncStorage.getItem(CLAVE_VERSION_LECTOR)) !== VERSION_LECTOR;
+  const desde = relectura
+    ? new Date(inicio.getTime() - DIAS_RELECTURA * 24 * 60 * 60 * 1000)
+    : desdeParaSincronizar(await AsyncStorage.getItem(CLAVE_ULTIMA_SYNC), inicio);
 
   const { correos, truncado, fallidos } = await traerCorreosDelProveedorActivo(desde);
+  if (relectura) await borrarAvisosPendientesDelCorreo();
   const avisos = avisosDeCorreos(correos, await listarCuentas());
   const { enviados, descartados } = await insertarTransaccionesDetectadas(avisos);
+  const registrados = await registrarAvisosDelCorreo();
+  const porRevisar = await contarTransaccionesPendientes().catch(() => undefined);
 
   let marca: string | null = null;
   if (fallidos === 0) {
     marca = inicio.toISOString();
     await AsyncStorage.setItem(CLAVE_ULTIMA_SYNC, marca);
+    if (relectura) await AsyncStorage.setItem(CLAVE_VERSION_LECTOR, VERSION_LECTOR);
   }
-  return { revisados: correos.length, enviados, descartados, truncado, fallidos, marca };
+  return { revisados: correos.length, enviados, descartados, truncado, fallidos, registrados, porRevisar, marca };
+}
+
+/**
+ * Después de una búsqueda: avisa lo que se registró solo, le busca el lugar a
+ * los consumos y revisa los presupuestos. Nunca lanza.
+ */
+export async function despuesDeSincronizar(r: ResultadoSincronizacion): Promise<void> {
+  const registrados = r.registrados ?? [];
+  if (!registrados.some((x) => x.resultado === "registrado")) return;
+  await avisarRegistradosDelCorreo(registrados);
+  for (const mes of new Set(registrados.filter((x) => x.clase === "consumo" && x.fecha).map((x) => x.fecha!.slice(0, 7)))) {
+    await avisarPresupuestos(`${mes}-01`);
+  }
+  await ubicarComerciosRegistrados(registrados);
+}
+
+let busquedaAutomatica: Promise<ResultadoSincronizacion | null> | null = null;
+
+/**
+ * Al abrir la app y al volver a ella: si el correo está conectado y la última
+ * búsqueda fue hace más de 10 minutos, busca sola (sin esperar a que toques
+ * «Buscar ahora»). Nunca lanza; devuelve null si no tocaba o falló.
+ */
+export function sincronizarCorreoSiToca(): Promise<ResultadoSincronizacion | null> {
+  if (Platform.OS === "web") return Promise.resolve(null);
+  busquedaAutomatica ??= (async () => {
+    try {
+      const marca = await AsyncStorage.getItem(CLAVE_ULTIMA_SYNC);
+      const hace = marca ? Date.now() - new Date(marca).getTime() : Infinity;
+      if (hace >= 0 && hace < ESPERA_ENTRE_BUSQUEDAS_MS) return null;
+      if (!(await proveedorConectado())) return null;
+      const r = await sincronizarCorreo();
+      await despuesDeSincronizar(r);
+      return r;
+    } catch {
+      return null;
+    }
+  })().finally(() => {
+    busquedaAutomatica = null;
+  });
+  return busquedaAutomatica;
 }
 
 /**
@@ -159,6 +228,7 @@ export async function desconectarYBorrarCorreo(): Promise<{
 }> {
   const borrados = await eliminarTransaccionesDetectadas();
   await AsyncStorage.removeItem(CLAVE_ULTIMA_SYNC);
+  await AsyncStorage.removeItem(CLAVE_VERSION_LECTOR);
   const { proveedor, revocado } = await desconectarProveedorActivo();
   return { proveedor, revocado, borrados };
 }
@@ -174,5 +244,6 @@ export async function olvidarCorreoDelDispositivo(): Promise<void> {
   await borrarSeguro(CLAVE_PROVEEDOR_ACTIVO);
   await borrarSeguro(CLAVE_DUENO);
   await AsyncStorage.removeItem(CLAVE_ULTIMA_SYNC).catch(() => {});
+  await AsyncStorage.removeItem(CLAVE_VERSION_LECTOR).catch(() => {});
   await Promise.allSettled([gmail.desconectarCorreo(), outlook.desconectarCorreo()]);
 }

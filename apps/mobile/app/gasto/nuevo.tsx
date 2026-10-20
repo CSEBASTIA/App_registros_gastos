@@ -122,7 +122,11 @@ export default function NuevoGasto() {
   const cuentaSeleccionada = cuentas.find((c) => c.id === cuentaId);
   const montoNumerico = parsearMonto(monto);
   const tasaNumerica = tasaInteres.trim() ? parsearMonto(tasaInteres) : 0;
-  const cupoInsuficiente = cuentaSeleccionada?.tipo === "credito" &&
+  // Una tarjeta puede pasarse del cupo (queda sobreendeudada, en rojo); una
+  // cuenta de ahorro, de débito o el efectivo no puede quedar en negativo.
+  const pasaElCupo = cuentaSeleccionada?.tipo === "credito" &&
+    Number.isFinite(montoNumerico) && montoNumerico > cuentaSeleccionada.disponible;
+  const saldoInsuficiente = !!cuentaSeleccionada && cuentaSeleccionada.tipo !== "credito" &&
     Number.isFinite(montoNumerico) && montoNumerico > cuentaSeleccionada.disponible;
   const plan = esDiferido && montoNumerico > 0 &&
     Number.isFinite(tasaNumerica) && tasaNumerica >= 0 && tasaNumerica <= 999.99
@@ -150,8 +154,8 @@ export default function NuevoGasto() {
       setError("Escribí una tasa anual válida entre 0 y 999,99 %.");
       return;
     }
-    if (cupoInsuficiente) {
-      setError(`El monto supera el cupo disponible de la tarjeta ($${cuentaSeleccionada!.disponible.toFixed(2)}).`);
+    if (saldoInsuficiente) {
+      setError(`No alcanza el saldo de «${cuentaSeleccionada!.nombre}» ($${cuentaSeleccionada!.disponible.toFixed(2)}): una cuenta no puede quedar en negativo.`);
       return;
     }
     setGuardando(true);
@@ -354,10 +358,18 @@ export default function NuevoGasto() {
                 </Text>
               </View>
             )}
-            {cupoInsuficiente && (
-              <ErrorTexto>El monto supera el cupo disponible de esta tarjeta.</ErrorTexto>
-            )}
           </>
+        )}
+
+        {pasaElCupo && (
+          <Text style={[styles.ayudaTexto, { color: color.danger }]} accessibilityLiveRegion="polite">
+            ⚠ Este gasto pasa el cupo disponible de la tarjeta (${cuentaSeleccionada!.disponible.toFixed(2)}): quedará sobreendeudada.
+          </Text>
+        )}
+        {saldoInsuficiente && (
+          <ErrorTexto>
+            {`No alcanza el saldo de «${cuentaSeleccionada!.nombre}» ($${cuentaSeleccionada!.disponible.toFixed(2)}): una cuenta no puede quedar en negativo.`}
+          </ErrorTexto>
         )}
 
         <Campo

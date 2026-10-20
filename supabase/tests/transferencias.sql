@@ -74,17 +74,17 @@ do $$ begin
     insert into resultados values ('T04 a una tarjeta de crédito no se transfiere (es «Pagar tarjeta»)', sqlerrm like '%Pagar tarjeta%', sqlerrm);
   end;
 
-  -- Avance de efectivo: desde la tarjeta, dentro del cupo.
+  -- Avance de efectivo desde la tarjeta: dentro del cupo y también por encima
+  -- (desde la migración de saldos, una tarjeta puede quedar sobreendeudada).
   insert into transferencias (cuenta_origen_id, cuenta_destino_id, monto)
     values ('7e100000-0000-4000-8000-000000000004', '7e100000-0000-4000-8000-000000000002', 50);
-  begin
-    insert into transferencias (cuenta_origen_id, cuenta_destino_id, monto)
-      values ('7e100000-0000-4000-8000-000000000004', '7e100000-0000-4000-8000-000000000002', 151);
-    insert into resultados values ('T05 desde una tarjeta: dentro del cupo sí, por encima no', false, 'se permitió pasar el cupo');
-  exception when invalid_parameter_value then
-    insert into resultados values ('T05 desde una tarjeta: dentro del cupo sí, por encima no',
-      (select disponible from cuentas where id = '7e100000-0000-4000-8000-000000000004') = 150, sqlerrm);
-  end;
+  insert into transferencias (id, cuenta_origen_id, cuenta_destino_id, monto)
+    values ('7e200000-0000-4000-8000-0000000000f5', '7e100000-0000-4000-8000-000000000004', '7e100000-0000-4000-8000-000000000002', 151);
+  insert into resultados values ('T05 desde una tarjeta se puede pasar del cupo (queda en negativo)',
+    (select disponible from cuentas where id = '7e100000-0000-4000-8000-000000000004') = -1,
+    'tarjeta ' || (select disponible from cuentas where id = '7e100000-0000-4000-8000-000000000004'));
+  -- Se deshace para que lo que sigue vea los saldos de siempre.
+  delete from transferencias where id = '7e200000-0000-4000-8000-0000000000f5';
 
   begin
     insert into transferencias (cuenta_origen_id, cuenta_destino_id, monto)

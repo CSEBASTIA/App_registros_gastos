@@ -61,12 +61,27 @@ export default function TarjetaVisual({
   const corte = compacta ? undefined : lineaCorte(cuenta);
   const tipoTexto = cuenta.tipo === "credito" && esCasaComercial(cuenta.banco) ? "Crédito directo" : ETIQUETA_TIPO[cuenta.tipo];
   const usoPorcentaje = cuenta.cupoTotal ? ((cuenta.cupoTotal - cuenta.disponible) / cuenta.cupoTotal) * 100 : undefined;
+  // Solo una tarjeta puede quedar en negativo: se pasó del cupo (sobreendeudamiento).
+  const sobreendeudada = esCredito && cuenta.disponible < 0;
+  const textoExceso = `Sobreendeudada: te pasaste ${formatMonto(-cuenta.disponible)} del cupo`;
 
   const contenido = esCredito && imagen ? (
-    <View style={[styles.imagenBase, compacta && styles.imagenBaseCompacta, { backgroundColor: color.surface, borderColor: color.border }]}>
+    <View
+      style={[
+        styles.imagenBase,
+        compacta && styles.imagenBaseCompacta,
+        { backgroundColor: color.surface, borderColor: color.border },
+        sobreendeudada && { borderColor: color.danger, borderWidth: 2, backgroundColor: color.dangerBg },
+      ]}
+    >
       <View style={[styles.imagenMarco, compacta && styles.imagenMarcoCompacta]}>
         <Image source={imagen} style={[styles.imagenArte, compacta && styles.imagenArteCompacta]} resizeMode={producto?.ajusteImagen ?? "contain"} accessibilityLabel={producto?.nombre ?? cuenta.nombre} />
         <Text numberOfLines={1} style={styles.marcaAgua}>{ETIQUETA_BANCO[cuenta.banco]}</Text>
+        {sobreendeudada && (
+          <View style={[styles.sello, { backgroundColor: color.danger }]} accessibilityElementsHidden importantForAccessibility="no">
+            <Ionicons name="warning" size={compacta ? 14 : 18} color="#fff" />
+          </View>
+        )}
       </View>
       <View style={styles.imagenInfo}>
         <Text style={[styles.nombreImagen, { color: color.text }]} numberOfLines={1}>{cuenta.nombre}</Text>
@@ -74,16 +89,22 @@ export default function TarjetaVisual({
           <>
             <Text style={[styles.tipoImagen, { color: color.textMuted }]} numberOfLines={1}>{producto?.nombre ?? tipoTexto}</Text>
             {corte && <Text style={[styles.tipoImagen, { color: color.textMuted }]}>{corte}</Text>}
+            {sobreendeudada && (
+              <View style={styles.alerta}>
+                <Ionicons name="warning" size={16} color={color.danger} />
+                <Text style={[styles.alertaTexto, { color: color.danger }]}>{textoExceso}</Text>
+              </View>
+            )}
             {cuenta.cupoTotal ? (
               <View style={{ gap: spacing(1.5) }}>
                 <View style={styles.cupoLinea}>
-                  <Text style={[styles.cupoTextoImagen, { color: color.textMuted }]}>Disponible</Text>
-                  <Text style={[styles.cupoTextoImagen, { color: color.textMuted }]}>{formatMonto(cuenta.disponible)} / {formatMonto(cuenta.cupoTotal)}</Text>
+                  <Text style={[styles.cupoTextoImagen, { color: sobreendeudada ? color.danger : color.textMuted }]}>Disponible</Text>
+                  <Text style={[styles.cupoTextoImagen, { color: sobreendeudada ? color.danger : color.textMuted }]}>{formatMonto(cuenta.disponible)} / {formatMonto(cuenta.cupoTotal)}</Text>
                 </View>
                 <BarraProgreso porcentaje={usoPorcentaje ?? 0} />
               </View>
             ) : (
-              <Text style={[styles.tipoImagen, { color: color.textMuted }]}>{formatMonto(cuenta.disponible)}</Text>
+              <Text style={[styles.tipoImagen, { color: sobreendeudada ? color.danger : color.textMuted }]}>{formatMonto(cuenta.disponible)}</Text>
             )}
           </>
         )}
@@ -91,7 +112,7 @@ export default function TarjetaVisual({
     </View>
   ) : esCredito ? (
     <LinearGradient
-      colors={GRADIENTE_BANCO[cuenta.banco]}
+      colors={sobreendeudada ? GRADIENTE_SOBREENDEUDADA : GRADIENTE_BANCO[cuenta.banco]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.base, compacta && styles.baseCompacta]}
@@ -112,7 +133,11 @@ export default function TarjetaVisual({
             <Text style={styles.bancoTexto} numberOfLines={1}>{ETIQUETA_BANCO[cuenta.banco]}</Text>
           </View>
         )}
-        <Ionicons name="wifi-outline" size={16} color="rgba(255,255,255,0.85)" style={{ transform: [{ rotate: "90deg" }] }} />
+        {sobreendeudada ? (
+          <Ionicons name="warning" size={18} color="#fff" accessibilityElementsHidden importantForAccessibility="no" />
+        ) : (
+          <Ionicons name="wifi-outline" size={16} color="rgba(255,255,255,0.85)" style={{ transform: [{ rotate: "90deg" }] }} />
+        )}
       </View>
 
       <Text style={styles.nombre} numberOfLines={1}>
@@ -120,6 +145,12 @@ export default function TarjetaVisual({
       </Text>
       {!compacta && <Text style={styles.tipo}>{tipoTexto}</Text>}
       {corte && <Text style={styles.tipo}>{corte}</Text>}
+      {sobreendeudada && !compacta && (
+        <View style={[styles.alerta, styles.alertaClara]}>
+          <Ionicons name="warning" size={16} color="#fff" />
+          <Text style={[styles.alertaTexto, { color: "#fff" }]}>{textoExceso}</Text>
+        </View>
+      )}
 
       {!compacta &&
         (cuenta.cupoTotal ? (
@@ -193,6 +224,7 @@ export default function TarjetaVisual({
     cuenta.cupoTotal
       ? `Disponible ${formatMonto(cuenta.disponible)} de ${formatMonto(cuenta.cupoTotal)}`
       : `Saldo ${formatMonto(cuenta.disponible)}`,
+    ...(sobreendeudada ? [textoExceso] : []),
   ].join(", ");
 
   return (
@@ -202,7 +234,14 @@ export default function TarjetaVisual({
   );
 }
 
+/** Rojo de peligro para una tarjeta que se pasó del cupo (en lugar del color del banco). */
+const GRADIENTE_SOBREENDEUDADA: [string, string] = ["#c23b34", "#7a1714"];
+
 const styles = StyleSheet.create({
+  alerta: { flexDirection: "row", alignItems: "center", gap: spacing(1.5) },
+  alertaClara: { backgroundColor: "rgba(0,0,0,0.22)", borderRadius: radius.sm, paddingHorizontal: spacing(2), paddingVertical: spacing(1), alignSelf: "flex-start" },
+  alertaTexto: { fontFamily: font.semibold, fontSize: 12.5, flexShrink: 1 },
+  sello: { position: "absolute", top: spacing(2), left: spacing(2), borderRadius: radius.pill, padding: 5 },
   base: {
     borderRadius: radius.lg,
     padding: spacing(5),

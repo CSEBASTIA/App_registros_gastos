@@ -34,6 +34,8 @@ export interface Lugar {
   longitud: number;
   /** Un gasto a menos de esta distancia (20-500 m) pertenece a este lugar. */
   radioM: number;
+  /** Dirección del sitio (la de OpenStreetMap, si la app pudo ubicar el comercio por su nombre). */
+  direccion?: string;
   createdAt: string;
 }
 
@@ -100,6 +102,8 @@ export interface Cuenta {
 
 export type TipoTransaccionDetectada = "gasto" | "ingreso";
 export type EstadoTransaccionDetectada = "pendiente" | "confirmado" | "descartado";
+/** Qué reconoció la app en el correo: un consumo con tarjeta, un pago de tarjeta o una transferencia. */
+export type ClaseAviso = "consumo" | "pago_tarjeta" | "transferencia";
 /** De dónde llegó el aviso a la bandeja. Los de billetera son siempre gastos. */
 export type OrigenTransaccion = "correo" | "apple_pay" | "google_wallet";
 
@@ -128,6 +132,12 @@ export interface TransaccionDetectada {
   pagadoEn?: string;
   /** El correo habla de una transferencia: la base busca la otra mitad en otra cuenta propia. */
   esTransferencia?: boolean;
+  /** Formato reconocido del correo: con las cuentas identificadas, la base lo registra sola. */
+  clase?: ClaseAviso;
+  /** La otra cuenta: la que pagó (pago de tarjeta) o la de destino (transferencia). */
+  contraparteCuentaId?: string;
+  /** Comisión que cobró el banco, aparte del monto. */
+  comision?: number;
   /** Se resolvió como transferencia entre cuentas propias (junto con su otra mitad, si llegó). */
   transferenciaId?: string;
   /** El gasto que creó este aviso (al confirmarlo o al registrarse solo). */

@@ -73,7 +73,11 @@ export function filasDetalleGasto(
     { clave: "fecha", etiqueta: "Fecha", valor: fechaLarga(g.fecha) },
     !!g.pagadoEn && { clave: "pagado", etiqueta: "Hora del pago", valor: fechaHora(g.pagadoEn, opciones) },
     { clave: "registrado", etiqueta: "Registrado", valor: fechaHora(g.createdAt, opciones) },
-    !!ctx.lugar && { clave: "lugar", etiqueta: "Lugar", valor: ctx.lugar.nombre },
+    !!ctx.lugar && {
+      clave: "lugar",
+      etiqueta: "Lugar",
+      valor: ctx.lugar.direccion ? `${ctx.lugar.nombre} · ubicado en ${ctx.lugar.direccion}` : ctx.lugar.nombre,
+    },
     !!g.ubicacion && { clave: "ubicacion", etiqueta: "Ubicación", valor: textoUbicacion(g.ubicacion), mono: true },
     { clave: "categoria", etiqueta: "Categoría", valor: nombreCategoria(ctx.categoria, g.categoriaDetalle) ?? "Sin categoría" },
     (!!metodo || !!billetera) && {

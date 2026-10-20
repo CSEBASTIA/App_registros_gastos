@@ -4,6 +4,7 @@ import { leerEstadoCuenta, parseEstadoCuenta } from "../lib/estadoCuenta";
 import {
   ErrorImportacionParcial,
   formatMonto,
+  saldosDelEstado,
   importarMovimientos,
   mensajeError,
   movimientosDelPeriodo,
@@ -79,8 +80,14 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, cuentaFija, 
             `Se omitieron ${preparado.pagosOmitidos} pago(s) a la tarjeta: regístralos con «Registrar pago» para que también se descuenten de la cuenta de origen.`
           );
         }
-        if (preparado.filas.some((f) => f.tipo === "ingreso")) {
-          notas.push("Los abonos y depósitos salen sin marcar: revisa que de verdad sean ingresos antes de incluirlos.");
+        if (preparado.filas.some((f) => f.tipo === "ingreso" && !f.seleccionada && !f.posibleDuplicado)) {
+          notas.push(
+            "Los abonos y depósitos que el estado no marca como crédito salen sin marcar: revisa que de verdad sean ingresos antes de incluirlos."
+          );
+        }
+        const { final } = saldosDelEstado(texto);
+        if (final !== undefined && cuentaFija.tipo !== "credito") {
+          notas.push(`El estado termina con un saldo de ${formatMonto(final)}: compáralo con el saldo de la cuenta después de importar.`);
         }
         if (preparado.filas.some((f) => f.posibleDuplicado)) {
           notas.push("Las filas «posible duplicado» tienen la misma fecha y monto que algo ya registrado: salen sin marcar.");
@@ -131,8 +138,10 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, cuentaFija, 
         cuentaFija
       )
     : null;
-  // La base no acepta pasar el cupo de una tarjeta: se avisa antes de intentarlo.
+  // Una tarjeta puede pasarse del cupo (queda sobreendeudada): solo se avisa.
   const pasaElCupo = cuentaFija?.tipo === "credito" && !!resumen && resumen.disponibleDespues < 0;
+  // Una cuenta de ahorro, de débito o el efectivo no puede quedar en negativo: la base lo rechazaría.
+  const quedaEnNegativo = !!cuentaFija && cuentaFija.tipo !== "credito" && !!resumen && resumen.disponibleDespues < 0;
 
   async function confirmarImportacion() {
     setError(null);
@@ -166,9 +175,9 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, cuentaFija, 
       }
       onCerrar();
     } catch (err) {
-      // Los gastos ya se guardaron: salen de la tabla y solo se reintentan los ingresos.
+      // Los ingresos ya se guardaron: salen de la tabla y solo se reintentan los gastos.
       if (err instanceof ErrorImportacionParcial) {
-        setFilas((prev) => prev.filter((f) => !(f.tipo === "gasto" && f.seleccionado)));
+        setFilas((prev) => prev.filter((f) => !(f.tipo === "ingreso" && f.seleccionado)));
         await onImportado?.();
       }
       setError(mensajeError(err));
@@ -224,7 +233,13 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, cuentaFija, 
                   </p>
                   {pasaElCupo && (
                     <p className="error" style={{ margin: "0 0 6px" }}>
-                      Lo marcado supera el cupo disponible de la tarjeta: desmarca algunos consumos o revisa el cupo.
+                      ⚠ Con lo marcado la tarjeta se pasa del cupo: quedará sobreendeudada (en rojo).
+                    </p>
+                  )}
+                  {quedaEnNegativo && (
+                    <p className="error" style={{ margin: "0 0 6px" }}>
+                      Con lo marcado la cuenta quedaría en {formatMonto(resumen.disponibleDespues)}, y una cuenta no puede quedar en
+                      negativo: desmarca algunos gastos o marca los ingresos que faltan.
                     </p>
                   )}
                   {avisos.map((a) => (
@@ -352,7 +367,7 @@ export default function ImportarEstadoCuenta({ categorias, cuentas, cuentaFija, 
             <button
               className="btn btn-primary"
               onClick={confirmarImportacion}
-              disabled={fase === "importando" || seleccionadas.length === 0 || faltaCategoria || pasaElCupo}
+              disabled={fase === "importando" || seleccionadas.length === 0 || faltaCategoria || quedaEnNegativo}
               type="button"
               title={faltaCategoria ? "Asigna una categoría a cada fila seleccionada" : undefined}
             >

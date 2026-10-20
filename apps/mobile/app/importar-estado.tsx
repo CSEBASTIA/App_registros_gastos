@@ -15,6 +15,7 @@ import {
   movimientosParaGuardar,
   paginaSinTexto,
   parseEstadoCuenta,
+  saldosDelEstado,
   prepararFilasImportacion,
   resumenImportacion,
   textoResultadoImportacion,
@@ -64,6 +65,8 @@ export default function ImportarEstadoScreen() {
   const [filas, setFilas] = useState<FilaImportacion[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [resultado, setResultado] = useState<string | null>(null);
+  // Saldo final que declara el propio estado («SALDO ACTUAL»), para compararlo.
+  const [saldoFinalEstado, setSaldoFinalEstado] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     Promise.all([listarCuentas(), listarCategorias()])
@@ -79,8 +82,10 @@ export default function ImportarEstadoScreen() {
 
   const resumen = useMemo(() => (cuenta ? resumenImportacion(filas, cuenta) : null), [filas, cuenta]);
   const elegidas = resumen ? resumen.gastos + resumen.ingresos : 0;
-  // La base no acepta pasar el cupo de una tarjeta: se avisa antes de intentarlo.
+  // Una tarjeta puede pasarse del cupo (queda sobreendeudada): solo se avisa.
   const pasaElCupo = cuenta?.tipo === "credito" && !!resumen && resumen.disponibleDespues < 0;
+  // Una cuenta de ahorro, de débito o el efectivo no puede quedar en negativo: la base lo rechazaría.
+  const quedaEnNegativo = cuenta?.tipo !== "credito" && !!resumen && resumen.disponibleDespues < 0;
 
   function irALaCuenta() {
     if (!cuenta) return router.back();
@@ -99,6 +104,7 @@ export default function ImportarEstadoScreen() {
     if (preparado.filas.length === 0) {
       throw new Error("El estado de cuenta solo trae pagos a la tarjeta: no hay consumos para importar.");
     }
+    setSaldoFinalEstado(saldosDelEstado(texto).final);
     setPreparadas(preparado);
     setFilas(preparado.filas);
     setFase("revisar");
@@ -196,9 +202,9 @@ export default function ImportarEstadoScreen() {
       void avisarPresupuestos();
       setFase("listo");
     } catch (err) {
-      // Los gastos ya quedaron guardados: salen de la lista y solo se reintentan los ingresos.
+      // Los ingresos ya quedaron guardados: salen de la lista y solo se reintentan los gastos.
       if (err instanceof ErrorImportacionParcial) {
-        setFilas((actuales) => actuales.filter((f) => !(f.tipo === "gasto" && f.seleccionada)));
+        setFilas((actuales) => actuales.filter((f) => !(f.tipo === "ingreso" && f.seleccionada)));
       }
       setError(mensajeError(err));
       setFase("revisar");
@@ -315,9 +321,23 @@ export default function ImportarEstadoScreen() {
                   : ""}
                 . La categoría se sugiere sola; puedes cambiarla después en cada movimiento.
               </Text>
+              {saldoFinalEstado !== undefined && !esCredito && (
+                <Text style={styles.textoMuted}>
+                  El estado termina con un saldo de {formatMonto(saldoFinalEstado)}
+                  {Math.abs(saldoFinalEstado - resumen.disponibleDespues) < 0.005
+                    ? ": coincide con la cuenta."
+                    : `; la cuenta quedaría con ${formatMonto(resumen.disponibleDespues)}. Si no coinciden, revisa el saldo con el que creaste la cuenta o los movimientos que ya tenías.`}
+                </Text>
+              )}
               {pasaElCupo && (
                 <Text style={styles.textoAviso}>
-                  Lo marcado supera el cupo disponible de la tarjeta: desmarca algunos consumos o revisa el cupo.
+                  ⚠ Con lo marcado la tarjeta se pasa del cupo: quedará sobreendeudada (en rojo).
+                </Text>
+              )}
+              {quedaEnNegativo && (
+                <Text style={styles.textoAviso}>
+                  Con lo marcado la cuenta quedaría en {formatMonto(resumen.disponibleDespues)}, y una cuenta no puede quedar en
+                  negativo: desmarca algunos gastos o marca los ingresos que faltan.
                 </Text>
               )}
               {preparadas.pagosOmitidos > 0 && (
@@ -326,9 +346,10 @@ export default function ImportarEstadoScreen() {
                   también se descuenten de la cuenta desde la que pagaste.
                 </Text>
               )}
-              {filas.some((f) => f.tipo === "ingreso") && (
+              {filas.some((f) => f.tipo === "ingreso" && !f.seleccionada && !f.posibleDuplicado) && (
                 <Text style={styles.textoMuted}>
-                  Los abonos y depósitos salen sin marcar: revisa que de verdad sean ingresos antes de incluirlos.
+                  Los abonos y depósitos que el estado no marca como crédito salen sin marcar: revisa que de verdad sean
+                  ingresos antes de incluirlos.
                 </Text>
               )}
               {filas.some((f) => f.posibleDuplicado) && (
@@ -379,7 +400,7 @@ export default function ImportarEstadoScreen() {
               variante="primario"
               onPress={importar}
               loading={fase === "guardando"}
-              disabled={fase === "guardando" || elegidas === 0 || pasaElCupo}
+              disabled={fase === "guardando" || elegidas === 0 || quedaEnNegativo}
             />
             <Boton
               titulo="Elegir otro archivo"

@@ -8,7 +8,7 @@ import { listarTransferencias } from "../repositories/transferencias.repo";
 import { mensajeError } from "../lib/mensajeError";
 import type { TransaccionEstadoCuenta } from "../lib/estadoCuenta";
 import {
-  cupoInsuficiente,
+  saldoQuedariaNegativo,
   rangoDeFilas,
   TOPE_FILAS_IMPORTACION,
   type MovimientosExistentes,
@@ -32,16 +32,16 @@ export async function movimientosDelPeriodo(transacciones: Pick<TransaccionEstad
   return { gastos: [...gastos, ...transferencias], ingresos: [...ingresos, ...transferencias] };
 }
 
-/** Los gastos se guardaron y los ingresos no: reintentar debe mandar solo los ingresos. */
+/** Los ingresos se guardaron y los gastos no: reintentar debe mandar solo los gastos. */
 export class ErrorImportacionParcial extends Error {
-  readonly gastosGuardados: number;
-  constructor(gastosGuardados: number, causa: unknown) {
+  readonly ingresosGuardados: number;
+  constructor(ingresosGuardados: number, causa: unknown) {
     super(
-      `Se guardaron ${gastosGuardados} gasto(s), pero los ingresos no (${mensajeError(causa)}). ` +
-        "Vuelve a intentarlo: solo se enviarán los ingresos."
+      `Se guardaron ${ingresosGuardados} ingreso(s), pero los gastos no (${mensajeError(causa)}). ` +
+        "Vuelve a intentarlo: solo se enviarán los gastos."
     );
     this.name = "ErrorImportacionParcial";
-    this.gastosGuardados = gastosGuardados;
+    this.ingresosGuardados = ingresosGuardados;
   }
 }
 
@@ -58,9 +58,12 @@ function validarTodas<T>(filas: unknown[], schema: ZodType<T>): T[] {
 /**
  * Guarda lo elegido al importar un estado de cuenta. Primero valida TODAS las
  * filas (si una está mal no se guarda nada) y luego escribe cada tabla en una
- * sola operación: la base guarda todos los gastos o ninguno, y todos los
- * ingresos o ninguno. Los saldos los ajustan los triggers, como al registrar
- * a mano.
+ * sola operación: la base guarda todos los ingresos o ninguno, y todos los
+ * gastos o ninguno. Los ingresos van primero: una cuenta de ahorro no puede
+ * quedar en negativo, ni siquiera a mitad del guardado (con los gastos
+ * primero, un estado con muchos débitos y créditos la habría dejado en
+ * negativo y la base lo habría rechazado). Los saldos los ajustan los
+ * triggers, como al registrar a mano.
  */
 export async function importarMovimientos(movimientos: MovimientosParaGuardar): Promise<{ gastos: number; ingresos: number }> {
   const total = movimientos.gastos.length + movimientos.ingresos.length;
@@ -70,15 +73,15 @@ export async function importarMovimientos(movimientos: MovimientosParaGuardar): 
   }
   const gastos = validarTodas(movimientos.gastos, gastoSchema);
   const ingresos = validarTodas(movimientos.ingresos, ingresoSchema);
-  // Con el cupo recién leído (ver `cupoInsuficiente`: en lote la base no lo frena sola).
+  // Con el saldo recién leído: la base rechazaría el lote entero, mejor decirlo antes.
   if (gastos.some((g) => g.cuentaId)) {
-    const excedido = cupoInsuficiente(gastos, await listarCuentas());
-    if (excedido) throw new Error(excedido);
+    const negativo = saldoQuedariaNegativo(gastos, ingresos, await listarCuentas());
+    if (negativo) throw new Error(negativo);
   }
 
-  const guardados = (await crearGastosEnLote(gastos)).length;
+  const guardados = (await crearIngresosEnLote(ingresos)).length;
   try {
-    return { gastos: guardados, ingresos: (await crearIngresosEnLote(ingresos)).length };
+    return { gastos: (await crearGastosEnLote(gastos)).length, ingresos: guardados };
   } catch (err) {
     if (guardados > 0) throw new ErrorImportacionParcial(guardados, err);
     throw err;

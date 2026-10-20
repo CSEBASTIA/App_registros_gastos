@@ -16,6 +16,7 @@ import {
   marcarTransaccionDetectada,
   confirmarTransaccionDetectada,
   confirmarAvisoComoTransferencia,
+  confirmarAvisoComoPagoTarjeta,
   mensajeError,
   parsearMonto,
   ETIQUETA_BANCO,
@@ -172,7 +173,29 @@ function ItemBandeja({
   const [verDetalle, setVerDetalle] = useState(false);
   // Un aviso del correo puede ser una transferencia entre cuentas propias.
   const [comoTransferencia, setComoTransferencia] = useState(false);
-  const [otraCuentaId, setOtraCuentaId] = useState("");
+  const [otraCuentaId, setOtraCuentaId] = useState(item.contraparteCuentaId ?? "");
+  // Un pago de tarjeta: qué tarjeta se pagó y desde qué cuenta salió el dinero.
+  const esPagoTarjeta = item.clase === "pago_tarjeta";
+  const tarjetas = cuentas.filter((c) => c.tipo === "credito");
+  const cuentasConSaldo = cuentas.filter((c) => c.tipo !== "credito");
+
+  async function confirmarPagoTarjeta() {
+    setError(null);
+    if (!cuentaId || !otraCuentaId) {
+      setError("Elige la tarjeta que pagaste y la cuenta desde la que pagaste.");
+      return;
+    }
+    setGuardando(true);
+    try {
+      // Sube el cupo de la tarjeta y baja la cuenta de origen; si el mismo pago llegó en otro correo, se resuelve junto.
+      await confirmarAvisoComoPagoTarjeta(item.id, { tarjetaId: cuentaId, origenId: otraCuentaId, monto: parsearMonto(monto) });
+      onResuelto();
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setGuardando(false);
+    }
+  }
 
   const categoriasDelTipo = categorias.filter((c) => c.tipo === item.tipo);
   // Si salió de esta cuenta, la otra recibe (no puede ser una tarjeta de crédito: eso es «Pagar tarjeta»).
@@ -249,7 +272,8 @@ function ItemBandeja({
             accessibilityLabel={ETIQUETA_ORIGEN_TRANSACCION[item.origen]}
           />
           <Text style={styles.tipo}>
-            {item.tipo === "gasto" ? "Gasto detectado" : "Ingreso detectado"} · {ETIQUETA_ORIGEN_TRANSACCION[item.origen]}
+            {esPagoTarjeta ? "Pago de tarjeta detectado" : item.tipo === "gasto" ? "Gasto detectado" : "Ingreso detectado"} ·{" "}
+            {ETIQUETA_ORIGEN_TRANSACCION[item.origen]}
           </Text>
         </View>
         <Text style={styles.fecha}>{item.fecha}</Text>
@@ -310,7 +334,44 @@ function ItemBandeja({
           Parece una transferencia. Si fue entre tus cuentas, márcala así para que no cuente como {item.tipo}.
         </Text>
       )}
+      {!!item.comision && (
+        <Text style={styles.pista}>
+          El banco cobró además una comisión de ${item.comision.toFixed(2)}: es un gasto aparte (regístralo si quieres llevarlo).
+        </Text>
+      )}
 
+      {esPagoTarjeta ? (
+        <>
+          <Text style={styles.pista}>
+            Es un pago a tu tarjeta de crédito: sube su cupo y baja la cuenta desde la que pagaste. No cuenta como gasto.
+          </Text>
+          <SelectorChips
+            titulo={cuentaId ? "Tarjeta que pagaste" : "Tarjeta que pagaste — no pude reconocerla, elígela"}
+            valor={tarjetas.some((c) => c.id === cuentaId) ? cuentaId : ""}
+            onCambiar={setCuentaId}
+            opciones={tarjetas.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+          />
+          <SelectorChips
+            titulo="Pagada desde"
+            valor={otraCuentaId}
+            onCambiar={setOtraCuentaId}
+            opciones={cuentasConSaldo.map((c) => ({ valor: c.id, etiqueta: c.nombre }))}
+          />
+          {error && <ErrorTexto>{error}</ErrorTexto>}
+          <View style={{ flexDirection: "row", gap: spacing(2) }}>
+            <Boton
+              titulo="Confirmar pago"
+              variante="primario"
+              onPress={confirmarPagoTarjeta}
+              loading={guardando}
+              disabled={guardando}
+              style={{ flex: 1 }}
+            />
+            <Boton titulo="Descartar" variante="peligro" onPress={descartar} loading={guardando} disabled={guardando} style={{ flex: 1 }} />
+          </View>
+        </>
+      ) : (
+      <>
       {!comoTransferencia && (
         <SelectorChips
           titulo="Categoría"
@@ -371,6 +432,8 @@ function ItemBandeja({
           style={{ flex: 1 }}
         />
       </View>
+      </>
+      )}
     </Tarjeta>
   );
 }

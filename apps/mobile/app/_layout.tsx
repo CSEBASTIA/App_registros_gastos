@@ -15,6 +15,7 @@ import {
   rutaDeNotificacion,
   sincronizarNotificaciones,
 } from "../lib/notificaciones";
+import { sincronizarCorreoSiToca } from "../lib/correoProveedor";
 
 // Sin sesión, RLS bloquea toda lectura y escritura: la app se ve vacía y
 // guardar un gasto falla. Por eso el login va activo también en desarrollo.
@@ -134,8 +135,14 @@ function ThemedLayout() {
     if (LOGIN_DESACTIVADO || session === undefined) return;
     if (usuarioId) {
       huboSesion.current = true;
-      sincronizarNotificaciones();
-      const sub = AppState.addEventListener("change", (estado) => estado === "active" && sincronizarNotificaciones());
+      // El correo también se revisa solo al abrir la app y al volver a ella
+      // (como mucho cada 10 minutos): lo reconocido se registra sin tocar nada.
+      const alAbrir = () => {
+        sincronizarNotificaciones();
+        void sincronizarCorreoSiToca();
+      };
+      alAbrir();
+      const sub = AppState.addEventListener("change", (estado) => estado === "active" && alAbrir());
       return () => sub.remove();
     }
     if (huboSesion.current) {

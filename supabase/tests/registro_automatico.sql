@@ -186,10 +186,12 @@ begin
   select * into t10 from transacciones_detectadas where usuario_id = '7f000000-0000-4000-8000-000000000022' and comercio = 'Farmacias Fybeca';
   select * into t11 from transacciones_detectadas where usuario_id = '7f000000-0000-4000-8000-000000000022' and comercio = 'Panadería Centro';
   select * into t12 from transacciones_detectadas where usuario_id = '7f000000-0000-4000-8000-000000000022' and comercio = 'Kiosco';
-  insert into resultados values ('R09 si supera el cupo, queda en la bandeja con la tarjeta puesta (y la respuesta de siempre)',
-    r9 = '{"estado": "recibido", "monto": 500.00}'::jsonb and t9.estado = 'pendiente' and t9.cuenta_id = '7e400000-0000-4000-8000-000000000001'
-      and t9.gasto_id is null,
-    r9::text || ' ' || t9.estado);
+  -- Desde la migración de saldos, una tarjeta puede pasarse del cupo: el pago se registra igual.
+  insert into resultados values ('R09 si supera el cupo, se registra igual y la tarjeta queda sobreendeudada',
+    r9 ->> 'estado' = 'registrado'
+      and exists (select 1 from gastos where id = (r9 ->> 'gasto_id')::uuid and monto = 500 and cuenta_id = '7e400000-0000-4000-8000-000000000001')
+      and (select disponible from cuentas where id = '7e400000-0000-4000-8000-000000000001') < 0,
+    r9::text);
   insert into resultados values ('R10 sin dígitos (solo el banco): a la bandeja, con la cuenta y la categoría sugeridas',
     r10 ->> 'estado' = 'recibido' and t10.estado = 'pendiente' and t10.cuenta_id = '7e400000-0000-4000-8000-000000000002'
       and t10.categoria_id = (select id from categorias where nombre = 'Salud' and usuario_id is null),

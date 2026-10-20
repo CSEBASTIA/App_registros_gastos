@@ -2,9 +2,10 @@
  * Piezas de la sincronización con el correo que no dependen del proveedor
  * (Gmail / Outlook) ni de la plataforma, para poder probarlas.
  */
-import type { Cuenta } from "../types/domain";
-import type { TransaccionDetectadaInsert } from "../repositories/transaccionesDetectadas.repo";
-import { parsearCorreoBancario } from "./correoBancario";
+import type { ClaseAviso, Cuenta } from "../types/domain";
+import type { AvisoRegistrado, TransaccionDetectadaInsert } from "../repositories/transaccionesDetectadas.repo";
+import { parsearCorreoBancario, type CorreoParseado } from "./correoBancario";
+import { formatMonto } from "./formatMonto";
 
 export interface CorreoRecibido {
   mensajeId: string;
@@ -111,22 +112,94 @@ export function cuentaParaAviso(
   return undefined;
 }
 
+/** Cuentas con saldo (sin cupo): de ahí sale el dinero de un pago de tarjeta o de una transferencia. */
+const CUENTAS_CON_SALDO: Cuenta["tipo"][] = ["ahorro", "debito"];
+
+/** El banco muestra 2, 3 o 4 dígitos («234», «1234»): coinciden si uno termina en el otro. */
+function digitosCoinciden(identificador: string, digitos: string): boolean {
+  const [corto, largo] = identificador.length <= digitos.length ? [identificador, digitos] : [digitos, identificador];
+  return corto.length >= 2 && largo.endsWith(corto);
+}
+
+/**
+ * La cuenta o tarjeta de un banco a la que corresponden unos últimos dígitos,
+ * con seguridad suficiente para registrar solo (más estricta que
+ * `cuentaParaAviso`, que solo propone una cuenta para revisar):
+ * - Con dígitos: la única cuenta que los lleva anotados. Si ninguna los lleva,
+ *   la única que todavía no tiene dígitos anotados (puede ser esa). Si hay dos
+ *   posibles, no adivina.
+ * - Sin dígitos: la única cuenta de ese banco y tipo.
+ */
+export function cuentaPorDigitos(
+  cuentas: Cuenta[],
+  banco: Cuenta["banco"] | undefined,
+  digitos: string | undefined,
+  tipos: Cuenta["tipo"][]
+): string | undefined {
+  if (!banco) return undefined;
+  const candidatas = cuentas.filter((c) => c.banco === banco && tipos.includes(c.tipo));
+  if (!digitos) return candidatas.length === 1 ? candidatas[0].id : undefined;
+  const coinciden = candidatas.filter((c) => c.identificador && digitosCoinciden(c.identificador, digitos));
+  if (coinciden.length === 1) return coinciden[0].id;
+  if (coinciden.length > 1) {
+    const exactas = coinciden.filter((c) => c.identificador === digitos);
+    return exactas.length === 1 ? exactas[0].id : undefined;
+  }
+  const sinDigitos = candidatas.filter((c) => !c.identificador);
+  return sinDigitos.length === 1 ? sinDigitos[0].id : undefined;
+}
+
+/** Las cuentas de un aviso reconocido por plantilla (consumo, pago de tarjeta o transferencia). */
+function cuentasDeAvisoReconocido(
+  p: CorreoParseado,
+  cuentas: Cuenta[]
+): { cuentaId?: string; contraparteCuentaId?: string } {
+  switch (p.clase) {
+    case "consumo":
+      return { cuentaId: cuentaPorDigitos(cuentas, p.banco, p.tarjetaFinal, ["credito", "debito", "ahorro"]) };
+    case "pago_tarjeta":
+      return {
+        cuentaId: cuentaPorDigitos(cuentas, p.banco, p.tarjetaFinal, ["credito"]),
+        contraparteCuentaId: cuentaPorDigitos(cuentas, p.banco, p.contraparteFinal, CUENTAS_CON_SALDO),
+      };
+    case "transferencia":
+      return {
+        cuentaId: cuentaPorDigitos(cuentas, p.banco, p.tarjetaFinal, CUENTAS_CON_SALDO),
+        contraparteCuentaId: cuentaPorDigitos(cuentas, p.contraparteBanco, p.contraparteFinal, CUENTAS_CON_SALDO),
+      };
+    default:
+      return {};
+  }
+}
+
 /** Convierte correos en avisos para la Bandeja. Sin tipo o sin monto no sirven: se omiten. */
 export function avisosDeCorreos(correos: CorreoRecibido[], cuentas: Cuenta[]): TransaccionDetectadaInsert[] {
   const avisos: TransaccionDetectadaInsert[] = [];
   for (const correo of correos) {
     const p = parsearCorreoBancario(correo.remitente, correo.asunto, correo.cuerpoTexto);
     if (!p.tipo || !p.monto) continue;
+    const reconocido = p.clase ? cuentasDeAvisoReconocido(p, cuentas) : undefined;
     avisos.push({
       mensajeId: correo.mensajeId,
       tipo: p.tipo,
       monto: p.monto,
       descripcion: p.descripcion,
       banco: p.banco,
-      cuentaId: cuentaParaAviso(cuentas, p.banco, p.identificadorCuenta),
+      cuentaId: reconocido ? reconocido.cuentaId : cuentaParaAviso(cuentas, p.banco, p.identificadorCuenta),
+      // La fecha de recepción solo sirve si el aviso no trae la suya.
       fecha: p.fecha ?? correo.fecha,
       correoAsunto: correo.asunto,
       ...(p.esTransferencia ? { esTransferencia: true } : {}),
+      ...(p.clase
+        ? {
+            clase: p.clase,
+            ...(p.comercio ? { comercio: p.comercio } : {}),
+            ...(p.tarjetaFinal ? { tarjetaFinal: p.tarjetaFinal } : {}),
+            ...(p.pagadoEn ? { pagadoEn: p.pagadoEn } : {}),
+            ...(reconocido?.contraparteCuentaId ? { contraparteCuentaId: reconocido.contraparteCuentaId } : {}),
+            ...(p.comision ? { comision: p.comision } : {}),
+          }
+        : {}),
     });
   }
   return avisos;
@@ -138,15 +211,71 @@ export interface ResultadoSincronizacion {
   descartados: number;
   truncado: boolean;
   fallidos: number;
+  /** Lo que la base registró sola con estos correos (consumos, pagos de tarjeta, transferencias entre tus cuentas). */
+  registrados?: AvisoRegistrado[];
+  /** Avisos que quedan en la Bandeja para revisar. */
+  porRevisar?: number;
+}
+
+const NOMBRE_CLASE: Record<ClaseAviso, [string, string]> = {
+  consumo: ["consumo con tarjeta", "consumos con tarjeta"],
+  pago_tarjeta: ["pago de tarjeta", "pagos de tarjeta"],
+  transferencia: ["transferencia entre tus cuentas", "transferencias entre tus cuentas"],
+};
+
+/** «2 consumos con tarjeta y 1 pago de tarjeta» */
+function describirRegistrados(registrados: AvisoRegistrado[]): string {
+  const cuentas = (Object.keys(NOMBRE_CLASE) as ClaseAviso[])
+    .map((clase) => [clase, registrados.filter((r) => r.clase === clase).length] as const)
+    .filter(([, n]) => n > 0)
+    .map(([clase, n]) => `${n} ${NOMBRE_CLASE[clase][n === 1 ? 0 : 1]}`);
+  return cuentas.length > 1 ? `${cuentas.slice(0, -1).join(", ")} y ${cuentas[cuentas.length - 1]}` : (cuentas[0] ?? "");
+}
+
+/**
+ * La notificación de un movimiento que se registró solo desde el correo:
+ * «Registré $12,34 en TIENDA PRUEBA S A · Con tu tarjeta •••• 1234 · Comida». `ruta` es
+ * la pantalla que abre al tocarla.
+ */
+export function textoNotificacionRegistrado(r: AvisoRegistrado): { titulo: string; cuerpo: string; ruta: string } {
+  const monto = r.monto !== undefined ? formatMonto(r.monto) : "un movimiento";
+  if (r.clase === "pago_tarjeta") {
+    return {
+      titulo: `Registré el pago de ${monto} a ${r.cuenta ?? "tu tarjeta"}`,
+      cuerpo: r.otraCuenta ? `Pagado desde ${r.otraCuenta}. Ya subió el cupo de la tarjeta.` : "Ya subió el cupo de la tarjeta.",
+      ruta: "/tarjetas",
+    };
+  }
+  if (r.clase === "transferencia") {
+    return {
+      titulo: `Registré una transferencia de ${monto}`,
+      cuerpo: `${r.cuenta ?? "Tu cuenta"} → ${r.otraCuenta ?? "otra cuenta tuya"}${r.comision ? ` · comisión ${formatMonto(r.comision)}` : ""}`,
+      ruta: "/transferencias",
+    };
+  }
+  const partes = [r.tarjeta ? `Con tu tarjeta •••• ${r.tarjeta}` : r.cuenta ? `Con ${r.cuenta}` : undefined, r.categoria].filter(Boolean);
+  return {
+    titulo: `Registré ${monto}${r.comercio ? ` en ${r.comercio}` : ""}`,
+    cuerpo: partes.length ? partes.join(" · ") : "Desde el aviso de tu banco.",
+    ruta: "/gastos",
+  };
 }
 
 /** Texto para la persona con lo que pasó en la búsqueda. */
 export function resumenSincronizacion(r: ResultadoSincronizacion): string {
-  const partes = [
-    r.enviados === 0
-      ? "No encontré movimientos nuevos que reconocer."
-      : `Encontré ${r.enviados} movimiento(s) — revísalos en la Bandeja (si ya estaban, no se duplican).`,
-  ];
+  const nuevos = (r.registrados ?? []).filter((x) => x.resultado === "registrado");
+  const partes: string[] = [];
+  if (r.registrados === undefined) {
+    partes.push(
+      r.enviados === 0
+        ? "No encontré movimientos nuevos que reconocer."
+        : `Encontré ${r.enviados} movimiento(s) — revísalos en la Bandeja (si ya estaban, no se duplican).`
+    );
+  } else {
+    if (nuevos.length > 0) partes.push(`Registré ${describirRegistrados(nuevos)}.`);
+    if ((r.porRevisar ?? 0) > 0) partes.push(`${r.porRevisar} movimiento(s) esperan tu revisión en la Bandeja.`);
+    if (nuevos.length === 0 && !(r.porRevisar ?? 0)) partes.push("No encontré movimientos nuevos que reconocer.");
+  }
   if (r.descartados > 0) partes.push(`${r.descartados} aviso(s) tenían datos imposibles y se omitieron.`);
   if (r.truncado) partes.push(`Había más de ${TOPE_CORREOS} correos: se revisaron los más recientes.`);
   if (r.fallidos > 0) partes.push(`No se pudieron leer ${r.fallidos} correo(s); se volverán a intentar en la próxima búsqueda.`);

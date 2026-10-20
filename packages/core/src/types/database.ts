@@ -111,6 +111,7 @@ export type Database = {
           latitud: number;
           longitud: number;
           radio_m: number;
+          direccion?: string | null;
           created_at: string;
           usuario_id: string;
         };
@@ -120,6 +121,7 @@ export type Database = {
           latitud: number;
           longitud: number;
           radio_m?: number;
+          direccion?: string | null;
           created_at?: string;
           usuario_id?: string;
         };
@@ -129,6 +131,7 @@ export type Database = {
           latitud?: number;
           longitud?: number;
           radio_m?: number;
+          direccion?: string | null;
           created_at?: string;
           usuario_id?: string;
         };
@@ -259,6 +262,9 @@ export type Database = {
           es_transferencia?: boolean;
           transferencia_id?: string | null;
           gasto_id?: string | null;
+          clase?: string | null;
+          contraparte_cuenta_id?: string | null;
+          comision?: number | null;
           usuario_id: string;
         };
         Insert: {
@@ -283,6 +289,9 @@ export type Database = {
           clave_captura_id?: string | null;
           pagado_en?: string | null;
           es_transferencia?: boolean;
+          clase?: string | null;
+          contraparte_cuenta_id?: string | null;
+          comision?: number | null;
           usuario_id?: string;
         };
         Update: {
@@ -307,6 +316,9 @@ export type Database = {
           clave_captura_id?: string | null;
           pagado_en?: string | null;
           es_transferencia?: boolean;
+          clase?: string | null;
+          contraparte_cuenta_id?: string | null;
+          comision?: number | null;
           usuario_id?: string;
         };
         Relationships: [];
@@ -637,6 +649,16 @@ export type Database = {
         };
         /** Id de la transferencia (la misma si se reintenta). */
         Returns: string;
+      };
+      confirmar_aviso_como_pago_tarjeta: {
+        Args: { p_id: string; p_tarjeta: string; p_origen: string; p_monto?: number | null };
+        /** Id del pago (null si el aviso ya estaba confirmado). */
+        Returns: string | null;
+      };
+      registrar_avisos_correo: {
+        Args: Record<string, never>;
+        /** Un elemento por aviso del correo que la base resolvió (registrado o ya registrado). */
+        Returns: unknown;
       };
       separar_transferencia: {
         Args: { p_id: string };

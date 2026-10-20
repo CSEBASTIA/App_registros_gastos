@@ -2380,3 +2380,22 @@ td.tabla-monto {
   .ui-blur-fade, .ui-list-leaving { animation: none; filter: none; transform: none; opacity: 1; }
   .ui-dock-item:hover .ui-dock-icon, .ui-dock-item:active .ui-dock-icon { transform: none; }
 }
+
+/* Tarjeta que se pasó del cupo (sobreendeudamiento): en rojo y con aviso. */
+.tarjeta-visual-sobreendeudada { box-shadow: 0 0 0 2px var(--color-danger); }
+.tarjeta-visual-imagen-cont.tarjeta-visual-sobreendeudada { background: var(--color-danger-bg); }
+.tarjeta-visual-alerta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 12.5px;
+  color: var(--color-danger);
+}
+.tarjeta-visual:not(.tarjeta-visual-imagen-cont) .tarjeta-visual-alerta {
+  color: #fff;
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 6px;
+  padding: 2px 8px;
+  align-self: flex-start;
+}

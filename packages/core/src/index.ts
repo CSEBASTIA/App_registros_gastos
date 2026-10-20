@@ -18,6 +18,7 @@ export * from "./lib/sincronizacionCorreo";
 export * from "./lib/fetchConTimeout";
 export * from "./lib/ubicacion";
 export * from "./lib/ubicacionDispositivo";
+export * from "./lib/ubicarComercio";
 export * from "./lib/corteTarjeta";
 export * from "./lib/recordatorios";
 export * from "./lib/detalleTransaccion";
@@ -100,11 +101,16 @@ export {
   confirmarTransaccionDetectada,
   eliminarTransaccionesDetectadas,
   avisoGuardable,
+  registrarAvisosDelCorreo,
+  confirmarAvisoComoPagoTarjeta,
+  borrarAvisosPendientesDelCorreo,
   type TransaccionDetectadaInsert,
   type DatosConfirmacion,
+  type AvisoRegistrado,
 } from "./repositories/transaccionesDetectadas.repo";
 export {
   listarLugares,
+  guardarDireccionLugar,
   borrarMisUbicaciones,
   resumenPorLugar,
   resumenPorComercio,

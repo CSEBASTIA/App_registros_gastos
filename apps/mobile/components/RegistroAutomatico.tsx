@@ -47,8 +47,8 @@ export default function RegistroAutomatico({ nota }: { nota?: string }) {
           <Text style={styles.titulo}>Registrar solo cuando reconozco la tarjeta</Text>
           <Text style={styles.texto}>
             {activo === false
-              ? "Apagado: todos los pagos llegan a la bandeja para que los confirmes."
-              : "El pago se guarda como gasto y descuenta del cupo o saldo de esa tarjeta. Te aviso con una notificación para que lo revises."}
+              ? "Apagado: todos los pagos y avisos del correo llegan a la bandeja para que los confirmes."
+              : "Vale para Google Wallet, Apple Pay y los avisos del correo (consumos, pagos de tarjeta y transferencias entre tus cuentas). Se guarda solo y te aviso con una notificación para que lo revises."}
           </Text>
         </View>
         {activo === null || guardando ? (
@@ -63,8 +63,9 @@ export default function RegistroAutomatico({ nota }: { nota?: string }) {
         )}
       </View>
       <Text style={styles.nota}>
-        La reconozco por sus últimos 4 dígitos: anótalos en el detalle de cada tarjeta. Si no la reconozco, o el pago supera
-        el cupo, va a la bandeja.{nota ? ` ${nota}` : ""}
+        La reconozco por sus últimos 4 dígitos: anótalos en el detalle de cada tarjeta y cuenta. Si no la reconozco, o el
+        pago dejaría una cuenta en negativo, va a la bandeja. Una tarjeta sí puede pasarse del cupo: queda en rojo.
+        {nota ? ` ${nota}` : ""}
       </Text>
       {error && <ErrorTexto>{error}</ErrorTexto>}
     </Tarjeta>

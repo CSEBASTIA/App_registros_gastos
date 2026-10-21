@@ -38,8 +38,12 @@ const NUMERO_MES: Record<string, number> = {
   ene: 1, jan: 1, feb: 2, mar: 3, abr: 4, apr: 4, may: 5, jun: 6,
   jul: 7, ago: 8, aug: 8, sep: 9, set: 9, oct: 10, nov: 11, dic: 12, dec: 12,
 };
+// Letras latinas, con tildes y ñ. No se usa \p{L}: Hermes (el motor de
+// JavaScript del teléfono) no lo entiende en un new RegExp y la app se cerraba
+// al abrirse (APK 1.4.0 y 1.5.0). Babel solo traduce los literales /…/u.
+const LETRA = "A-Za-z\\u00C0-\\u00D6\\u00D8-\\u00F6\\u00F8-\\u024F";
 // 2026-10-15 · 2026/10/15 · 15/10/2026 · 15-10-26 · 15/10 · 15-OCT-2026 · 15 oct 2026 · 15OCT
-const PATRON_FECHA = `(?:\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}|\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?|\\d{1,2}[\\s/-]?(?:${NOMBRE_MES})\\.?(?:[/-]\\d{2,4}|\\s\\d{4}|\\d{4})?)(?![\\p{L}\\d])`;
+const PATRON_FECHA = `(?:\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}|\\d{1,2}[/-]\\d{1,2}(?:[/-]\\d{2,4})?|\\d{1,2}[\\s/-]?(?:${NOMBRE_MES})\\.?(?:[/-]\\d{2,4}|\\s\\d{4}|\\d{4})?)(?![${LETRA}\\d])`;
 const FECHA = new RegExp(PATRON_FECHA, "giu");
 const FECHA_CON_NOMBRE = new RegExp(`^(\\d{1,2})[\\s/-]?(${NOMBRE_MES})\\.?(?:[\\s/-]?(\\d{2,4}))?$`, "iu");
 const CORTE = new RegExp(`(?:fecha\\s+de\\s+corte|corte|periodo\\s+hasta)\\s*[:\\s]+(${PATRON_FECHA})`, "iu");

@@ -1,5 +1,5 @@
 /**
- * Planes de FinTrack: Gratis, Plus ($2.99/mes) y Pro ($4.99/mes).
+ * Planes de FinTrack: Gratis, Plus ($1.99/mes) y Pro ($3.99/mes).
  *
  * El plan de cada persona vive en la tabla `planes_usuario`, que la app solo
  * puede leer: lo escribe el servidor cuando confirma un pago. Sin fila, o con
@@ -37,7 +37,7 @@ export const PLANES: Plan[] = [
   {
     id: "plus",
     nombre: "Plus",
-    precioMensual: 2.99,
+    precioMensual: 1.99,
     lema: "Tus gastos se registran solos.",
     destacado: "Más elegido",
     beneficios: [
@@ -51,7 +51,7 @@ export const PLANES: Plan[] = [
   {
     id: "pro",
     nombre: "Pro",
-    precioMensual: 4.99,
+    precioMensual: 3.99,
     lema: "Adelántate a fin de mes.",
     destacado: "Todo incluido",
     beneficios: [
@@ -72,7 +72,7 @@ export function planPorId(id: IdPlan): Plan {
   return PLANES.find((p) => p.id === id) ?? PLANES[0];
 }
 
-/** "Gratis" o "$2.99 al mes". */
+/** "Gratis" o "$1.99 al mes". */
 export function textoPrecio(plan: Plan): string {
   return plan.precioMensual === 0 ? "Gratis" : `$${plan.precioMensual.toFixed(2)} al mes`;
 }

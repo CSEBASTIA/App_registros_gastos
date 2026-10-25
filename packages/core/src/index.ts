@@ -145,6 +145,7 @@ export {
   registrarAceptacion,
   aceptarDocumentosPendientes,
 } from "./repositories/legal.repo";
+export { obtenerMiPlan } from "./repositories/planes.repo";
 export { totalesPorMes, type TotalMes } from "./repositories/totales.repo";
 export {
   contrasenaSchema,

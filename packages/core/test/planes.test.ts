@@ -2,9 +2,9 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { PLANES, estadoSuscriptor, textoPrecio } from "../src/lib/planes.ts";
 
-test("hay tres planes: Gratis, $2.99 y $4.99", () => {
-  assert.deepEqual(PLANES.map((p) => [p.id, p.precioMensual]), [["gratis", 0], ["plus", 2.99], ["pro", 4.99]]);
-  assert.equal(textoPrecio(PLANES[1]), "$2.99 al mes");
+test("hay tres planes: Gratis, $1.99 y $3.99", () => {
+  assert.deepEqual(PLANES.map((p) => [p.id, p.precioMensual]), [["gratis", 0], ["plus", 1.99], ["pro", 3.99]]);
+  assert.equal(textoPrecio(PLANES[1]), "$1.99 al mes");
 });
 
 test("sin plan pagado, la persona está en Gratis", () => {

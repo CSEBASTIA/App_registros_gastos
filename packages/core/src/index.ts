@@ -28,6 +28,8 @@ export * from "./lib/mapaEstatico";
 export * from "./lib/edicionMovimiento";
 export * from "./lib/legal";
 export * from "./lib/notificaciones";
+export * from "./lib/suscripciones";
+export * from "./lib/proyeccionMes";
 export { FILAS_POR_PAGINA, type RangoFechas } from "./lib/paginacion";
 export * from "./schemas/limites";
 export * from "./schemas/gasto.schema";

@@ -15,4 +15,9 @@ test("el diferido muestra capital e interés de la primera cuota y liquida el ca
 test("repara el nombre mal codificado y conserva los nombres correctos", () => {
   assert.equal(repararTexto("American ExpressÂ® ClÃ¡sica CrÃ©dito"), "American Express® Clásica Crédito");
   assert.equal(repararTexto("American Express® Clásica Crédito"), "American Express® Clásica Crédito");
+  // Asuntos reales de correos con la codificación mal declarada.
+  assert.equal(repararTexto("AsignaciÃ³n de cupo a la tarjeta exitosa"), "Asignación de cupo a la tarjeta exitosa");
+  assert.equal(repararTexto("PeÃ±a â€“ Ã\u0081ngel"), "Peña – Ángel");
+  // Un texto ya bien escrito, o con una «Ã» legítima, no se toca.
+  assert.equal(repararTexto("Bogotá y Ãvila"), "Bogotá y Ãvila");
 });

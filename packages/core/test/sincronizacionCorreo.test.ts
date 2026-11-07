@@ -90,12 +90,14 @@ test("cuentaParaAviso: única del banco, por últimos dígitos, o a mano si es a
   assert.equal(cuentaParaAviso(cuentas, undefined, "1234"), undefined);
 });
 
-test("avisosDeCorreos: arma los avisos y omite correos sin monto o sin tipo", () => {
+test("avisosDeCorreos: arma los avisos y omite correos sin monto, sin tipo o sin cuenta de un remitente desconocido", () => {
   const correos: CorreoRecibido[] = [
-    { mensajeId: "1", remitente: "x@y.com", asunto: "Consumo con tu tarjeta", cuerpoTexto: "Valor $12,50 el 14/10/2026", fecha: "2026-10-15" },
+    { mensajeId: "1", remitente: "x@y.com", asunto: "Consumo con tu tarjeta terminada en 1234", cuerpoTexto: "Valor $12,50 el 14/10/2026", fecha: "2026-10-15" },
     { mensajeId: "2", remitente: "x@y.com", asunto: "Boletín de noticias", cuerpoTexto: "Hola", fecha: "2026-10-15" },
     { mensajeId: "3", remitente: "x@y.com", asunto: "Depósito recibido", cuerpoTexto: "sin monto", fecha: "2026-10-15" },
-    { mensajeId: "4", remitente: "x@y.com", asunto: "Transferencia recibida", cuerpoTexto: "Valor $100.00", fecha: "2026-10-15" },
+    { mensajeId: "4", remitente: "x@y.com", asunto: "Transferencia recibida", cuerpoTexto: "En tu cuenta 5678. Valor $100.00", fecha: "2026-10-15" },
+    // Un boletín con montos y «compra», sin ninguna cuenta: no es un movimiento tuyo.
+    { mensajeId: "5", remitente: "noticias@cripto.com", asunto: "Cripto Radar: BTC rebotÃ³ $3K", cuerpoTexto: "Compra BTC desde $3,000.00 hoy", fecha: "2026-10-15" },
   ];
   const avisos = avisosDeCorreos(correos, []);
   assert.deepEqual(
@@ -117,4 +119,12 @@ test("resumenSincronizacion: cuenta lo enviado y avisa de lo omitido, truncado o
   assert.match(completo, /1 aviso\(s\) tenían datos imposibles/);
   assert.match(completo, new RegExp(`más de ${TOPE_CORREOS} correos`));
   assert.match(completo, /No se pudieron leer 2 correo/);
+});
+
+test("avisosDeCorreos: repara las letras dañadas del asunto antes de guardarlo", () => {
+  const [aviso] = avisosDeCorreos(
+    [{ mensajeId: "1", remitente: "x@y.com", asunto: "Consumo aprobado con tu tarjeta 1234 en CafeterÃ\u00ada", cuerpoTexto: "Valor $3,50", fecha: "2026-10-15" }],
+    [],
+  );
+  assert.equal(aviso.correoAsunto, "Consumo aprobado con tu tarjeta 1234 en Cafetería");
 });

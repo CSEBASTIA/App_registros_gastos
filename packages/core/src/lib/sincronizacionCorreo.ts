@@ -7,6 +7,7 @@ import type { AvisoRegistrado, TransaccionDetectadaInsert } from "../repositorie
 import { bancoDeNombre, bancoDeRemitente, parsearCorreoBancario, type CorreoParseado } from "./correoBancario";
 import { formatMonto } from "./formatMonto";
 import { ETIQUETA_BANCO } from "./marcas";
+import { repararTexto } from "./repararTexto";
 
 export interface CorreoRecibido {
   mensajeId: string;
@@ -195,9 +196,15 @@ function cuentasDeAvisoReconocido(
 /** Convierte correos en avisos para la Bandeja. Sin tipo o sin monto no sirven: se omiten. */
 export function avisosDeCorreos(correos: CorreoRecibido[], cuentas: Cuenta[]): TransaccionDetectadaInsert[] {
   const avisos: TransaccionDetectadaInsert[] = [];
-  for (const correo of correos) {
+  for (const recibido of correos) {
+    // Algunos remitentes declaran mal la codificación: «AsignaciÃ³n» → «Asignación».
+    const correo = { ...recibido, asunto: repararTexto(recibido.asunto), cuerpoTexto: repararTexto(recibido.cuerpoTexto) };
     const p = parsearCorreoBancario(correo.remitente, correo.asunto, correo.cuerpoTexto);
     if (!p.tipo || !p.monto) continue;
+    // De un remitente que no es un banco conocido (ni un recibo reconocido),
+    // solo entra si nombra una cuenta o tarjeta por sus dígitos: así un
+    // boletín con montos y la palabra «pago» no llena la Bandeja.
+    if (!p.banco && !p.clase && !p.identificadorCuenta) continue;
     const reconocido = p.clase ? cuentasDeAvisoReconocido(p, cuentas) : undefined;
     avisos.push({
       mensajeId: correo.mensajeId,

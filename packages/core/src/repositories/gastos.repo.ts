@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "../client";
+import { repararTexto } from "../lib/repararTexto";
 import { z } from "zod";
 import type { Billetera, Gasto, Ubicacion } from "../types/domain";
 import type { Database } from "../types/database";
@@ -14,7 +15,7 @@ function filaAGasto(row: GastoRow): Gasto {
   return {
     id: row.id,
     monto: Number(row.monto),
-    descripcion: row.descripcion,
+    descripcion: repararTexto(row.descripcion),
     categoriaId: row.categoria_id ?? "",
     categoriaDetalle: row.categoria_detalle ?? undefined,
     cuentaId: row.cuenta_id ?? undefined,

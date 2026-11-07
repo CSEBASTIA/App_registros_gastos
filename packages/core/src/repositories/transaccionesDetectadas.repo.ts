@@ -1,4 +1,5 @@
 import { getSupabaseClient } from "../client";
+import { repararTexto, repararTextoOpcional } from "../lib/repararTexto";
 import type { ClaseAviso, OrigenTransaccion, TransaccionDetectada } from "../types/domain";
 import type { Database } from "../types/database";
 import { z } from "zod";
@@ -17,15 +18,16 @@ function filaATransaccion(row: Row): TransaccionDetectada {
     mensajeId: row.mensaje_id,
     tipo: row.tipo as TransaccionDetectada["tipo"],
     monto: Number(row.monto),
-    descripcion: row.descripcion,
+    // Los guardados antes con letras dañadas («AsignaciÃ³n») se muestran bien.
+    descripcion: repararTexto(row.descripcion),
     banco: (row.banco as TransaccionDetectada["banco"]) ?? undefined,
     cuentaId: row.cuenta_id ?? undefined,
     categoriaId: row.categoria_id ?? undefined,
     fecha: row.fecha,
-    correoAsunto: row.correo_asunto ?? undefined,
+    correoAsunto: repararTextoOpcional(row.correo_asunto ?? undefined),
     // Una base sin la migración de billeteras no trae `origen`: todo es correo.
     origen: (row.origen as OrigenTransaccion | undefined) ?? "correo",
-    comercio: row.comercio ?? undefined,
+    comercio: repararTextoOpcional(row.comercio ?? undefined),
     ubicacion: ubicacionDeFila(row),
     tarjetaFinal: row.tarjeta_final ?? undefined,
     pagadoEn: row.pagado_en ?? undefined,

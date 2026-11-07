@@ -30,6 +30,7 @@ export * from "./lib/legal";
 export * from "./lib/notificaciones";
 export * from "./lib/suscripciones";
 export * from "./lib/proyeccionMes";
+export * from "./lib/planes";
 export { FILAS_POR_PAGINA, type RangoFechas } from "./lib/paginacion";
 export * from "./schemas/limites";
 export * from "./schemas/gasto.schema";

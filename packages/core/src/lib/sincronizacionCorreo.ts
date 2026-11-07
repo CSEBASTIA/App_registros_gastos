@@ -152,6 +152,19 @@ export function cuentaPorDigitos(
   return sinDigitos.length === 1 ? sinDigitos[0].id : undefined;
 }
 
+/**
+ * Recibo de un comercio (Uber), que no dice el banco: la única tarjeta o
+ * cuenta, de cualquier banco, con esos 4 últimos dígitos anotados. Si no
+ * hay ninguna o hay dos, no adivina (el aviso va a la Bandeja).
+ */
+export function tarjetaPorDigitos(cuentas: Cuenta[], digitos: string | undefined): string | undefined {
+  if (!digitos || digitos.length < 4) return undefined;
+  const coinciden = cuentas.filter(
+    (c) => c.tipo !== "efectivo" && c.identificador && c.identificador.length >= 3 && digitosCoinciden(c.identificador, digitos),
+  );
+  return coinciden.length === 1 ? coinciden[0].id : undefined;
+}
+
 /** Las cuentas de un aviso reconocido por plantilla (consumo, pago de tarjeta o transferencia). */
 function cuentasDeAvisoReconocido(
   p: CorreoParseado,
@@ -159,7 +172,11 @@ function cuentasDeAvisoReconocido(
 ): { cuentaId?: string; contraparteCuentaId?: string } {
   switch (p.clase) {
     case "consumo":
-      return { cuentaId: cuentaPorDigitos(cuentas, p.banco, p.tarjetaFinal, ["credito", "debito", "ahorro"]) };
+      return {
+        cuentaId: p.banco
+          ? cuentaPorDigitos(cuentas, p.banco, p.tarjetaFinal, ["credito", "debito", "ahorro"])
+          : tarjetaPorDigitos(cuentas, p.tarjetaFinal),
+      };
     case "pago_tarjeta":
       return {
         cuentaId: cuentaPorDigitos(cuentas, p.banco, p.tarjetaFinal, ["credito"]),

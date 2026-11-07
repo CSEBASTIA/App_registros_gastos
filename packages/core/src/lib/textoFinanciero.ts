@@ -18,8 +18,9 @@ export function normalizarNumero(valor: string): number {
 
 /** Palabras clave del comercio/descripción → nombre de categoría sugerido (debe coincidir con el catálogo de `categorias`). */
 export const PALABRAS_POR_CATEGORIA: Record<string, string[]> = {
-  Comida: ["supermaxi", "megamaxi", "mi comisariato", "coral", "restaurante", "market", "food"],
-  Transporte: ["uber", "cabify", "indriver", "taxi", "gasolina", "combustible", "peaje"],
+  // Comida va antes que Transporte: «UBER *EATS» es comida a domicilio, no un viaje.
+  Comida: ["supermaxi", "megamaxi", "mi comisariato", "coral", "restaurante", "market", "food", "uber eats", "ubereats", "uber *eats", "rappi", "pedidosya", "pedidos ya"],
+  Transporte: ["uber", "cabify", "indriver", "didi", "taxi", "gasolina", "combustible", "peaje"],
   Ocio: ["netflix", "spotify", "cine", "cinemark", "supercines", "steam", "teatro", "discoteca", "casino", "concierto"],
   Salud: ["farmacia", "farmacias", "fybeca", "sana sana", "cruz azul", "medico", "medica", "clinica", "hospital", "laboratorio clinico", "consultorio", "odontologo", "dentista", "medicamento"],
   Servicios: ["cnel", "cnt", "movistar", "claro", "agua potable", "electricidad"],

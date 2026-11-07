@@ -277,6 +277,7 @@ export type Database = {
           es_transferencia?: boolean;
           transferencia_id?: string | null;
           gasto_id?: string | null;
+          posible_duplicado_de?: string | null;
           clase?: string | null;
           contraparte_cuenta_id?: string | null;
           comision?: number | null;
@@ -370,6 +371,8 @@ export type Database = {
         Row: {
           usuario_id: string;
           registro_automatico: boolean;
+          /** Último mes "AAAA-MM" al que ya se copiaron los presupuestos (lo escribe `continuar_presupuestos`). */
+          presupuestos_hasta: string | null;
           updated_at: string;
         };
         Insert: {
@@ -678,6 +681,11 @@ export type Database = {
       separar_transferencia: {
         Args: { p_id: string };
         /** Cuántos avisos volvieron a la bandeja. */
+        Returns: number;
+      };
+      continuar_presupuestos: {
+        Args: { p_mes: string };
+        /** Cuántos presupuestos se copiaron del mes anterior (0 si el mes ya estaba preparado). */
         Returns: number;
       };
       revisar_mis_presupuestos: {

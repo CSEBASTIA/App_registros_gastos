@@ -142,6 +142,11 @@ export interface TransaccionDetectada {
   transferenciaId?: string;
   /** El gasto que creó este aviso (al confirmarlo o al registrarse solo). */
   gastoId?: string;
+  /**
+   * Parece el mismo cobro que este gasto ya registrado (el recibo de Uber y el
+   * aviso del banco): no se registró solo, la persona confirma si es el mismo.
+   */
+  posibleDuplicadoDe?: string;
   estado: EstadoTransaccionDetectada;
   createdAt: string;
 }

@@ -64,6 +64,7 @@ export {
 } from "./repositories/gastos.repo";
 export {
   listarPresupuestos,
+  continuarPresupuestos,
   eliminarPresupuesto,
   revisarMisPresupuestos,
   avisosPresupuestoDe,
@@ -103,6 +104,7 @@ export {
   contarTransaccionesPendientes,
   insertarTransaccionesDetectadas,
   marcarTransaccionDetectada,
+  descartarAvisosPendientes,
   confirmarTransaccionDetectada,
   eliminarTransaccionesDetectadas,
   avisoGuardable,

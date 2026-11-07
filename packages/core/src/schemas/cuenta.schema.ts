@@ -40,6 +40,10 @@ export const cuentaSchema = z
     message: "Una casa comercial o crédito directo se registra como tarjeta de crédito.",
     path: ["tipo"],
   })
+  .refine((c) => c.tipo === "credito" || c.disponible >= 0, {
+    message: "Una cuenta no puede empezar en negativo: solo una tarjeta de crédito puede pasarse del cupo.",
+    path: ["disponible"],
+  })
   .refine((c) => c.tipo !== "credito" || c.cupoTotal !== undefined, {
     message: "Una tarjeta de crédito necesita un cupo total",
     path: ["cupoTotal"],

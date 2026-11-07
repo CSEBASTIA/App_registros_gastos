@@ -361,6 +361,68 @@ const pichinchaTransferencia: Plantilla = ({ t }) => {
   };
 };
 
+/** Los recibos de Uber (viajes y Uber Eats) llegan de una dirección de uber.com. */
+export function esRemitenteUber(remitente: string): boolean {
+  return remitenteCoincide(direccionDe(remitente), "uber.com");
+}
+
+/**
+ * Recibo de Uber: «Tu viaje del jueves por la noche con Uber … Total $4,52 …
+ * Visa ••••1234» o «Tu pedido de Uber Eats … Total US$12.30». Solo el recibo
+ * de un viaje o de un pedido: promociones, Uber One, ajustes y reembolsos no.
+ * Si se pagó con tarjeta, trae sus últimos dígitos y se registra solo en esa
+ * tarjeta (como un aviso del banco). Si no los trae, la base usa la tarjeta
+ * que la persona más usa en Uber. En efectivo, va a la Bandeja.
+ */
+function reciboUber(asunto: string, t: string): Partial<CorreoParseado> | undefined {
+  const a = plano(asunto);
+  if (/reembolso|refund|ajuste|adjust|uber one|promo|cup[oó]n|descuento/i.test(a)) return undefined;
+  const esEats = /\buber\s*eats\b/i.test(t) && /\b(pedido|order)\b/i.test(`${a} ${t}`);
+  // El asunto no siempre dice «viaje»: el cuerpo del recibo sí («Gracias por
+  // usar Uber», «Tarifa del viaje»).
+  const esViaje =
+    /\b(viaje|trip|ride)\b/i.test(a) || /gracias\s+por\s+usar\s+uber|tarifa\s+del\s+viaje|thanks\s+for\s+riding|trip\s+fare/i.test(t);
+  if (!esEats && !esViaje) return undefined;
+  const valor = monto(t.match(/\bTotal\b\s*:?\s*(?:USD|US\$|\$)\s*(\d[\d.,]*\d)/i)?.[1]);
+  if (!valor) return undefined;
+  const tarjeta = t.match(
+    /\b(?:visa|master\s?card|mastercard|amex|american\s+express|diners(?:\s+club)?|discover)\b[^\d\n]{0,12}?(?:[•·.xX]{2,}\s*)(\d{4})(?!\d)/i,
+  )?.[1];
+  const comercio = esEats ? "Uber Eats" : "Uber";
+  // Fecha y hora del cobro: en la línea del pago («Visa ••••8803 … 30/10/26
+  // 4:55 p.m.»), no la del envío del correo, que va arriba.
+  const pagos = t.search(/\b(pagos|payments)\b/i);
+  const cobro = fechaHoraUber(pagos >= 0 ? t.slice(pagos) : t);
+  // Pagado en efectivo: no salió de ninguna tarjeta, no se registra solo.
+  const enEfectivo = !tarjeta && /\b(efectivo|cash)\b/i.test(t);
+  return {
+    tipo: "gasto",
+    monto: valor,
+    comercio,
+    descripcion: comercio,
+    ...(enEfectivo ? {} : { clase: "consumo" as const }),
+    ...(tarjeta ? { tarjetaFinal: tarjeta } : {}),
+    ...(cobro ?? {}),
+  };
+}
+
+/** «30/10/26 4:55 p.m.», «30/10/2026 16:55» → fecha y hora de Ecuador. */
+function fechaHoraUber(texto: string): { fecha: string; pagadoEn?: string } | undefined {
+  const m = texto.match(/(?<!\d)(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:\s+(\d{1,2}):(\d{2})\s*(?:([ap])\.?\s*m\.?)?)?(?![\d/])/i);
+  if (!m) return undefined;
+  const fecha = fechaValida(m[3].length === 2 ? `20${m[3]}` : m[3], m[2].padStart(2, "0"), m[1].padStart(2, "0"));
+  if (!fecha) return undefined;
+  if (!m[4]) return { fecha };
+  let hora = Number(m[4]);
+  const minuto = Number(m[5]);
+  const meridiano = m[6]?.toLowerCase();
+  if (meridiano && (hora < 1 || hora > 12)) return { fecha };
+  if (meridiano === "p" && hora < 12) hora += 12;
+  if (meridiano === "a" && hora === 12) hora = 0;
+  if (hora > 23 || minuto > 59) return { fecha };
+  return { fecha, pagadoEn: `${fecha}T${String(hora).padStart(2, "0")}:${m[5]}:00-05:00` };
+}
+
 const PLANTILLAS: Plantilla[] = [
   guayaquilConsumo,
   guayaquilPagoTarjeta,
@@ -382,6 +444,20 @@ export function parsearCorreoBancario(remitente: string, asunto: string, cuerpoT
   const banco = bancoDeRemitente(remitente);
   const texto = `${asunto}\n${cuerpoTexto}`;
   const t = plano(texto);
+
+  if (esRemitenteUber(remitente)) {
+    const r = reciboUber(asunto, t);
+    // Lo demás que manda Uber (promociones, avisos de la cuenta) no es un movimiento.
+    if (!r) return { tipo: undefined, monto: undefined, fecha: undefined, descripcion: asunto.trim(), banco: undefined, identificadorCuenta: undefined, categoriaSugerida: undefined, esTransferencia: false };
+    return {
+      fecha: r.fecha ?? extraerFecha(t),
+      banco: undefined,
+      identificadorCuenta: r.tarjetaFinal,
+      categoriaSugerida: sugerirCategoria(r.comercio ?? ""),
+      esTransferencia: false,
+      ...r,
+    } as CorreoParseado;
+  }
 
   // Las plantillas solo valen para remitentes de bancos conocidos.
   if (banco) {

@@ -4,6 +4,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import {
+  ETIQUETA_BANCO,
+  crearCuenta,
+  cuentaDelEstado,
+  parsearMonto,
+  propuestaCuentaDelEstado,
+  type PropuestaCuentaNueva,
   ErrorImportacionParcial,
   formatMonto,
   importarMovimientos,
@@ -32,10 +38,12 @@ import Casilla from "../components/Casilla";
 import ErrorTexto from "../components/ErrorTexto";
 import LectorPdf, { ErrorClavePdf, type LectorPdfRef } from "../components/LectorPdf";
 import { avisarPresupuestos } from "../lib/notificaciones";
+import SelectorChips from "../components/SelectorChips";
+import { leerPdfEntrante, tomarPdfEntrante } from "../lib/pdfEntrante";
 import { borrarCopiaTemporal, leerArchivoBase64, leerArchivoTexto, TAMANO_MAXIMO_ESTADO } from "../lib/archivosImportacion";
 import { spacing, useTheme, font, radius, type Colors } from "../lib/theme";
 
-type Fase = "elegir" | "leyendo" | "clave" | "revisar" | "guardando" | "listo";
+type Fase = "elegir" | "leyendo" | "clave" | "cuenta" | "revisar" | "guardando" | "listo";
 
 const TIPOS_ARCHIVO = ["application/pdf", "text/csv", "text/comma-separated-values", "text/plain"];
 
@@ -44,7 +52,10 @@ const fechaCorta = (iso: string) => iso.split("-").reverse().join("/");
 
 /**
  * Importar el estado de cuenta de una cuenta o tarjeta: se abre al crearla
- * («Agregar e importar») o desde su detalle. El archivo se lee en el teléfono
+ * («Agregar e importar»), desde su detalle, o sin cuenta («Subir PDF» o un PDF
+ * abierto con la app desde otra): entonces la app reconoce por el banco y los
+ * últimos dígitos de qué cuenta es y, si aún no existe (al empezar a usar la
+ * app), la propone con los datos del propio estado de cuenta. El archivo se lee en el teléfono
  * (o en el navegador, en la web) y no se sube a ningún servidor; nada se
  * guarda hasta que la persona revisa las filas y confirma.
  */
@@ -57,7 +68,18 @@ export default function ImportarEstadoScreen() {
   // El PDF con clave se guarda solo en memoria mientras se pide la clave.
   const pdfPendiente = useRef<string | null>(null);
 
+  // undefined: cargando. null: sin cuenta (con `cuentaId`, no existe; sin él, aún no se sabe de cuál es).
   const [cuenta, setCuenta] = useState<Cuenta | null | undefined>(undefined);
+  const [cuentas, setCuentas] = useState<Cuenta[]>([]);
+  // El texto leído mientras se elige o se crea la cuenta (solo en memoria).
+  const textoPendiente = useRef<string | null>(null);
+  const [propuesta, setPropuesta] = useState<PropuestaCuentaNueva | null>(null);
+  const [cuentaElegida, setCuentaElegida] = useState("");
+  const [nombreNueva, setNombreNueva] = useState("");
+  const [digitosNueva, setDigitosNueva] = useState("");
+  const [saldoNueva, setSaldoNueva] = useState("");
+  const [cupoNueva, setCupoNueva] = useState("");
+  const [creando, setCreando] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [fase, setFase] = useState<Fase>("elegir");
   const [nombreArchivo, setNombreArchivo] = useState<string | null>(null);
@@ -71,8 +93,9 @@ export default function ImportarEstadoScreen() {
 
   useEffect(() => {
     Promise.all([listarCuentas(), listarCategorias()])
-      .then(([cuentas, cats]) => {
-        setCuenta(cuentas.find((c) => c.id === cuentaId) ?? null);
+      .then(([cs, cats]) => {
+        setCuentas(cs);
+        setCuenta(cuentaId ? (cs.find((c) => c.id === cuentaId) ?? null) : null);
         setCategorias(cats);
       })
       .catch((err) => {
@@ -80,6 +103,24 @@ export default function ImportarEstadoScreen() {
         setCuenta(null);
       });
   }, [cuentaId]);
+
+  // Un PDF abierto con «Abrir con FinTrack» desde otra app: se lee apenas cargan las cuentas.
+  const pdfEntranteLeido = useRef(false);
+  useEffect(() => {
+    if (cuentaId || cuenta !== null || pdfEntranteLeido.current) return;
+    pdfEntranteLeido.current = true;
+    const uri = tomarPdfEntrante();
+    if (!uri) return;
+    setNombreArchivo("el PDF compartido");
+    setFase("leyendo");
+    leerPdfEntrante(uri)
+      .then((base64) => leerPdf(base64))
+      .catch((err) => {
+        setError(mensajeError(err));
+        setFase("elegir");
+      });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cuenta, cuentaId]);
 
   const resumen = useMemo(() => (cuenta ? resumenImportacion(filas, cuenta) : null), [filas, cuenta]);
   const elegidas = resumen ? resumen.gastos + resumen.ingresos : 0;
@@ -93,15 +134,33 @@ export default function ImportarEstadoScreen() {
     router.replace(cuenta.tipo === "credito" ? `/tarjeta/${cuenta.id}` : `/cuenta/${cuenta.id}`);
   }
 
-  async function analizar(texto: string) {
-    if (!cuenta) return;
+  async function analizar(texto: string, laCuenta: Cuenta | null = cuenta ?? null) {
     const transacciones = parseEstadoCuenta(texto);
     if (transacciones.length === 0) {
       throw new Error(
         "No encontré movimientos en el archivo. Revisa que muestre la fecha, el detalle y el monto de cada consumo."
       );
     }
-    const preparado = prepararFilasImportacion(transacciones, cuenta.tipo, await movimientosDelPeriodo(transacciones));
+    if (!laCuenta) {
+      // ¿De qué cuenta es? Por el banco y los últimos dígitos de la cabecera.
+      const detectada = cuentaDelEstado(texto, cuentas);
+      const reconocida = detectada.cuentaId ? cuentas.find((c) => c.id === detectada.cuentaId) : undefined;
+      if (!reconocida) {
+        const p = propuestaCuentaDelEstado(texto, detectada, saldosDelEstado(texto).anterior);
+        textoPendiente.current = texto;
+        setPropuesta(p);
+        setNombreNueva(p.nombre);
+        setDigitosNueva(p.identificador ?? "");
+        setSaldoNueva(p.disponible !== undefined ? p.disponible.toFixed(2) : "");
+        setCupoNueva(p.cupoTotal !== undefined ? p.cupoTotal.toFixed(2) : "");
+        setCuentaElegida("");
+        setFase("cuenta");
+        return;
+      }
+      laCuenta = reconocida;
+      setCuenta(reconocida);
+    }
+    const preparado = prepararFilasImportacion(transacciones, laCuenta.tipo, await movimientosDelPeriodo(transacciones));
     if (preparado.filas.length === 0) {
       throw new Error("El estado de cuenta solo trae pagos a la tarjeta: no hay consumos para importar.");
     }
@@ -184,6 +243,50 @@ export default function ImportarEstadoScreen() {
     }
   }
 
+  /** Sigue con una cuenta que ya existe, elegida por la persona. */
+  async function usarCuentaElegida() {
+    const elegida = cuentas.find((c) => c.id === cuentaElegida);
+    if (!elegida || !textoPendiente.current) return;
+    setError(null);
+    setCuenta(elegida);
+    try {
+      await analizar(textoPendiente.current, elegida);
+      textoPendiente.current = null;
+    } catch (err) {
+      setError(mensajeError(err));
+    }
+  }
+
+  /** Crea la cuenta o tarjeta con los datos del estado de cuenta (revisados) y sigue con sus movimientos. */
+  async function crearCuentaDelEstado() {
+    if (!propuesta || !textoPendiente.current || creando) return;
+    setError(null);
+    const esTarjeta = propuesta.tipo === "credito";
+    const saldo = saldoNueva.trim() ? parsearMonto(saldoNueva) : 0;
+    const cupo = parsearMonto(cupoNueva);
+    if (!Number.isFinite(saldo)) return setError(esTarjeta ? "Escribe el cupo disponible." : "Escribe el saldo con números.");
+    if (esTarjeta && !(cupo > 0)) return setError("Escribe el cupo total de la tarjeta (sale en el estado de cuenta).");
+    setCreando(true);
+    try {
+      const nueva = await crearCuenta({
+        nombre: nombreNueva.trim(),
+        tipo: propuesta.tipo,
+        banco: propuesta.banco,
+        disponible: saldo,
+        ...(digitosNueva.trim() ? { identificador: digitosNueva.trim() } : {}),
+        ...(esTarjeta ? { cupoTotal: cupo } : {}),
+      });
+      setCuentas((cs) => [...cs, nueva]);
+      setCuenta(nueva);
+      await analizar(textoPendiente.current, nueva);
+      textoPendiente.current = null;
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setCreando(false);
+    }
+  }
+
   function cambiarFila(id: number, seleccionada: boolean) {
     setFilas((actuales) => actuales.map((f) => (f.id === id ? { ...f, seleccionada } : f)));
   }
@@ -219,7 +322,7 @@ export default function ImportarEstadoScreen() {
       </View>
     );
   }
-  if (cuenta === null) {
+  if (cuenta === null && cuentaId) {
     return (
       <View style={[styles.contenedor, styles.centro]}>
         <ErrorTexto>{error ?? "No encontré esa cuenta."}</ErrorTexto>
@@ -228,7 +331,11 @@ export default function ImportarEstadoScreen() {
     );
   }
 
-  const esCredito = cuenta.tipo === "credito";
+  const esCredito = cuenta?.tipo === "credito";
+  // Para elegir una cuenta existente: las del tipo del estado (tarjeta o cuenta), sin el efectivo.
+  const compatibles = cuentas.filter((c) =>
+    c.tipo !== "efectivo" && (propuesta?.tipo === "credito" ? c.tipo === "credito" : c.tipo !== "credito"),
+  );
 
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: color.bg }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
@@ -243,7 +350,9 @@ export default function ImportarEstadoScreen() {
             Estado de cuenta
           </Text>
           <Text style={styles.intro}>
-            {cuenta.nombre}: sube el estado de cuenta y la app arma los movimientos para que los revises.
+            {cuenta
+              ? `${cuenta.nombre}: sube el estado de cuenta y la app arma los movimientos para que los revises.`
+              : "Sube el estado de cuenta en PDF que te manda el banco: la app reconoce de qué cuenta o tarjeta es (o la crea con sus datos) y arma los movimientos para que los revises."}
           </Text>
         </View>
 
@@ -270,6 +379,79 @@ export default function ImportarEstadoScreen() {
               <Boton titulo="Elegir PDF o CSV" variante="primario" onPress={elegirArchivo} />
             )}
             <Boton titulo="Ahora no" onPress={irALaCuenta} disabled={fase === "leyendo"} />
+          </Tarjeta>
+        )}
+
+        {fase === "cuenta" && propuesta && (
+          <Tarjeta>
+            <View style={styles.filaTitulo}>
+              <Ionicons name={propuesta.tipo === "credito" ? "card-outline" : "wallet-outline"} size={18} color={color.textMuted} />
+              <Text style={styles.tituloCard}>¿De qué {propuesta.tipo === "credito" ? "tarjeta" : "cuenta"} es?</Text>
+            </View>
+            <Text style={styles.texto}>
+              {`Es un estado de ${propuesta.tipo === "credito" ? "tarjeta de crédito" : "cuenta"}${
+                propuesta.banco !== "otro" ? ` de ${ETIQUETA_BANCO[propuesta.banco]}` : ""
+              }${propuesta.identificador ? ` terminada en ${propuesta.identificador}` : ""}, y no la encontré entre las tuyas.`}
+            </Text>
+
+            {compatibles.length > 0 && (
+              <>
+                <SelectorChips
+                  titulo="¿Es una que ya tienes?"
+                  opciones={compatibles.map((c) => ({
+                    valor: c.id,
+                    etiqueta: c.identificador ? `${c.nombre} ••${c.identificador}` : c.nombre,
+                  }))}
+                  valor={cuentaElegida}
+                  onCambiar={setCuentaElegida}
+                />
+                <Boton titulo="Usar esta" onPress={usarCuentaElegida} disabled={!cuentaElegida || creando} />
+              </>
+            )}
+
+            <Text style={styles.textoMuted}>
+              {compatibles.length > 0 ? "Si no, créala con los datos del estado de cuenta" : "Créala con los datos del estado de cuenta"}{" "}
+              (revísalos; los cambias cuando quieras):
+            </Text>
+            <Campo etiqueta="Nombre" value={nombreNueva} onChangeText={setNombreNueva} maxLength={60} />
+            <Campo
+              etiqueta="Últimos 4 dígitos"
+              value={digitosNueva}
+              onChangeText={(v) => setDigitosNueva(v.replace(/\D/g, "").slice(0, 4))}
+              keyboardType="number-pad"
+              maxLength={4}
+            />
+            {propuesta.tipo === "credito" && (
+              <Campo etiqueta="Cupo total" value={cupoNueva} onChangeText={setCupoNueva} keyboardType="decimal-pad" placeholder="Ej. 2500.00" />
+            )}
+            <Campo
+              etiqueta={propuesta.tipo === "credito" ? "Cupo disponible al inicio del estado" : "Saldo al inicio del estado"}
+              value={saldoNueva}
+              onChangeText={setSaldoNueva}
+              keyboardType="decimal-pad"
+              placeholder="0.00"
+            />
+            <Text style={styles.textoMuted}>
+              {propuesta.tipo === "credito"
+                ? "Es el cupo menos lo que debías al empezar el periodo: al importar los consumos, queda el cupo disponible de hoy."
+                : "Es el «saldo anterior» del estado: al importar los movimientos, la cuenta queda con el saldo de hoy."}
+            </Text>
+            <Boton
+              titulo={`Crear ${propuesta.tipo === "credito" ? "tarjeta" : "cuenta"} y ver movimientos`}
+              variante="primario"
+              onPress={crearCuentaDelEstado}
+              loading={creando}
+              disabled={!nombreNueva.trim()}
+            />
+            <Boton
+              titulo="Elegir otro archivo"
+              onPress={() => {
+                textoPendiente.current = null;
+                setPropuesta(null);
+                setFase("elegir");
+              }}
+              disabled={creando}
+            />
           </Tarjeta>
         )}
 
@@ -305,7 +487,7 @@ export default function ImportarEstadoScreen() {
           </Tarjeta>
         )}
 
-        {(fase === "revisar" || fase === "guardando") && preparadas && resumen && (
+        {(fase === "revisar" || fase === "guardando") && preparadas && resumen && cuenta && (
           <>
             <ResumenEstadoCuenta
               archivo={nombreArchivo}
@@ -431,8 +613,12 @@ export default function ImportarEstadoScreen() {
                 setResultado(null);
                 setFase("elegir");
                 // El saldo cambió: se vuelve a leer para el próximo resumen.
+                // Sin cuenta fija, el próximo estado puede ser de otra cuenta.
                 listarCuentas()
-                  .then((cs) => setCuenta(cs.find((c) => c.id === cuentaId) ?? null))
+                  .then((cs) => {
+                    setCuentas(cs);
+                    setCuenta(cuentaId ? (cs.find((c) => c.id === cuentaId) ?? null) : null);
+                  })
                   .catch(() => {});
               }}
             />

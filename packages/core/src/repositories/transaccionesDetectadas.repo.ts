@@ -33,6 +33,7 @@ function filaATransaccion(row: Row): TransaccionDetectada {
     esTransferencia: row.es_transferencia === true,
     transferenciaId: row.transferencia_id ?? undefined,
     gastoId: row.gasto_id ?? undefined,
+    posibleDuplicadoDe: row.posible_duplicado_de ?? undefined,
     // Sin la migración del correo estas columnas no existen.
     clase: (row.clase as ClaseAviso | null | undefined) ?? undefined,
     contraparteCuentaId: row.contraparte_cuenta_id ?? undefined,
@@ -281,6 +282,21 @@ export async function marcarTransaccionDetectada(id: string, estado: "descartado
     .update({ estado, correo_asunto: null })
     .eq("id", id);
   if (error) throw error;
+}
+
+/**
+ * Vacía la bandeja: descarta de una vez todos los avisos pendientes. No se
+ * borran: quedan como descartados para que la próxima lectura del correo (o
+ * un reintento de la billetera) no los vuelva a traer. Los gastos ya
+ * confirmados no se tocan. Devuelve cuántos se descartaron.
+ */
+export async function descartarAvisosPendientes(): Promise<number> {
+  const { error, count } = await getSupabaseClient()
+    .from("transacciones_detectadas")
+    .update({ estado: "descartado", correo_asunto: null }, { count: "exact" })
+    .eq("estado", "pendiente");
+  if (error) throw error;
+  return count ?? 0;
 }
 
 const confirmacionSchema = z.object({

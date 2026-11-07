@@ -10,6 +10,7 @@ import { cuentaPorDigitos } from "./sincronizacionCorreo";
 import { fechaDeTexto } from "./estadoCuenta";
 import { normalizarNumero, sugerirCategoria } from "./textoFinanciero";
 import { fechaLocal } from "./semanas";
+import { ETIQUETA_BANCO } from "./marcas";
 
 /** La cabecera de un estado de cuenta: aquí van el banco y el número de la cuenta (no en los movimientos). */
 const LINEAS_CABECERA = 40;
@@ -148,4 +149,59 @@ export function parsearComprobante(texto: string, hoy: string = fechaLocal()): C
     ...(comercio ? { comercio } : {}),
     ...(comercio && sugerirCategoria(comercio) ? { categoriaSugerida: sugerirCategoria(comercio) } : {}),
   };
+}
+
+/** Lo que el estado de cuenta permite llenar de una cuenta nueva; la persona lo revisa antes de crearla. */
+export interface PropuestaCuentaNueva {
+  nombre: string;
+  tipo: "credito" | "ahorro";
+  banco: Banco;
+  identificador?: string;
+  /** Solo tarjetas: el cupo total que imprime el estado, si lo trae. */
+  cupoTotal?: number;
+  /**
+   * Con qué saldo empieza la cuenta para que, al importar los movimientos,
+   * termine como dice el estado: el saldo anterior (cuenta) o el cupo menos la
+   * deuda anterior (tarjeta). Undefined si el estado no lo dice.
+   */
+  disponible?: number;
+}
+
+// «CUPO TOTAL 2.500,00», «Cupo autorizado: $1500», «Límite de crédito 3,000.00».
+const CUPO_TOTAL = /\b(?:cupo\s+(?:total|autorizado|asignado|aprobado)|l[ií]mite\s+de\s+cr[eé]dito)\b\s*:?\s*(?:usd|us\$|\$)?\s*(\d[\d.,]*\d)/i;
+
+function cupoDelTexto(texto: string): number | undefined {
+  const m = texto.match(CUPO_TOTAL);
+  const n = m ? normalizarNumero(m[1]) : NaN;
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
+/**
+ * Los datos de la cuenta o tarjeta nueva que se crea desde su estado de
+ * cuenta, cuando todavía no está en la app (al empezar a usarla).
+ */
+export function propuestaCuentaDelEstado(
+  texto: string,
+  detectada: CuentaDelEstado,
+  saldoAnterior?: number,
+): PropuestaCuentaNueva {
+  const banco = detectada.banco ?? "otro";
+  const tipo = detectada.esTarjeta ? "credito" : "ahorro";
+  const base = banco === "otro" ? (detectada.esTarjeta ? "Tarjeta" : "Cuenta") : ETIQUETA_BANCO[banco];
+  const nombre = (detectada.digitos ? `${base} ${detectada.digitos}` : base).slice(0, 60);
+  const identificador = detectada.digitos ? { identificador: detectada.digitos } : {};
+
+  if (tipo === "credito") {
+    const cupoTotal = cupoDelTexto(texto);
+    const disponible =
+      cupoTotal !== undefined ? Math.round((cupoTotal - Math.max(0, saldoAnterior ?? 0)) * 100) / 100 : undefined;
+    return {
+      nombre, tipo, banco, ...identificador,
+      ...(cupoTotal !== undefined ? { cupoTotal } : {}),
+      ...(disponible !== undefined ? { disponible } : {}),
+    };
+  }
+  // Una cuenta no empieza en negativo: si el estado dice lo contrario, que la persona lo escriba.
+  const disponible = saldoAnterior !== undefined && saldoAnterior >= 0 ? saldoAnterior : undefined;
+  return { nombre, tipo, banco, ...identificador, ...(disponible !== undefined ? { disponible } : {}) };
 }

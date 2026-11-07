@@ -3,6 +3,7 @@ import type { AvisoPresupuesto, Presupuesto } from "../types/domain";
 import type { Database } from "../types/database";
 import { MES_ISO } from "../schemas/limites";
 import { faltaEnLaBase } from "../lib/mensajeError";
+import { mesLocal } from "../lib/semanas";
 
 type PresupuestoRow = Database["public"]["Tables"]["presupuestos"]["Row"];
 
@@ -15,7 +16,26 @@ function filaAPresupuesto(row: PresupuestoRow): Presupuesto {
   };
 }
 
+/**
+ * Prepara el mes: la primera vez que se abre, copia los presupuestos del
+ * último mes que los tuvo (solo las categorías que faltan). La base lo hace
+ * una sola vez por mes, así un presupuesto borrado no reaparece. Devuelve
+ * cuántos copió; en una base sin la migración, 0.
+ */
+export async function continuarPresupuestos(mes: string): Promise<number> {
+  if (!MES_ISO.test(mes)) throw new Error("Mes inválido: se espera AAAA-MM.");
+  const { data, error } = await getSupabaseClient().rpc("continuar_presupuestos", { p_mes: mes });
+  if (error) {
+    if (faltaEnLaBase(error)) return 0;
+    throw error;
+  }
+  return Number(data) || 0;
+}
+
+/** Los presupuestos de un mes (o todos). Al pedir el mes en curso, primero lo prepara con `continuarPresupuestos`. */
 export async function listarPresupuestos(mes?: string): Promise<Presupuesto[]> {
+  // Si no se pudo preparar el mes (sin conexión un instante), igual se muestran los que haya.
+  if (mes && mes === mesLocal()) await continuarPresupuestos(mes).catch(() => 0);
   let query = getSupabaseClient().from("presupuestos").select("*");
   if (mes) query = query.eq("mes", mes);
 

@@ -14,6 +14,7 @@ import {
   listarCategorias,
   listarCuentas,
   marcarTransaccionDetectada,
+  descartarAvisosPendientes,
   confirmarTransaccionDetectada,
   confirmarAvisoComoTransferencia,
   confirmarAvisoComoPagoTarjeta,
@@ -38,6 +39,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { abrirEnMapas } from "../lib/ubicacion";
 import IslaDetalle from "../components/IslaDetalle";
 import { avisarPresupuestos, sincronizarNotificaciones } from "../lib/notificaciones";
+import { avisar, confirmar as preguntar } from "../lib/dialogo";
 
 export default function BandejaScreen() {
   const { color } = useTheme();
@@ -47,6 +49,30 @@ export default function BandejaScreen() {
   const [cuentas, setCuentas] = useState<Cuenta[]>([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [vaciando, setVaciando] = useState(false);
+
+  async function vaciarBandeja() {
+    if (vaciando) return;
+    const cuantos = items.length === 1 ? "el movimiento pendiente" : `los ${items.length} movimientos pendientes`;
+    const ok = await preguntar(
+      "Vaciar la bandeja",
+      `Se descartarán ${cuantos}. No se registran como gastos ni ingresos, y no vuelven a aparecer al leer el correo otra vez. Lo que ya confirmaste no se toca.`,
+      "Vaciar",
+    );
+    if (!ok) return;
+    setVaciando(true);
+    setError(null);
+    try {
+      const n = await descartarAvisosPendientes();
+      setItems([]);
+      void sincronizarNotificaciones();
+      void avisar("Bandeja vacía", n === 1 ? "Se descartó 1 movimiento." : `Se descartaron ${n} movimientos.`, "success");
+    } catch (err) {
+      setError(mensajeError(err));
+    } finally {
+      setVaciando(false);
+    }
+  }
 
   const cargar = useCallback(() => {
     setCargando(true);
@@ -127,6 +153,9 @@ export default function BandejaScreen() {
           <Text style={styles.screenIntro}>
             Revisá cada movimiento antes de confirmarlo.
           </Text>
+          {items.length > 1 && (
+            <Boton titulo={`Vaciar bandeja (${items.length})`} variante="peligro" onPress={vaciarBandeja} loading={vaciando} />
+          )}
         </BlurFade>
         {error && <ErrorTexto>{error}</ErrorTexto>}
         {!cargando && !error && items.length === 0 ? (
@@ -278,6 +307,16 @@ function ItemBandeja({
         </View>
         <Text style={styles.fecha}>{item.fecha}</Text>
       </View>
+      {item.posibleDuplicadoDe && (
+        <View style={styles.avisoDuplicado} accessibilityLiveRegion="polite">
+          <Text style={styles.avisoDuplicadoTitulo}>¿Es el mismo cobro?</Text>
+          <Text style={styles.avisoDuplicadoTexto}>
+            Ya registramos un gasto de ${item.monto.toFixed(2)} en esta tarjeta por esas fechas (el recibo del comercio y el aviso
+            del banco suelen ser del mismo pago). Si es el mismo, descártalo; si fue otro cobro, confírmalo.
+          </Text>
+          <Boton titulo="Es el mismo cobro: descartar" variante="primario" onPress={descartar} loading={guardando} disabled={guardando} />
+        </View>
+      )}
       <Boton titulo="Ver detalles (id, hora, lugar)" onPress={() => setVerDetalle(true)} />
       {verDetalle && (
         <IslaDetalle
@@ -440,6 +479,9 @@ function ItemBandeja({
 
 const createStyles = (color: Colors) =>
   StyleSheet.create({
+    avisoDuplicado: { backgroundColor: color.warningBg, borderRadius: 10, padding: spacing(3), gap: spacing(2) },
+    avisoDuplicadoTitulo: { fontFamily: font.semibold, fontSize: 14, color: color.warning },
+    avisoDuplicadoTexto: { fontFamily: font.body, fontSize: 13, lineHeight: 19, color: color.text },
     screenTitle: {
       fontFamily: font.display,
       fontSize: 30,

@@ -165,6 +165,21 @@ export type Database = {
         Update: never;
         Relationships: [];
       };
+      planes_usuario: {
+        Row: {
+          usuario_id: string;
+          plan: string;
+          estado: string;
+          vence_en: string | null;
+          producto: string | null;
+          entorno: string | null;
+          ultimo_evento_en: string;
+          actualizado_en: string;
+        };
+        Insert: never;
+        Update: never;
+        Relationships: [];
+      };
       presupuestos: {
         Row: {
           id: string;

@@ -74,7 +74,8 @@ export async function importarMovimientos(movimientos: MovimientosParaGuardar): 
   const gastos = validarTodas(movimientos.gastos, gastoSchema);
   const ingresos = validarTodas(movimientos.ingresos, ingresoSchema);
   // Con el saldo recién leído: la base rechazaría el lote entero, mejor decirlo antes.
-  if (gastos.some((g) => g.cuentaId)) {
+  // Lo del historial no mueve el saldo: no hace falta revisarlo.
+  if (gastos.some((g) => g.cuentaId && !g.historico)) {
     const negativo = saldoQuedariaNegativo(gastos, ingresos, await listarCuentas());
     if (negativo) throw new Error(negativo);
   }

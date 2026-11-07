@@ -8,6 +8,7 @@ export const ingresoSchema = z.object({
   categoriaDetalle: textoRequerido(LIMITES.detalle).optional(),
   cuentaId: z.string().uuid().optional(),
   fecha: fechaIso(),
+  historico: z.boolean().optional(),
 });
 
 export type IngresoInput = z.infer<typeof ingresoSchema>;

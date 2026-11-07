@@ -62,6 +62,11 @@ export interface Gasto {
   fecha: string;
   /** Hora real del pago, si se conoce (avisos de Apple Pay o Google Wallet confirmados). */
   pagadoEn?: string;
+  /**
+   * Del historial (importado del estado de cuenta de un mes pasado): cuenta en
+   * los resúmenes pero no mueve el saldo de la cuenta, que ya lo incluía.
+   */
+  historico?: boolean;
   createdAt: string;
 }
 
@@ -200,6 +205,11 @@ export interface Ingreso {
   categoriaDetalle?: string;
   cuentaId?: string;
   fecha: string;
+  /**
+   * Del historial (importado del estado de cuenta de un mes pasado): cuenta en
+   * los resúmenes pero no mueve el saldo de la cuenta, que ya lo incluía.
+   */
+  historico?: boolean;
   createdAt: string;
 }
 

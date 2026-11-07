@@ -51,6 +51,7 @@ export type Database = {
           meses_diferido: number | null;
           tasa_interes: number | null;
           fecha: string;
+          historico?: boolean;
           created_at: string;
           billetera: string | null;
           latitud: number | null;
@@ -72,6 +73,7 @@ export type Database = {
           meses_diferido?: number | null;
           tasa_interes?: number | null;
           fecha?: string;
+          historico?: boolean;
           created_at?: string;
           billetera?: string | null;
           latitud?: number | null;
@@ -408,6 +410,7 @@ export type Database = {
           categoria_detalle: string | null;
           cuenta_id: string | null;
           fecha: string;
+          historico?: boolean;
           created_at: string;
           usuario_id: string;
         };
@@ -419,6 +422,7 @@ export type Database = {
           categoria_detalle?: string | null;
           cuenta_id?: string | null;
           fecha?: string;
+          historico?: boolean;
           created_at?: string;
           usuario_id?: string;
         };
@@ -682,6 +686,11 @@ export type Database = {
         Args: { p_id: string };
         /** Cuántos avisos volvieron a la bandeja. */
         Returns: number;
+      };
+      resumen_anual: {
+        Args: { p_anio: number };
+        /** { anio, meses, categorias, comercios } (jsonb). */
+        Returns: unknown;
       };
       continuar_presupuestos: {
         Args: { p_mes: string };

@@ -153,8 +153,11 @@ export interface MovimientosParaGuardar {
 export function movimientosParaGuardar(
   filas: FilaImportacion[],
   cuenta: Pick<Cuenta, "id" | "tipo">,
-  categorias: Pick<Categoria, "id" | "nombre" | "tipo">[]
+  categorias: Pick<Categoria, "id" | "nombre" | "tipo">[],
+  /** Estado de un mes pasado ya reflejado en el saldo: van al historial (no mueven el saldo). */
+  historico = false
 ): MovimientosParaGuardar {
+  const marca = historico ? { historico: true } : {};
   // Solo categorías de gasto: también puede existir un «Otros» de ingresos.
   const porNombre = new Map(
     categorias.filter((c) => c.tipo !== "ingreso").map((c) => [nombreNormalizado(c.nombre), c.id])
@@ -169,14 +172,14 @@ export function movimientosParaGuardar(
     .map((f): MovimientosParaGuardar["gastos"][number] => {
       const categoriaId = porNombre.get(nombreNormalizado(f.categoriaSugerida)) ?? otros;
       if (!categoriaId) throw new Error("Falta la categoría «Otros»: créala en Categorías y vuelve a intentarlo.");
-      return { monto: f.monto, descripcion: f.descripcion, categoriaId, cuentaId: cuenta.id, metodoPago, fecha: f.fecha };
+      return { monto: f.monto, descripcion: f.descripcion, categoriaId, cuentaId: cuenta.id, metodoPago, fecha: f.fecha, ...marca };
     });
   const ingresos =
     cuenta.tipo === "credito"
       ? []
       : elegidas
           .filter((f) => f.tipo === "ingreso")
-          .map((f) => ({ monto: f.monto, descripcion: f.descripcion, cuentaId: cuenta.id, fecha: f.fecha }));
+          .map((f) => ({ monto: f.monto, descripcion: f.descripcion, cuentaId: cuenta.id, fecha: f.fecha, ...marca }));
   return { gastos, ingresos };
 }
 

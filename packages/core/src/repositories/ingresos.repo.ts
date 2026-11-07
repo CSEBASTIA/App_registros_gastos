@@ -69,6 +69,7 @@ function filaNuevaIngreso(ingreso: Omit<Ingreso, "id" | "createdAt">) {
     categoria_detalle: ingreso.categoriaDetalle ?? null,
     cuenta_id: ingreso.cuentaId ?? null,
     fecha: ingreso.fecha,
+    ...(ingreso.historico ? { historico: true } : {}),
   };
 }
 

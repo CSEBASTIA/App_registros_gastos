@@ -28,6 +28,8 @@ function filaAGasto(row: GastoRow): Gasto {
     fecha: row.fecha,
     // Sin la migración de hora del pago la columna no existe.
     pagadoEn: row.pagado_en ?? undefined,
+    // Sin la migración del historial la columna no existe.
+    ...(row.historico ? { historico: true } : {}),
     createdAt: row.created_at,
   };
 }
@@ -92,6 +94,8 @@ function filaNuevaGasto(gasto: Omit<Gasto, "id" | "createdAt">) {
     ...(gasto.lugarId !== undefined ? { lugar_id: gasto.lugarId } : {}),
     factura_path: gasto.facturaPath ?? null,
     fecha: gasto.fecha,
+    // Solo si se pide: así funciona en una base sin la migración del historial.
+    ...(gasto.historico ? { historico: true } : {}),
   };
 }
 

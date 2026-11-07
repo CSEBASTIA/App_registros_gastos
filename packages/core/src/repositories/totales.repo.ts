@@ -1,5 +1,6 @@
 import { getSupabaseClient } from "../client";
 import { validarRango } from "../lib/paginacion";
+import { resumenAnualDe, type ResumenAnual } from "../lib/resumenAnual";
 
 export interface TotalMes {
   mes: string; // "YYYY-MM"
@@ -24,4 +25,15 @@ export async function totalesPorMes(desde: string, hasta: string): Promise<Total
     totalGastos: Number(fila.total_gastos),
     totalIngresos: Number(fila.total_ingresos),
   }));
+}
+
+/**
+ * Resumen de un año (por mes, por categoría y los comercios donde más se
+ * gastó), sumado en la base. Incluye lo importado al historial.
+ */
+export async function obtenerResumenAnual(anio: number): Promise<ResumenAnual> {
+  if (!Number.isInteger(anio) || anio < 2000 || anio > 2100) throw new Error("Año inválido.");
+  const { data, error } = await getSupabaseClient().rpc("resumen_anual", { p_anio: anio });
+  if (error) throw error;
+  return resumenAnualDe(data, anio);
 }

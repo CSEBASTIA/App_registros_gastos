@@ -33,6 +33,12 @@ const ITEMS: {
     icono: "person-circle-outline",
   },
   {
+    titulo: "Resumen del año",
+    subtitulo: "Todos tus gastos del año y los estados de meses anteriores",
+    ruta: "/resumen-anual",
+    icono: "calendar-outline",
+  },
+  {
     titulo: "Cuentas",
     subtitulo: "Ahorros, débito, efectivo",
     ruta: "/cuentas",

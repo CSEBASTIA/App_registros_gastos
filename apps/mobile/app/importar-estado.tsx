@@ -5,6 +5,8 @@ import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
 import {
   ETIQUETA_BANCO,
+  etiquetaMes,
+  mesLocal,
   crearCuenta,
   cuentaDelEstado,
   parsearMonto,
@@ -60,7 +62,8 @@ const fechaCorta = (iso: string) => iso.split("-").reverse().join("/");
  * guarda hasta que la persona revisa las filas y confirma.
  */
 export default function ImportarEstadoScreen() {
-  const { cuentaId } = useLocalSearchParams<{ cuentaId: string }>();
+  // `mes`: se abrió desde el resumen anual para subir el estado de ese mes.
+  const { cuentaId, mes: mesPedido } = useLocalSearchParams<{ cuentaId: string; mes?: string }>();
   const router = useRouter();
   const { color } = useTheme();
   const styles = crearEstilos(color);
@@ -80,6 +83,8 @@ export default function ImportarEstadoScreen() {
   const [saldoNueva, setSaldoNueva] = useState("");
   const [cupoNueva, setCupoNueva] = useState("");
   const [creando, setCreando] = useState(false);
+  // Estado de un mes que ya pasó: el saldo de hoy ya lo incluye, va al historial.
+  const [historico, setHistorico] = useState(false);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [fase, setFase] = useState<Fase>("elegir");
   const [nombreArchivo, setNombreArchivo] = useState<string | null>(null);
@@ -122,7 +127,12 @@ export default function ImportarEstadoScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cuenta, cuentaId]);
 
-  const resumen = useMemo(() => (cuenta ? resumenImportacion(filas, cuenta) : null), [filas, cuenta]);
+  const resumen = useMemo(() => {
+    if (!cuenta) return null;
+    const r = resumenImportacion(filas, cuenta);
+    // Lo del historial no mueve el saldo: queda como está.
+    return historico ? { ...r, disponibleDespues: cuenta.disponible } : r;
+  }, [filas, cuenta, historico]);
   const elegidas = resumen ? resumen.gastos + resumen.ingresos : 0;
   // Una tarjeta puede pasarse del cupo (queda sobreendeudada): solo se avisa.
   const pasaElCupo = cuenta?.tipo === "credito" && !!resumen && resumen.disponibleDespues < 0;
@@ -165,6 +175,9 @@ export default function ImportarEstadoScreen() {
       throw new Error("El estado de cuenta solo trae pagos a la tarjeta: no hay consumos para importar.");
     }
     setSaldoFinalEstado(saldosDelEstado(texto).final);
+    // Si todos los movimientos son de antes de este mes, el saldo de hoy ya los incluye.
+    const masReciente = transacciones.reduce((max, t) => (t.fecha > max ? t.fecha : max), "");
+    setHistorico(masReciente !== "" && masReciente < `${mesLocal()}-01`);
     setPreparadas(preparado);
     setFilas(preparado.filas);
     setFase("revisar");
@@ -300,7 +313,7 @@ export default function ImportarEstadoScreen() {
     setError(null);
     setFase("guardando");
     try {
-      const r = await importarMovimientos(movimientosParaGuardar(filas, cuenta, categorias));
+      const r = await importarMovimientos(movimientosParaGuardar(filas, cuenta, categorias, historico));
       setResultado(textoResultadoImportacion(r));
       // Si lo importado de este mes pasó un presupuesto, avisa ya (sin esperar).
       void avisarPresupuestos();
@@ -350,6 +363,7 @@ export default function ImportarEstadoScreen() {
             Estado de cuenta
           </Text>
           <Text style={styles.intro}>
+            {mesPedido ? `Estado de cuenta de ${etiquetaMes(mesPedido)} de ${mesPedido.slice(0, 4)}. ` : ""}
             {cuenta
               ? `${cuenta.nombre}: sube el estado de cuenta y la app arma los movimientos para que los revises.`
               : "Sube el estado de cuenta en PDF que te manda el banco: la app reconoce de qué cuenta o tarjeta es (o la crea con sus datos) y arma los movimientos para que los revises."}
@@ -501,7 +515,14 @@ export default function ImportarEstadoScreen() {
               <Text style={styles.textoMuted}>
                 La categoría se sugiere sola; puedes cambiarla después en cada movimiento.
               </Text>
-              {saldoFinalEstado !== undefined && !esCredito && (
+              <Casilla marcada={historico} onChange={setHistorico} etiqueta="Es de un mes que ya pasó" disabled={fase === "guardando"}>
+                <Text style={styles.textoMuted}>
+                  {historico
+                    ? "Es de un mes que ya pasó: el saldo de hoy ya incluye estos movimientos. Se guardan en tu historial (cuentan en el resumen anual y en las categorías) sin cambiar el saldo."
+                    : "Marca esto si el estado es de un mes que ya pasó: así no se descuenta otra vez del saldo de hoy."}
+                </Text>
+              </Casilla>
+              {saldoFinalEstado !== undefined && !esCredito && !historico && (
                 <Text style={styles.textoMuted}>
                   El estado termina con un saldo de {formatMonto(saldoFinalEstado)}
                   {Math.abs(saldoFinalEstado - resumen.disponibleDespues) < 0.005

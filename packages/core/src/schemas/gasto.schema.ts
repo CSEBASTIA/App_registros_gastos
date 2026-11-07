@@ -19,6 +19,7 @@ export const gastoSchema = z
     ubicacion: ubicacionSchema.optional(),
     lugarId: z.string().uuid().optional(),
     fecha: fechaIso(),
+    historico: z.boolean().optional(),
   })
   .refine((g) => g.billetera === undefined || billeteraCompatible(g.metodoPago), {
     message: BILLETERA_SIN_TARJETA,
@@ -29,6 +30,10 @@ export const gastoSchema = z
   .refine((g) => g.metodoPago !== "diferido" || g.mesesDiferido !== undefined, {
     message: "Indica a cuántos meses es el diferido.",
     path: ["mesesDiferido"],
+  })
+  .refine((g) => !g.historico || g.metodoPago !== "diferido", {
+    message: "Un gasto de un mes pasado no puede registrarse como diferido.",
+    path: ["metodoPago"],
   })
   .refine((g) => g.metodoPago !== "diferido" || g.cuentaId !== undefined, {
     message: "Elegí una tarjeta de crédito para el diferido.",

@@ -148,7 +148,8 @@ export {
   aceptarDocumentosPendientes,
 } from "./repositories/legal.repo";
 export { obtenerMiPlan } from "./repositories/planes.repo";
-export { totalesPorMes, type TotalMes } from "./repositories/totales.repo";
+export { totalesPorMes, obtenerResumenAnual, type TotalMes } from "./repositories/totales.repo";
+export * from "./lib/resumenAnual";
 export {
   contrasenaSchema,
   validarContrasena,

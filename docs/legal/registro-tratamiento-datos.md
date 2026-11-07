@@ -53,6 +53,7 @@ Apple (Wallet y Atajos) corre en el iPhone de la persona: el atajo envía los pa
 | Clave de captura de Apple Pay: solo su huella, límite de avisos por hora y día, nunca en la URL | `captura_apple_pay.sql` |
 | Transferencias solo entre cuentas propias; nadie ve, junta ni separa las de otra persona | `transferencias.sql` |
 | El registro automático solo usa la tarjeta reconocida por sus dígitos, se puede apagar, y sus funciones internas no se llaman desde afuera | `registro_automatico.sql` |
+| Las funciones de los disparadores no se pueden llamar por la API (ni con sesión ni sin ella) | `normas_de_seguridad.sql` (N01, N05) |
 | Funciones con permisos elevados fijan `search_path` y se quitan a `anon` | `aceptaciones_legales.sql` (L26), `captura_apple_pay.sql` |
 | El plan de pago solo lo escribe el servidor con los avisos de RevenueCat que traen su clave secreta; la persona solo ve el suyo, y un aviso repetido o desordenado no cambia el plan | `planes_usuario.sql` |
 | La contraseña exige 8 o más caracteres con letras y números | `packages/core/test/acceso.test.ts` |
